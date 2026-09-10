@@ -256,6 +256,29 @@ a { color: inherit; text-decoration: none; }
 }
 .register-prompt a { color: #f1c44e; font-weight: 650; }
 
+.forgot-password-intro h1 {
+    font-size: clamp(44px, 3.8vw, 54px);
+    letter-spacing: -1.7px;
+    white-space: nowrap;
+}
+.password-reset-form { margin-top: 27px; }
+.password-reset-submit { margin-top: 20px; }
+.back-to-login {
+    width: fit-content;
+    margin-top: 34px;
+    padding: 7px 3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    color: rgba(255, 255, 255, .94);
+    border-radius: 6px;
+    font-size: 15px;
+    transition: color .18s ease, transform .18s ease;
+}
+.back-to-login:hover { color: #fff; transform: translateX(-2px); }
+.back-to-login__arrow { transform: rotate(180deg); }
+.back-to-login strong { color: #f1c44e; font-weight: 650; }
+
 @media (max-width: 1050px) {
     .login-panel {
         background-image:
@@ -304,6 +327,9 @@ a { color: inherit; text-decoration: none; }
     .login-field { height: 56px; }
     .login-options { gap: 10px; font-size: 13px; }
     .login-submit { height: 57px; font-size: 17px; }
+    .forgot-password-intro h1 { font-size: clamp(36px, 10.5vw, 41px); white-space: normal; }
+    .password-reset-submit { margin-top: 18px; }
+    .back-to-login { margin-top: 26px; font-size: 14px; }
 }
 
 @media (max-width: 355px) {
