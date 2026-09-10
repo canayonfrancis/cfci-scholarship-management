@@ -962,6 +962,7 @@ Before asking for help, check these:
 # Quick Setup Check
 
 Run all of these:
+test
 
 ```bash
 php -v
