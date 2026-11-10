@@ -8,14 +8,20 @@
         <nav class="desktop-nav" aria-label="Primary navigation">
             @php
                 $navItems = [
-                    ['Dashboard', 'home', route('dashboard'), true],
-                    ['Applications', 'applications', '#recent-applications', false],
-                    ['Students', 'users', '#recent-applications', false],
-                    ['Evaluations', 'clipboard', '#applications-trend', false],
-                    ['Scholarships', 'graduation-cap', '#scholars-by-program', false],
-                    ['Reports', 'chart', '#applications-trend', false],
-                    ['Announcements', 'megaphone', '#announcements', false],
+                    ['Dashboard', 'home', route('dashboard'), request()->routeIs('dashboard')],
+                    ['Applications', 'applications', route('dashboard').'#recent-applications', false],
                 ];
+                if (auth()->user()->can('viewAny', \App\Models\Student::class)) {
+                    $navItems[] = ['Scholars', 'users', route('scholars.index'), request()->routeIs('scholars.*')];
+                }
+                $navItems[] = ['Evaluations', 'clipboard', route('dashboard').'#applications-trend', false];
+                if (auth()->user()->can('viewAny', \App\Models\ScholarshipProgram::class)) {
+                    $navItems[] = ['Scholarships', 'graduation-cap', route('scholarship-programs.index'), request()->routeIs('scholarship-programs.*', 'academic-periods.*')];
+                }
+                $navItems[] = ['Reports', 'chart', route('dashboard').'#applications-trend', false];
+                $navItems[] = ['Announcements', 'megaphone', route('dashboard').'#announcements', false];
+                $roleLabels = auth()->user()->roles->pluck('role')->map(fn ($role) => Str::headline($role));
+                $initials = Str::of(auth()->user()->name)->trim()->explode(' ')->filter()->take(2)->map(fn ($part) => Str::upper(Str::substr($part, 0, 1)))->implode('');
             @endphp
             @foreach ($navItems as [$label, $icon, $href, $active])
                 <a href="{{ $href }}" @class(['nav-item', 'is-active' => $active]) @if($active) aria-current="page" @endif>
@@ -46,8 +52,8 @@
 
             <div class="profile-wrap">
                 <button class="profile-button" type="button" @click="profileOpen = !profileOpen; notificationsOpen = false" :aria-expanded="profileOpen" aria-label="Open user menu">
-                    <span class="avatar" aria-hidden="true">FC</span>
-                    <span class="profile-copy"><strong>{{ Auth::user()->name ?? 'Francis C. Canayon' }}</strong><small>Administrator</small></span>
+                    <span class="avatar" aria-hidden="true">{{ $initials }}</span>
+                    <span class="profile-copy"><strong>{{ Auth::user()->name }}</strong><small>{{ $roleLabels->isNotEmpty() ? $roleLabels->implode(', ') : 'No staff role assigned' }}</small></span>
                     <x-dashboard-icon name="chevron-down" :size="17" />
                 </button>
                 <div class="popover profile-popover" x-cloak x-show="profileOpen" x-transition @click.outside="profileOpen = false">
