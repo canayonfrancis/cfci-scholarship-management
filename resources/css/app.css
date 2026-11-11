@@ -340,7 +340,7 @@ a { color: inherit; text-decoration: none; }
 /* Floating application navigation */
 .site-header { position: relative; z-index: 40; padding: 10px 18px 0; }
 .topbar { width: 100%; min-height: 64px; margin: 0 auto; padding: 7px 10px 7px 20px; display: flex; align-items: center; gap: 18px; background: rgba(255,255,255,.82); border: 1px solid rgba(255,255,255,.72); border-radius: 32px; box-shadow: 0 10px 30px rgba(15,23,42,.075); backdrop-filter: blur(16px); }
-.brand { width: 225px; min-width: 225px; height: 50px; display: inline-flex; align-items: center; border-radius: 16px; outline-offset: 3px; }
+.brand { flex-shrink: 0; width: 225px; min-width: 225px; height: 50px; display: inline-flex; align-items: center; border-radius: 16px; outline-offset: 3px; }
 .brand-logo { width: 210px; height: auto; max-height: 41px; display: block; object-fit: contain; object-position: left center; }
 .brand-mark { position: relative; width: 44px; height: 48px; flex: none; }
 .brand-mark .leaf, .mini-leaves i, .mini-leaves b, .cta-leaves i, .cta-leaves b { position: absolute; display: block; background: var(--brand-gold); transform-origin: bottom center; }
@@ -351,12 +351,21 @@ a { color: inherit; text-decoration: none; }
 .brand-copy { display: flex; flex-direction: column; line-height: 1; }
 .brand-copy strong { font-size: 25px; letter-spacing: -.6px; color: #101318; }
 .brand-copy small { margin-top: 5px; color: var(--text-secondary); font-size: 11px; font-weight: 500; }
-.desktop-nav { flex: 1 1 auto; min-width: 705px; max-width: 810px; margin: 0 auto; padding: 4px; display: flex; align-items: center; justify-content: center; gap: 2px; background: rgba(255,255,255,.56); border-radius: 25px; }
+.desktop-nav-wrap { position: relative; flex: 1 1 0%; min-width: 0; max-width: 810px; margin: 0 auto; background: rgba(255,255,255,.56); border-radius: 25px; overflow: hidden; isolation: isolate; }
+.desktop-nav { width: 100%; min-width: 0; padding: 4px; display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; border-radius: inherit; }
+.desktop-nav::-webkit-scrollbar { display: none; }
+.desktop-nav > .nav-item { flex: 0 0 auto; }
+.desktop-nav > .nav-item:first-child { margin-inline-start: auto; }
+.desktop-nav > .nav-item:last-child { margin-inline-end: auto; }
+.desktop-nav-wrap::before, .desktop-nav-wrap::after { content: ''; position: absolute; z-index: 1; inset-block: 0; width: 32px; pointer-events: none; opacity: 0; transition: opacity .2s ease; }
+.desktop-nav-wrap::before { left: 0; background: linear-gradient(to right, rgba(255,255,255,.98), rgba(255,255,255,0)); }
+.desktop-nav-wrap::after { right: 0; background: linear-gradient(to left, rgba(255,255,255,.98), rgba(255,255,255,0)); }
+.desktop-nav-wrap.can-scroll-left::before, .desktop-nav-wrap.can-scroll-right::after { opacity: 1; }
 .nav-item { min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: #263149; font-size: 13px; font-weight: 500; border-radius: 22px; transition: .2s ease; white-space: nowrap; }
 .nav-item:hover { color: var(--brand-primary); background: #fff5f4; }
 .nav-item.is-active { padding-inline: 20px; color: #fff; background: var(--brand-primary); font-weight: 600; }
 .nav-item.is-active:hover { color: #fff; background: var(--brand-primary-hover); }
-.topbar-actions { min-width: 314px; display: flex; justify-content: flex-end; align-items: center; gap: 7px; }
+.topbar-actions { flex: 0 0 auto; min-width: 314px; display: flex; justify-content: flex-end; align-items: center; gap: 7px; }
 .round-button { position: relative; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 50%; color: #253047; background: rgba(255,255,255,.62); cursor: pointer; transition: .2s; }
 .round-button:hover { color: var(--brand-primary); background: #fff; box-shadow: 0 5px 16px rgba(15,23,42,.06); }
 .notification-dot { position: absolute; top: 7px; right: 8px; width: 8px; height: 8px; background: var(--brand-primary); border: 2px solid white; border-radius: 50%; box-sizing: content-box; }
@@ -554,7 +563,6 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
 @media (max-width: 1470px) {
     .brand { width: 195px; min-width: 195px; }
     .brand-logo { width: 184px; }
-    .desktop-nav { min-width: 635px; }
     .nav-item { padding-inline: 9px; font-size: 12px; gap: 6px; }
     .nav-item.is-active { padding-inline: 14px; }
     .topbar-actions { min-width: 288px; }
@@ -568,8 +576,6 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
 }
 
 @media (max-width: 1240px) {
-    .desktop-nav { min-width: 0; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
-    .desktop-nav::-webkit-scrollbar { display: none; }
     .brand { width: 163px; min-width: 163px; }
     .brand-logo { width: 152px; }
     .topbar-actions { min-width: 240px; }
@@ -590,7 +596,7 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
     .topbar { min-height: 62px; padding-left: 15px; border-radius: 25px; }
     .brand { width: 178px; min-width: 0; margin-right: auto; }
     .brand-logo { width: 168px; }
-    .desktop-nav, .topbar-actions .search-wrap, .profile-wrap .profile-button .dashboard-icon { display: none; }
+    .desktop-nav-wrap, .topbar-actions .search-wrap, .profile-wrap .profile-button .dashboard-icon { display: none; }
     .topbar-actions { min-width: 0; flex: none; }
     .profile-wrap { display: block; }
     .profile-button { width: 44px; height: 44px; min-width: 44px; padding: 2px; }
@@ -677,6 +683,11 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
 }
 
 /* Scholar records use the existing dashboard palette, cards, and navigation. */
+.scholar-form-intro { margin-bottom: 20px; }
+.scholar-missing-fields { margin-top: 12px; padding-left: 20px; list-style: disc; color: var(--text-secondary); font-size: 13px; line-height: 1.8; }
+.scholar-section-title { margin-top: 24px; }
+.scholar-program-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.scholar-program-row p { min-width: 0; overflow-wrap: anywhere; }
 .records-page { padding-top: 5px; }
 .records-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 22px; }
 .records-eyebrow { margin: 0 0 7px !important; color: var(--brand-primary) !important; font-size: 11px !important; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }

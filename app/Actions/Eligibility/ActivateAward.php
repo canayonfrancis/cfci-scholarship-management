@@ -50,7 +50,7 @@ class ActivateAward
                 $approval = $application->externalApprovals()->where('scope', 'semester')->orderByDesc('id')->lockForUpdate()->first();
                 $today = now('Asia/Manila')->toDateString();
                 if (! $approval || $approval->id !== $expectedApproval || $approval->decision !== 'approved' || ! $approval->recorded_by || ! $approval->decided_on || ! trim($approval->reference ?? '') ||
-                    $approval->authority !== ($application->program->code === 'EDUKAR' ? 'EDUKAR/AKLAT' : 'CHED/UniFAST') || $approval->decided_on->toDateString() > $today ||
+                    (! trim($approval->authority ?? '') || ($application->program->expectedApprovalAuthority() !== null && $approval->authority !== $application->program->expectedApprovalAuthority())) || $approval->decided_on->toDateString() > $today ||
                     $approval->assignment_id !== $assignment->id || $approval->academic_period_id !== $application->academic_period_id ||
                     ($approval->valid_from && $approval->valid_from->toDateString() > $today) || ($approval->valid_until && $approval->valid_until->toDateString() < $today) ||
                     ! $approval->documents()->get()->contains(fn ($document) => $this->evidence->usable($document))) {

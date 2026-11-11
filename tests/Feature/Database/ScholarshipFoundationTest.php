@@ -39,9 +39,9 @@ class ScholarshipFoundationTest extends TestCase
         $this->seed(ScholarshipProgramSeeder::class);
         $this->seed(ScholarshipProgramSeeder::class);
 
-        $this->assertSame(3, ScholarshipProgram::count());
-        $this->assertSame('7500.00', ScholarshipProgram::where('code', 'TDP')->first()->school_stated_semester_amount);
-        $this->assertSame('13500.00', ScholarshipProgram::where('code', 'TES')->first()->school_stated_semester_amount);
+        $this->assertSame(4, ScholarshipProgram::count());
+        $this->assertSame('13500.00', ScholarshipProgram::where('code', 'TDP')->first()->school_stated_semester_amount);
+        $this->assertSame('7500.00', ScholarshipProgram::where('code', 'TES')->first()->school_stated_semester_amount);
         $edukar = ScholarshipProgram::where('code', 'EDUKAR')->first();
         $this->assertNull($edukar->school_stated_semester_amount);
         $this->assertSame(5, $edukar->planning_duration_years);

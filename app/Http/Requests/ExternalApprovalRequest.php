@@ -18,7 +18,7 @@ class ExternalApprovalRequest extends FormRequest
         return [
             'previous_approval' => ['required', 'integer', 'min:0'],
             'decision' => ['required', Rule::in(['approved', 'rejected', 'revoked'])],
-            'authority' => ['required', Rule::in([$this->route('application')->program->code === 'EDUKAR' ? 'EDUKAR/AKLAT' : 'CHED/UniFAST'])],
+            'authority' => ['required', 'string', 'max:255', 'regex:/\\S/', ...($this->route('application')->program->expectedApprovalAuthority() ? [Rule::in([$this->route('application')->program->expectedApprovalAuthority()])] : [])],
             'reference' => ['required', 'string', 'max:255'],
             'decided_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.now('Asia/Manila')->toDateString()],
             'valid_from' => ['nullable', 'date_format:Y-m-d'],

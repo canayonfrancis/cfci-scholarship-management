@@ -77,7 +77,7 @@ class ScholarRecordsTest extends TestCase
 
     public static function roles(): array
     {
-        return [['administrator', true, true, true], ['coordinator', true, false, true], ['registrar', true, false, false], ['finance', false, false, false], ['viewer', false, false, false]];
+        return [['administrator', true, true, true], ['coordinator', true, false, false], ['registrar', true, false, false], ['finance', false, false, false], ['viewer', false, false, false]];
     }
 
     #[DataProvider('roles')]
@@ -131,7 +131,7 @@ class ScholarRecordsTest extends TestCase
         $this->assertSame(['registrar'], $actor->roles()->pluck('role')->all());
         $this->get(route('scholars.edit', $scholar))->assertOk();
         $this->patch(route('scholars.update', $scholar), $this->scholarData(['student_number' => 'CFC-010', 'phone' => '+63 900 123 4567']))->assertSessionHasNoErrors()->assertRedirect(route('scholars.show', $scholar));
-        $this->assertSame('+63 900 123 4567', $scholar->fresh()->phone);
+        $this->assertSame('9001234567', $scholar->fresh()->phone);
         $this->assertSame(2, AuditEvent::where('subject_type', Student::class)->where('subject_id', $scholar->id)->count());
     }
 
@@ -168,18 +168,19 @@ class ScholarRecordsTest extends TestCase
         $this->get(route('scholars.index', ['record_status' => 'archived']))->assertOk()->assertSeeText('Ana Dela Cruz')->assertDontSeeText('Group Dela');
     }
 
-    public function test_programs_support_the_three_codes_and_keep_unknown_edukar_amount_null(): void
+    public function test_program_codes_are_configurable_and_unknown_edukar_amount_stays_null(): void
     {
         $this->actingAs($this->staff());
-        foreach (['TDP' => '7500.00', 'TES' => '13500.00', 'EDUKAR' => null] as $code => $amount) {
+        foreach (['TDP' => '13500.00', 'TES' => '7500.00', 'EDUKAR' => null] as $code => $amount) {
             $this->post(route('scholarship-programs.store'), $this->programData(['code' => $code, 'name' => $code, 'school_stated_semester_amount' => $amount, 'planning_duration_years' => $code === 'EDUKAR' ? 5 : 4]))->assertSessionHasNoErrors()->assertRedirect();
         }
         $edukar = ScholarshipProgram::where('code', 'EDUKAR')->firstOrFail();
         $this->assertNull($edukar->school_stated_semester_amount);
         $this->get(route('scholarship-programs.show', $edukar))->assertOk()->assertSeeText('Unconfirmed')->assertSeeText('5 years');
         $this->post(route('scholarship-programs.store'), $this->programData(['code' => 'tes']))->assertSessionHasErrors('code');
-        $this->post(route('scholarship-programs.store'), $this->programData(['code' => 'UNKNOWN']))->assertSessionHasErrors('code');
-        $this->assertSame(3, ScholarshipProgram::count());
+        $this->post(route('scholarship-programs.store'), $this->programData(['code' => 'NEW-AID']))->assertSessionHasNoErrors();
+        $this->post(route('scholarship-programs.store'), $this->programData(['code' => 'INVALID PROGRAM']))->assertSessionHasErrors('code');
+        $this->assertSame(4, ScholarshipProgram::count());
     }
 
     public function test_program_updates_preserve_identity_and_require_a_source_for_amount_changes(): void
@@ -224,7 +225,7 @@ class ScholarRecordsTest extends TestCase
     public function test_assignment_creation_is_audited_and_does_not_create_evaluations_bills_or_external_approval(): void
     {
         $g = $this->fixtures();
-        $actor = $this->staff('coordinator');
+        $actor = $this->staff('administrator');
         $this->actingAs($actor)->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g) + ['activated_by' => 9999, 'student_id' => 9999])->assertSessionHasNoErrors()->assertRedirect(route('scholars.show', $g['scholar']));
         $assignment = ScholarshipAssignment::firstOrFail();
         $this->assertSame($g['scholar']->id, $assignment->student_id);
@@ -240,7 +241,7 @@ class ScholarRecordsTest extends TestCase
     public function test_a_second_active_program_is_rejected_with_a_field_error_and_no_extra_history(): void
     {
         $g = $this->fixtures();
-        $this->actingAs($this->staff('coordinator'));
+        $this->actingAs($this->staff('administrator'));
         // Retained pre-module active assignment; new activation is tested by the evaluation workflow.
         ScholarshipAssignment::create(['student_id' => $g['scholar']->id, 'program_id' => $g['program']->id, 'status' => 'active']);
         $tes = ScholarshipProgram::create(['code' => 'TES', 'name' => 'TES']);
@@ -252,7 +253,7 @@ class ScholarRecordsTest extends TestCase
     public function test_pending_duplicates_are_prevented_and_activation_requires_the_evaluation_workflow(): void
     {
         $g = $this->fixtures();
-        $this->actingAs($this->staff('coordinator'));
+        $this->actingAs($this->staff('administrator'));
         $pending = $this->assignmentData($g, ['status' => 'pending']);
         $this->post(route('scholars.assignments.store', $g['scholar']), $pending)->assertSessionHasNoErrors();
         $this->post(route('scholars.assignments.store', $g['scholar']), $pending)->assertSessionHasErrors('program_id');
@@ -268,7 +269,7 @@ class ScholarRecordsTest extends TestCase
     public function test_relinquishing_retains_history_and_allows_a_new_program_without_reopening_the_old_assignment(): void
     {
         $g = $this->fixtures();
-        $this->actingAs($this->staff('coordinator'));
+        $this->actingAs($this->staff('administrator'));
         $old = ScholarshipAssignment::create(['student_id' => $g['scholar']->id, 'program_id' => $g['program']->id, 'start_period_id' => $g['period']->id, 'status' => 'active']);
         $closed = $this->assignmentData($g, ['status' => 'relinquished', 'end_period_id' => $g['period']->id, 'ends_on' => '2026-11-11', 'status_reason' => 'Scholar relinquished TDP by written request']);
         $this->patch(route('scholars.assignments.update', [$g['scholar'], $old]), $closed)->assertSessionHasNoErrors();

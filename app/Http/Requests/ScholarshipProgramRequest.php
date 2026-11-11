@@ -35,7 +35,7 @@ class ScholarshipProgramRequest extends FormRequest
         );
 
         return [
-            'code' => ['bail', 'required', 'string', Rule::in($program instanceof ScholarshipProgram ? [$program->code] : ['TDP', 'TES', 'EDUKAR']), Rule::unique('scholarship_programs')->ignore($program)],
+            'code' => ['bail', 'required', 'string', 'max:30', 'regex:/^[A-Z][A-Z0-9_-]*$/D', ...($program instanceof ScholarshipProgram ? [Rule::in([$program->code])] : []), Rule::unique('scholarship_programs')->ignore($program)],
             'name' => ['required', 'string', 'max:255'],
             'school_stated_semester_amount' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'planning_duration_years' => ['nullable', 'integer', 'min:1', 'max:65535'],
@@ -46,6 +46,6 @@ class ScholarshipProgramRequest extends FormRequest
 
     public function messages(): array
     {
-        return ['code.in' => 'Use the existing program code; TDP, TES, and EDUKAR are the supported programs.', 'source_notes.required' => 'Record the school source or reason for changing the reference amount.'];
+        return ['code.in' => 'Keep the existing program code to preserve its historical identity.', 'source_notes.required' => 'Record the school source or reason for changing the reference amount.'];
     }
 }

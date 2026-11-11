@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ScholarshipAssignmentPolicy extends RecordPolicy
 {
-    protected const WRITERS = ['administrator', 'coordinator'];
+    protected const WRITERS = ['administrator'];
 
     public function update(User $user, Model $record): bool
     {

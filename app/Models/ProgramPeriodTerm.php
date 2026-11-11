@@ -12,6 +12,10 @@ class ProgramPeriodTerm extends Model
         'program_id',
         'academic_period_id',
         'semester_gross_amount',
+        'billing_policy',
+        'billing_source_reference',
+        'billing_confirmed_by',
+        'billing_confirmed_at',
         'criteria',
         'rule_version',
         'source_reference',
@@ -25,6 +29,7 @@ class ProgramPeriodTerm extends Model
             'semester_gross_amount' => 'decimal:2',
             'criteria' => 'array',
             'confirmed_at' => 'immutable_datetime',
+            'billing_confirmed_at' => 'immutable_datetime',
         ];
     }
 
@@ -43,6 +48,11 @@ class ProgramPeriodTerm extends Model
         return $this->belongsTo(User::class, 'confirmed_by');
     }
 
+    public function billingConfirmedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'billing_confirmed_by');
+    }
+
     public function applications(): HasMany
     {
         return $this->hasMany(ScholarshipApplication::class, 'program_period_term_id');
@@ -56,5 +66,15 @@ class ProgramPeriodTerm extends Model
     public function fundingReceipts(): HasMany
     {
         return $this->hasMany(FundingReceipt::class, 'program_period_term_id');
+    }
+
+    public function rates(): HasMany
+    {
+        return $this->hasMany(ScholarshipRate::class, 'program_period_term_id');
+    }
+
+    public function budgets(): HasMany
+    {
+        return $this->hasMany(ScholarshipBudget::class, 'program_period_term_id');
     }
 }

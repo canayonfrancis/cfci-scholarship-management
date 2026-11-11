@@ -23,7 +23,7 @@ class ScholarshipAssignmentRequest extends FormRequest
         $closed = in_array($this->input('status'), ['ended', 'relinquished'], true);
 
         return [
-            'program_id' => ['required', 'integer', Rule::exists('scholarship_programs', 'id')->whereIn('code', ['TDP', 'TES', 'EDUKAR']), ...($assignment ? [Rule::in([$assignment->program_id])] : [])],
+            'program_id' => ['required', 'integer', Rule::exists('scholarship_programs', 'id'), ...($assignment ? [Rule::in([$assignment->program_id])] : [])],
             'start_period_id' => ['required', 'integer', 'exists:academic_periods,id', ...($assignment?->start_period_id !== null && $assignment ? [Rule::in([$assignment->start_period_id])] : [])],
             'status' => ['required', Rule::in(['pending', 'active', 'ended', 'relinquished'])],
             'starts_on' => ['nullable', 'date_format:Y-m-d'],

@@ -5,25 +5,30 @@
             <img class="brand-logo" src="{{ asset('images/cfc-logo.webp') }}" alt="Cronasia Foundation College, Inc.">
         </a>
 
-        <nav class="desktop-nav" aria-label="Primary navigation">
+        <div class="desktop-nav-wrap" x-data="scrollableNavigation" :class="{ 'can-scroll-left': canScrollLeft, 'can-scroll-right': canScrollRight }">
+        <nav class="desktop-nav" x-ref="navigation" aria-label="Primary navigation" tabindex="0" @scroll.passive="updateScrollEdges()">
             @php
                 $navItems = [
                     ['Dashboard', 'home', route('dashboard'), request()->routeIs('dashboard')],
                 ];
+                if (auth()->user()->can('viewAny', \App\Models\ScholarshipApplication::class)) {
+                    $navItems[] = ['Evaluations', 'clipboard', route('evaluations.index'), request()->routeIs('evaluations.*')];
+                }
                 if (auth()->user()->can('viewAny', \App\Models\AcademicRecord::class)) {
-                    $navItems[] = ['Academic records', 'applications', route('academic-verifications.index'), request()->routeIs('academic-verifications.*')];
+                    $navItems[] = ['Academic verification', 'check-circle', route('academic-verifications.index'), request()->routeIs('academic-verifications.*')];
                 }
                 if (auth()->user()->can('viewAny', \App\Models\Student::class)) {
                     $navItems[] = ['Scholars', 'users', route('scholars.index'), request()->routeIs('scholars.*')];
                 }
-                if (auth()->user()->can('viewAny', \App\Models\ScholarshipApplication::class)) {
-                    $navItems[] = ['Evaluations', 'clipboard', route('evaluations.index'), request()->routeIs('evaluations.*')];
-                }
                 if (auth()->user()->can('viewAny', \App\Models\ScholarshipProgram::class)) {
-                    $navItems[] = ['Scholarships', 'graduation-cap', route('scholarship-programs.index'), request()->routeIs('scholarship-programs.*', 'academic-periods.*')];
+                    $navItems[] = ['Scholarship programs', 'graduation-cap', route('scholarship-programs.index'), request()->routeIs('scholarship-programs.*')];
                 }
-                $navItems[] = ['Reports', 'chart', route('dashboard').'#applications-trend', false];
-                $navItems[] = ['Announcements', 'megaphone', route('dashboard').'#announcements', false];
+                if (auth()->user()->can('viewAny', \App\Models\AcademicPeriod::class)) {
+                    $navItems[] = ['Academic periods', 'calendar', route('academic-periods.index'), request()->routeIs('academic-periods.*')];
+                }
+                if (auth()->user()->can('viewAny', \App\Models\BillingBatch::class)) {
+                    $navItems[] = ['Billing batches', 'clipboard', route('billing-batches.index'), request()->routeIs('billing-batches.*')];
+                }
                 $roleLabels = auth()->user()->roles->pluck('role')->map(fn ($role) => Str::headline($role));
                 $initials = Str::of(auth()->user()->name)->trim()->explode(' ')->filter()->take(2)->map(fn ($part) => Str::upper(Str::substr($part, 0, 1)))->implode('');
             @endphp
@@ -33,6 +38,7 @@
                 </a>
             @endforeach
         </nav>
+        </div>
 
         <div class="topbar-actions">
             <div class="search-wrap" :class="{ 'is-open': searching }">

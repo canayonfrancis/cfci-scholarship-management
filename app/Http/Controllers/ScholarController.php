@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Actions\Records\RecordAudit;
 use App\Http\Requests\ScholarRequest;
+use App\Models\AcademicPeriod;
+use App\Models\AcademicProgram;
 use App\Models\AuditEvent;
 use App\Models\ScholarshipAssignment;
 use App\Models\ScholarshipProgram;
@@ -23,7 +25,7 @@ class ScholarController extends Controller
     {
         Gate::authorize('viewAny', Student::class);
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'record_status' => ['nullable', Rule::in(['active', 'archived'])], 'program_id' => ['nullable', 'integer', 'exists:scholarship_programs,id']]);
-        $query = Student::with('activeAssignment.program')->withCount('assignments');
+        $query = Student::with(['activeAssignment.program', 'academicProgram', 'academicPeriod'])->withCount('assignments');
         foreach (preg_split('/\s+/u', trim($filters['q'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) as $word) {
             $query->where(function ($query) use ($word) {
                 foreach (['student_number', 'first_name', 'middle_name', 'last_name', 'email'] as $column) {
@@ -41,7 +43,9 @@ class ScholarController extends Controller
     {
         Gate::authorize('create', Student::class);
 
-        return view('scholars.form', ['scholar' => new Student(['record_status' => 'active'])]);
+        $scholar = new Student(['record_status' => 'active']);
+
+        return view('scholars.form', ['scholar' => $scholar, ...$this->choices($scholar)]);
     }
 
     public function store(ScholarRequest $request, RecordAudit $audit): RedirectResponse
@@ -63,17 +67,20 @@ class ScholarController extends Controller
     public function show(Student $scholar): View
     {
         Gate::authorize('view', $scholar);
-        $scholar->load(['assignments' => fn ($query) => $query->with(['program', 'startPeriod', 'endPeriod', 'activatedBy', 'closedBy'])->orderByDesc('id')]);
+        $scholar->load(['academicProgram', 'academicPeriod', 'assignments' => fn ($query) => $query->with(['program', 'startPeriod', 'endPeriod', 'activatedBy', 'closedBy'])->orderByDesc('id')]);
         $history = AuditEvent::with('actor')->where('subject_type', ScholarshipAssignment::class)->whereIn('subject_id', $scholar->assignments->modelKeys())->latest('id')->get();
+        $profileHistory = AuditEvent::where('subject_type', Student::class)->where('subject_id', $scholar->id)
+            ->whereIn('action', ['scholar_created', 'scholar_updated', 'sample_profile_created'])
+            ->whereNotNull('after_state->academic_period_id')->latest('id')->paginate(10, ['*'], 'profile_history_page');
 
-        return view('scholars.show', compact('scholar', 'history'));
+        return view('scholars.show', compact('scholar', 'history', 'profileHistory'));
     }
 
     public function edit(Student $scholar): View
     {
         Gate::authorize('update', $scholar);
 
-        return view('scholars.form', compact('scholar'));
+        return view('scholars.form', ['scholar' => $scholar, ...$this->choices($scholar)]);
     }
 
     public function update(ScholarRequest $request, Student $scholar, RecordAudit $audit): RedirectResponse
@@ -93,5 +100,13 @@ class ScholarController extends Controller
         }
 
         return to_route('scholars.show', $scholar)->with('status', 'Scholar record updated.');
+    }
+
+    private function choices(Student $scholar): array
+    {
+        return [
+            'academicPrograms' => AcademicProgram::where('is_active', true)->orWhere('id', $scholar->academic_program_id)->orderBy('name')->get(),
+            'periods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),
+        ];
     }
 }

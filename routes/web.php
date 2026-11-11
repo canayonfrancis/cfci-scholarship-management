@@ -1,12 +1,15 @@
 <?php
 
 use App\Http\Controllers\AcademicPeriodController;
+use App\Http\Controllers\AcademicProgramController;
 use App\Http\Controllers\AcademicVerificationController;
+use App\Http\Controllers\BillingBatchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScholarController;
 use App\Http\Controllers\ScholarshipAssignmentController;
 use App\Http\Controllers\ScholarshipEvaluationController;
+use App\Http\Controllers\ScholarshipFundsController;
 use App\Http\Controllers\ScholarshipProgramController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +20,19 @@ Route::get('/dashboard', DashboardController::class)
     ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::resource('academic-programs', AcademicProgramController::class)->only(['index', 'store', 'update']);
+    Route::get('billing-batches', [BillingBatchController::class, 'index'])->name('billing-batches.index');
+    Route::post('billing-batches/terms', [BillingBatchController::class, 'configure'])->name('billing-batches.terms');
+    Route::post('billing-batches', [BillingBatchController::class, 'store'])->name('billing-batches.store');
+    Route::get('billing-batches/report', [ScholarshipFundsController::class, 'report'])->name('billing-batches.report');
+    Route::post('billing-batches/budget', [ScholarshipFundsController::class, 'budget'])->name('billing-batches.budget');
+    Route::post('billing-batches/{batch}/approve', [ScholarshipFundsController::class, 'approve'])->name('billing-batches.approve');
+    Route::post('billing-batches/{batch}/items/{item}/adjust', [ScholarshipFundsController::class, 'adjust'])->name('billing-batches.items.adjust');
+    Route::get('billing-batches/{batch}', [BillingBatchController::class, 'show'])->name('billing-batches.show');
+    Route::patch('billing-batches/{batch}', [BillingBatchController::class, 'update'])->name('billing-batches.update');
+    Route::post('billing-batches/{batch}/items', [BillingBatchController::class, 'add'])->name('billing-batches.items.store');
+    Route::delete('billing-batches/{batch}/items/{item}', [BillingBatchController::class, 'remove'])->name('billing-batches.items.destroy');
+    Route::post('billing-batches/{batch}/submit', [BillingBatchController::class, 'submit'])->name('billing-batches.submit');
     Route::post('academic-periods/validation-context', [AcademicPeriodController::class, 'saveContext'])->name('academic-periods.context');
     Route::get('evaluations', [ScholarshipEvaluationController::class, 'index'])->name('evaluations.index');
     Route::get('evaluations/create', [ScholarshipEvaluationController::class, 'create'])->name('evaluations.create');
@@ -33,7 +49,7 @@ Route::middleware('auth')->group(function () {
     Route::post('academic-verifications/{verification}/correction', [AcademicVerificationController::class, 'correct'])->name('academic-verifications.correct');
     Route::get('academic-verifications/{verification}/certificates/{document}', [AcademicVerificationController::class, 'certificate'])->name('academic-verifications.certificate');
     Route::resource('academic-verifications', AcademicVerificationController::class)->parameters(['academic-verifications' => 'verification'])->except('destroy');
-    Route::resource('scholars', ScholarController::class)->except('destroy');
+    Route::resource('scholars', ScholarController::class)->except('destroy')->middleware('cache.headers:no_store;private');
     Route::resource('scholarship-programs', ScholarshipProgramController::class)->parameters(['scholarship-programs' => 'program'])->except('destroy');
     Route::resource('academic-periods', AcademicPeriodController::class)->parameters(['academic-periods' => 'period'])->except('destroy');
     Route::scopeBindings()->group(function () {

@@ -54,4 +54,13 @@ class ScholarshipProgram extends Model
     {
         return $this->hasMany(FundingReceipt::class, 'program_id');
     }
+
+    public function expectedApprovalAuthority(): ?string
+    {
+        return match ($this->code) {
+            'TDP', 'TES' => 'CHED/UniFAST',
+            'EDUKAR' => 'EDUKAR/AKLAT',
+            default => null,
+        };
+    }
 }

@@ -2,7 +2,12 @@
 
 namespace Tests\Feature\Database;
 
+use App\Models\AcademicPeriod;
 use App\Models\BillingBatch;
+use App\Models\ProgramPeriodTerm;
+use App\Models\ScholarshipApplication;
+use App\Models\ScholarshipAssignment;
+use App\Models\ScholarshipProgram;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -35,7 +40,9 @@ class ScholarshipConcurrencyTest extends TestCase
 
         try {
             (require database_path('migrations/0001_01_01_000000_create_users_table.php'))->up();
-            (require database_path('migrations/2026_11_11_000000_create_scholarship_foundation_tables.php'))->up();
+            foreach (glob(database_path('migrations/2026_11_11_*.php')) as $migration) {
+                (require $migration)->up();
+            }
             $g = $this->applicationContext();
             $g['assignment']->update(['status' => 'ended']);
             $assignment = ['student_id' => $g['student']->id, 'program_id' => $g['program']->id, 'status' => 'active'];
@@ -47,6 +54,18 @@ class ScholarshipConcurrencyTest extends TestCase
             ]);
             $item = $this->billingItemData($g);
             $this->assertCompetingInsertIsRejected('billing_items', $item, array_replace($item, ['billing_batch_id' => $secondBatch->id]), $connection);
+            // Different assignments and programs must also compete for the same scholar/semester slot.
+            $period = AcademicPeriod::create(['academic_year' => '2026-2027', 'semester_code' => '2']);
+            $rows = [];
+            foreach (['TDP', 'TES'] as $code) {
+                $program = ScholarshipProgram::firstOrCreate(['code' => $code], ['name' => $code]);
+                $terms = ProgramPeriodTerm::create(['program_id' => $program->id, 'academic_period_id' => $period->id]);
+                $assignment = ScholarshipAssignment::create(['student_id' => $g['student']->id, 'program_id' => $program->id, 'start_period_id' => $period->id]);
+                $application = ScholarshipApplication::create(['student_id' => $g['student']->id, 'program_id' => $program->id, 'academic_period_id' => $period->id, 'program_period_term_id' => $terms->id, 'assignment_id' => $assignment->id]);
+                $batch = BillingBatch::create(['program_period_term_id' => $terms->id, 'program_id' => $program->id, 'academic_period_id' => $period->id, 'batch_number' => 'Cross-program race']);
+                $rows[] = ['billing_batch_id' => $batch->id, 'application_id' => $application->id, 'assignment_id' => $assignment->id, 'student_id' => $g['student']->id, 'program_id' => $program->id, 'academic_period_id' => $period->id];
+            }
+            $this->assertCompetingInsertIsRejected('billing_items', $rows[0], $rows[1], $connection);
             $revision = ['student_id' => $g['student']->id, 'academic_period_id' => $g['period']->id, 'revision' => 2, 'supersedes_id' => $g['record']->id];
             $this->assertCompetingInsertIsRejected('academic_records', $revision, $revision, $connection);
             $evaluation = ['application_id' => $g['application']->id, 'student_id' => $g['student']->id, 'program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'run_number' => 2, 'application_revision' => 1];
@@ -90,8 +109,19 @@ class ScholarshipConcurrencyTest extends TestCase
 
         try {
             $connection->table($table)->insert($first);
-            $process->start();
-            $this->assertTrue($process->waitUntil(fn ($type, $output) => str_contains($output, 'READY')));
+            // Accumulate from start: waitUntil can consume READY during its initial
+            // status refresh before installing its readiness callback on Windows.
+            $readiness = '';
+            $process->start(function ($type, $output) use (&$readiness) {
+                if ($type === Process::OUT) {
+                    $readiness .= $output;
+                }
+            });
+            $deadline = microtime(true) + 10;
+            while (! str_contains($readiness, 'READY') && $process->isRunning() && microtime(true) < $deadline) {
+                usleep(1000);
+            }
+            $this->assertStringContainsString('READY', $readiness, $process->getErrorOutput());
             usleep(100000);
             $this->assertTrue($process->isRunning(), 'The competing writer should wait for the first writer to commit.');
             $connection->commit();

@@ -9,6 +9,7 @@ use App\Models\Student;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class SaveScholarshipAssignment
@@ -22,6 +23,7 @@ class SaveScholarshipAssignment
                 // All assignment changes serialize on the same student, not just the chosen program.
                 $student = Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
                 $current = $assignment ? $student->assignments()->whereKey($assignment->id)->lockForUpdate()->firstOrFail() : new ScholarshipAssignment;
+                Gate::forUser($actor)->authorize($current->exists ? 'update' : 'create', $current->exists ? $current : ScholarshipAssignment::class);
                 if ($current->exists && ! in_array($current->status, ['pending', 'active'], true)) {
                     throw ValidationException::withMessages(['status' => 'Historical and suspended scholarships cannot be rewritten.']);
                 }

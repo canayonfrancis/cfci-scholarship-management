@@ -48,7 +48,7 @@ class ScholarshipAssignmentController extends Controller
     {
         return view('assignments.form', [
             'scholar' => $scholar, 'assignment' => $assignment,
-            'programs' => ScholarshipProgram::whereIn('code', ['TDP', 'TES', 'EDUKAR'])->orderBy('code')->get(),
+            'programs' => ScholarshipProgram::orderBy('code')->get(),
             'periods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),
         ]);
     }

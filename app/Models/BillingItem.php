@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Billing\Money;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -83,5 +84,15 @@ class BillingItem extends Model
     public function payouts(): HasMany
     {
         return $this->hasMany(Payout::class, 'billing_item_id');
+    }
+
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(BillingAdjustment::class, 'billing_item_id');
+    }
+
+    public function effectiveAmount(): string
+    {
+        return Money::decimal(Money::cents($this->gross_amount) + Money::signedTotal($this->adjustments()->get()));
     }
 }

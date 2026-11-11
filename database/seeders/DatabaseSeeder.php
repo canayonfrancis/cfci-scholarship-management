@@ -5,21 +5,34 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Seed a repeatable administrator account for local testing.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        DB::transaction(function () {
+            $admin = User::firstOrCreate(
+                ['email' => 'test@example.com'],
+                [
+                    'name' => 'Test Admin',
+                    'email_verified_at' => now(),
+                    'password' => 'admin123',
+                ],
+            );
+
+            if ($admin->wasRecentlyCreated) {
+                $admin->roles()->firstOrCreate(['role' => 'administrator']);
+            }
+        });
     }
 }
