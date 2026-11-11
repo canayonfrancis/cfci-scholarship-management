@@ -1,0 +1,16 @@
+<x-records-page title="Academic verification" description="Registrar records of enrollment and academic standing, with retained revisions and private certificates.">
+    <x-slot:actions>@can('create', \App\Models\AcademicRecord::class)<a class="records-button is-primary" href="{{ route('academic-verifications.create') }}">Add academic record</a>@endcan</x-slot:actions>
+    <section class="dashboard-card records-card">
+        <form method="GET" class="records-filters" action="{{ route('academic-verifications.index') }}">
+            <x-record-field name="student_id" label="Scholar" type="select"><option value="">All scholars</option>@foreach($students as $student)<option value="{{ $student->id }}" @selected(request('student_id') == $student->id)>{{ $student->student_number }} · {{ $student->full_name }}</option>@endforeach</x-record-field>
+            <x-record-field name="academic_period_id" label="Academic period" type="select"><option value="">All periods</option>@foreach($periods as $period)<option value="{{ $period->id }}" @selected(request('academic_period_id') == $period->id)>{{ $period->academic_year }} · Semester {{ $period->semester_code }}</option>@endforeach</x-record-field>
+            <x-record-field name="verification_status" label="Verification" type="select"><option value="">All statuses</option>@foreach(['pending', 'verified', 'rejected'] as $status)<option value="{{ $status }}" @selected(request('verification_status') === $status)>{{ ucfirst($status) }}</option>@endforeach</x-record-field>
+            <div class="records-actions"><x-primary-button class="records-submit">Filter</x-primary-button><a class="records-link" href="{{ route('academic-verifications.index') }}">Clear</a></div>
+        </form>
+        <div class="records-table-wrap"><table class="records-table"><caption class="sr-only">Academic record revisions</caption><thead><tr><th>Scholar</th><th>Period</th><th>Revision</th><th>Enrollment</th><th>Standing</th><th>Verification</th><th>Actions</th></tr></thead><tbody>
+        @forelse($records as $record)
+            <tr><td>{{ $record->student->full_name }}<small class="records-muted">{{ $record->student->student_number }}</small></td><td>{{ $record->academicPeriod->academic_year }}<small class="records-muted">Semester {{ $record->academicPeriod->semester_code }}</small></td><td>{{ $record->revision }}<small class="records-muted">{{ $record->isLatestRevision() ? 'Latest revision' : 'Superseded' }}</small></td><td>{{ Str::headline($record->enrollment_status ?? 'unverified') }}</td><td>{{ ucfirst($record->academic_standing) }}</td><td><span class="records-badge {{ $record->verification_status === 'verified' ? 'is-green' : 'is-amber' }}">{{ ucfirst($record->verification_status) }}</span>@if($record->verifiedBy)<small class="records-muted">{{ $record->verifiedBy->name }}</small>@endif</td><td><a class="records-link" href="{{ route('academic-verifications.show', $record) }}">View record</a></td></tr>
+        @empty<tr><td colspan="7"><div class="records-empty"><strong>No academic records found</strong><p>Select another filter or add a Registrar record.</p></div></td></tr>@endforelse
+        </tbody></table></div><div class="records-pagination">{{ $records->links() }}</div>
+    </section>
+</x-records-page>

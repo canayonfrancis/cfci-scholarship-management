@@ -26,8 +26,9 @@ class DashboardTest extends TestCase
             ->assertOk()
             ->assertSeeText('Good morning, Francis!')
             ->assertSeeText('Thu, Sep 10, 2026')
-            ->assertSee('Applications Trend')
+            ->assertSee('Validations Trend')
             ->assertSee('Anne Dela Cruz')
-            ->assertSee('Create a New Application');
+            ->assertSee('Direct Scholarship Validation')
+            ->assertDontSee('Create a New Application');
     }
 }

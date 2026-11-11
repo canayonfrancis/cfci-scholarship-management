@@ -9,12 +9,16 @@
             @php
                 $navItems = [
                     ['Dashboard', 'home', route('dashboard'), request()->routeIs('dashboard')],
-                    ['Applications', 'applications', route('dashboard').'#recent-applications', false],
                 ];
+                if (auth()->user()->can('viewAny', \App\Models\AcademicRecord::class)) {
+                    $navItems[] = ['Academic records', 'applications', route('academic-verifications.index'), request()->routeIs('academic-verifications.*')];
+                }
                 if (auth()->user()->can('viewAny', \App\Models\Student::class)) {
                     $navItems[] = ['Scholars', 'users', route('scholars.index'), request()->routeIs('scholars.*')];
                 }
-                $navItems[] = ['Evaluations', 'clipboard', route('dashboard').'#applications-trend', false];
+                if (auth()->user()->can('viewAny', \App\Models\ScholarshipApplication::class)) {
+                    $navItems[] = ['Evaluations', 'clipboard', route('evaluations.index'), request()->routeIs('evaluations.*')];
+                }
                 if (auth()->user()->can('viewAny', \App\Models\ScholarshipProgram::class)) {
                     $navItems[] = ['Scholarships', 'graduation-cap', route('scholarship-programs.index'), request()->routeIs('scholarship-programs.*', 'academic-periods.*')];
                 }
@@ -45,8 +49,8 @@
                 </button>
                 <div class="popover notification-popover" x-cloak x-show="notificationsOpen" x-transition @click.outside="notificationsOpen = false">
                     <strong>Notifications</strong>
-                    <p>48 applications are ready for evaluation.</p>
-                    <a href="#recent-applications" @click="notificationsOpen = false">View applications</a>
+                    <p>Dashboard notifications are demonstration data.</p>
+                    <a href="#recent-applications" @click="notificationsOpen = false">View validation overview</a>
                 </div>
             </div>
 

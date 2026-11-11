@@ -3,9 +3,17 @@
 Cronasia Foundation College, Inc. (CFCI)  
 Review date: 2026-11-10, Asia/Manila  
 Inspected application commit: `a345c39`  
-Status: baseline design; database foundation and Task 3 Scholarship and Scholar Records implemented on 2026-11-11. See [progress.md](progress.md) for the current state, naming reconciliation, staff permissions, and verification. Eligibility, billing, and reporting workflows remain unimplemented.
+Status: baseline design with CFCI's subsequent direct-validation clarification applied. Reported Registrar grade columns, configured active/source periods, direct validation and existing award-status safeguards are tracked in [progress.md](progress.md). Scope and verified national sources are in [eligibility-rules.md](eligibility-rules.md). Conversion, thresholds/full scale and required academic interpretation remain unconfirmed; scholarship application processing, including EDUKAR/AKLAT intake/requirements/exceptions, is excluded. Billing/reporting workflows remain unimplemented. The original inspection below is historical context, not a current inventory.
 
 This plan is based on the repository and the school's requirements supplied in this conversation. It does not establish external scholarship policy. Confirmed requirements, implementation proposals, and unresolved decisions are identified separately. See [progress.md](progress.md) for verification results and the work tracker.
+
+## CFCI clarification accepted on 2026-11-11
+
+Use existing student academic records for direct scholarship validation. The confirmed display format contains subject Prelim, Midterm, Semi-Final, Final, Average, Equivalent, units and remarks. Record values as reported; do not infer a conversion formula, passing threshold or complete scale from examples. Those interpretation rules remain pending, and missing required policies/data produce `needs_review` rather than automatic eligible/ineligible.
+
+The target is the configured active academic year/semester. The grade-source semester must follow a separately confirmed school policy/reference; first semester and 2026-2027 are not defaults. The current context and source revisions must be pinned to each validation, and changes must invalidate reliance on older decisions.
+
+Application processing is outside scope. EDUKAR/AKLAT applicants deal directly with the provider; do not build its application requirements, submission flow or exceptions. Existing `scholarship_applications` storage is retained only as legacy internal semester-validation context to preserve data/FKs/history. Earlier application-intake descriptions below are superseded by this clarification; they are not authorized future work. Continue verifying only applicable official TDP/TES conditions, without inventing school grading rules or an EDUKAR application engine.
 
 ## 1. Scope and confirmed requirements
 

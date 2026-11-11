@@ -3,9 +3,187 @@
 Cronasia Foundation College, Inc. (CFCI)  
 Last updated: 2026-11-11, Asia/Manila  
 Base application commit: `a345c39`  
-Current milestone: Task 3 Scholarship and Scholar Records implemented, tested, and enabled locally; eligibility evaluation, billing, and reporting workflows remain outside this task.
+Current milestone: CFCI's clarified direct-validation scope implemented and tested: reported subject-grade columns, configured active/source periods, and pending review for unconfirmed grading policy. Scholarship application processing, including EDUKAR/AKLAT intake, is outside scope. Prior Task 4/5 implementation details below are historical where superseded by this clarification. Billing and reporting workflows remain unimplemented.
 
-The design and decision register are in [implementation-plan.md](implementation-plan.md). Task 2 authorized the database foundation; Task 3 authorizes supporting records and their staff permissions. Unknown eligibility, financial, and external-approval rules remain unresolved. This tracker distinguishes recordkeeping from evaluation or financial authorization.
+The design and decision register are in [implementation-plan.md](implementation-plan.md); verified national-rule sources and execution boundaries are in [eligibility-rules.md](eligibility-rules.md). Task 2 authorized the database foundation; Task 3 supporting records; Task 4 Registrar verification; Task 5 school evaluation, external-decision recording and guarded activation. Unknown school grading, EDUKAR and financial rules remain unresolved. School eligibility never constitutes external approval or financial authorization.
+
+## CFCI clarification: confirmed scope and pending rules (2026-11-11)
+
+This user-provided school clarification supersedes earlier assumptions about application processing and grade-entry format.
+
+| Area | Confirmed requirement | Still pending / treatment |
+| --- | --- | --- |
+| Grade presentation | Subject rows with Prelim, Midterm, Semi-Final, Final, Average, Equivalent, units and remarks; examples include reported values 92/93/94 and equivalents 1.1/1.2/1.5/1.7/2.2 | Conversion formula, passing thresholds and full scale are unconfirmed. Copy the source values; never calculate, convert, infer a scale from examples or assign automatic standing. |
+| Grading source | Depends on the benefit/validation semester and confirmed school policy | First semester is common, not a default. Require an explicitly configured source period and school policy reference; missing source/policy means pending review. |
+| Validation target | Currently active academic year and semester configured by the school | The example 2026–2027 / first semester is illustrative. Neither it nor a year/semester fallback is automatically selected. Open-for-maintenance periods are separate from the single active validation context. |
+| Application processing | Outside this system; validate existing students and Registrar academic records directly | No scholarship intake/submission workflow. Retain the legacy `scholarship_applications` table/model only as internal semester-validation context to preserve FKs and history; do not expose its name as an application service. |
+| EDUKAR/AKLAT | Students apply directly through the provider | Do not implement application requirements, application workflows or EDUKAR exceptions. Existing academic data and separately recorded external award status can be reviewed. This is a scope exclusion, not a request to build an EDUKAR application engine later. |
+| TDP/TES | Verify official published national eligibility conditions; implement only confirmed conditions applicable to direct validation | National intake and billing forms are not mandatory requirements of this direct-validation screen. Unconfirmed required school criteria or unavailable academic information produce `needs_review` (pending review), not automatic eligible/ineligible. |
+
+Implementation is complete for this clarification. As-reported grade values use text storage with numeric-format/length validation so no unconfirmed grade precision is rounded or converted. Existing semester-average values remain historical data. The school grading-policy check deliberately remains pending in production until the actual required academic criteria are confirmed; entering high grades or attaching all national evidence cannot bypass that check.
+
+### Changes delivered after clarification
+
+- Added Registrar subject entry/viewing for the stated columns, including units and remarks. Values such as `92.7500`, `1.10` and `3.00` remain exactly as reported; Average and Equivalent are not calculated. Standing remains manually recorded, and entering grades cannot silently set passing/failing. Blank/unavailable values are not replaced by zero. Numeric formatting/length and request-size checks are technical limits, not an assumed academic scale.
+- Additive migration `2026_11_11_000004_add_reported_grades_and_academic_context` adds `academic_record_grades` and the singleton `academic_validation_context`. Grade rows have an indexed restrictive academic-record FK and unique optional subject code per revision. Database triggers protect their insert/update/delete/move history once the parent is verified. Corrections retain previous rows and create a new revision. Existing parent-table triggers and existing records are not rebuilt or rewritten.
+- Administrators configure one active target period and the school-confirmed source period/reference in **Academic periods**. Registrar/Coordinator accounts can view these settings but cannot change them. A version token prevents stale configuration saves; changes and their previous state are audited atomically. The singleton key constraint prevents competing active-context rows. The migration seeds only an empty context; it does not choose a live school year or semester.
+- Direct validation uses the configured target, rejects a different posted benefit period, and independently retrieves current-period enrollment and source-period reported grades. It never silently substitutes the benefit semester, first semester, or an older verified record when the latest source revision is pending. Context and source snapshots are retained with every run. Context changes and pre-clarification scope invalidate reliance on old decisions while preserving the historical decisions and existing awards.
+- Removed automatic application submission. The retained `scholarship_applications` model/table serves internal relational validation context only; its legacy state is not an application workflow. Removed intake/billing form types from direct-validation uploads and mandatory checks. Existing source metadata and uploaded history remain readable. National checks continue to use the verified official source profiles, with the actually applied direct-validation evidence keys snapshotted separately.
+- EDUKAR exposes existing academic review and external award-status recording, with no application category, intake checklist, intake uploads or exceptions form. No EDUKAR application requirements/criteria/exception engine is planned as follow-up work. Missing school academic policy leaves academic review pending; an external approval still does not imply school eligibility.
+- `SchoolGradingPolicy` returns review while the conversion, passing and full-scale/academic interpretation rules are unconfirmed. This missing prerequisite takes precedence over both pass and fail outcomes; posted flags or high grades cannot bypass it. Existing national-rule/activation regression tests explicitly mock a **synthetic** resolved school prerequisite to exercise downstream safeguards; that test setup is not production school policy or a production bypass.
+- Dashboard labels/navigation now refer to academic records and validations, with the existing layout, branding, cards, CSS, sample values and chart structure preserved. The chart labels identify their demonstration data. No reporting engine or live dashboard analytics were added.
+
+### Verification after clarification
+
+| Check | Result |
+| --- | --- |
+| Full SQLite suite | **155 passed, 1 skipped, 1,297 assertions**; the only skip is MySQL-specific concurrency. |
+| Full isolated MariaDB 10.4.28 suite | **156 passed, 1,315 assertions**, including migration rollback/reapply, immutable grade rows and the existing race checks. Temporary databases were removed. |
+| Clarification coverage | **11 new feature tests** for separate target/source periods, missing policy overriding both pass/fail, no default period, no older-source fallback, context invalidation and authorization, duplicate/stale config, immutable grade children, raw grade corrections, excluded EDUKAR/intake processing, and audit rollback. Registrar tests were updated for as-reported subject grades; earlier national tests retain explicit synthetic prerequisites. |
+| Browser workflow | Actual Administrator source/target configuration, Registrar subject entry/draft/reopen/verification, exact decimal text preservation, direct Coordinator validation with pending grading policy, denied activation, and EDUKAR without intake fields passed. Add/remove subject rows and mobile width checks passed, with no JavaScript page errors. |
+| Visual review | Six screenshots at desktop/mobile sizes generated; grade detail table, mobile editor and preserved dashboard layout inspected. Browser data used disposable DB/storage; server and database removed afterward. |
+| Build / views / formatting | `npm run build`, `php artisan view:cache`, Pint and `git diff --check` passed. |
+| Official source recheck | TDP MC02/2026 and TES MC01/2026 were downloaded again from UniFAST; both SHA-256 hashes still match the reviewed source versions in [eligibility-rules.md](eligibility-rules.md). |
+| Local enablement | Additive migration applied successfully. Existing domain values/counts, academic data, accounts/credentials and roles were checked before/after and preserved. No live sample students, grade rows or source-period choices were inserted. |
+
+### Current operation and remaining school decisions
+
+The existing Registrar account can enter/view reported grades under **Academic records**. An administrator must configure the actual active/source periods in **Academic periods** using the school's real policy reference; the example supplied in the conversation is not used as live configuration. The relevant format is implemented, while **conversion formula, passing thresholds, full scale and any required eligibility interpretation remain pending**. Automatic validation stays `needs_review` until those required school rules are supplied and implemented. Billing, reporting and external application processing remain outside this change.
+
+## Task 5: Automated Scholarship Validation and Evaluation (before clarification)
+
+### Registrar prerequisite rechecked
+
+Before this task, all migrations through Task 4 were applied locally and the unchanged SQLite suite passed **113 tests / 749 assertions**, with only the MySQL concurrency test skipped. Registrar draft/verification, staff/time provenance, immutable corrections, private certificates, role permissions and academic-source freshness are operational. **Full Task 4 acceptance remains pending the numeric grading format**; this was not misreported as complete. A further school-rule clarification was requested during Task 5 and no format/EDUKAR policy was supplied. The evaluation module does not invent a GPA scale or treat an unverified grade as a verified pass.
+
+### Rule verification
+
+- Reviewed UniFAST's official issuance index and signed **MC 02 series of 2026 (TDP)** and **MC 01 series of 2026 (TES)**, which specify effectivity from the first semester of AY 2026-2027. Source URLs, hashes, relevant sections and limits are documented in [eligibility-rules.md](eligibility-rules.md). Scanned documents were OCR-extracted and relevant eligibility pages visually verified. Neither older web summaries nor a third-party university's local criteria were adopted as CFCI policy.
+- The Coordinator explicitly confirms the applicable official profile for a program/semester. Numeric semester codes 1/2 from AY 2026-2027 onward are supported; older/custom/summer periods require reviewed mapping and remain `needs_review`. No policy is automatically seeded or confirmed in the application database.
+- EDUKAR/AKLAT has no invented criteria. Unknown profiles, incomplete evidence, unresolved special categories or unreviewed exceptions cannot produce eligible. TDP/TES retain their official aid/exception distinctions; the older brochure's income cap and the school's 4/4/5 planning durations are not hard-coded eligibility cutoffs.
+
+### Delivered workflow
+
+- `/evaluations`: program/semester filters and a paginated assessment list, using the existing layout/cards/navigation. Coordinators select a program and semester, then a scholar with a pending/active assignment to that program. The existing unique student/program/semester application is reused; wrong-program and competing-assignment links are rejected.
+- Latest Registrar revision fetched from the benefit semester, with source fields and verification metadata pinned. A newer pending correction prevents fallback to an older verified record. No school SIS or national portal integration is claimed. Retention and non-academic/institutional facts are explicitly verified by the Coordinator against certified private sources; the software evaluates those documented facts without inventing a numerical grade rule.
+- Fixed, program-specific PHP checks in `EligibilityEvaluator`, with an official profile catalog rather than a generic configurable rule language. Results are **eligible**, **ineligible**, or **needs_review**, mapped to existing database outcomes `passed`, `failed`, `needs_review`. Incomplete mandatory facts/evidence take precedence and remain review cases. There is no override-to-eligible control.
+- Conditional evidence requirements for new/continuing applicants, LOA returns, transfers, applicable legacy-PNSL residency and TES-3A claims. Unsupported direct-grantee submission alternatives/special categories require review. Duration is an evidenced manual review of actual curriculum/award history, grace periods, LOA/transfer treatment and approved exceptions; potentially exceeded/undocumented duration remains review, not an automatic rejection from planning years.
+- Each evaluation appends a completed immutable run: submission revision, academic IDs/revision/verified state, facts and source references, private document IDs/checksums/reviewers, applied fact/document keys, official rule/source/hash and confirmation snapshot, structured results, reasons, evaluator/Coordinator, server date and evaluator notes. Previous runs are never updated or deleted.
+- Private evidence uploads/reviews use a dedicated `scholarship` disk at `storage/app/scholarship-private`, outside public and generic local-serving roots. PDF/JPG/PNG are checked by MIME and extension, up to 2 MB per request. Hashed filenames, checksums, ownership checks, authenticated policy-protected attachment downloads, private/no-store caching and nosniff are used. Accepted evidence metadata is immutable. A replacement remains a new retained document; a new upload/review increments the application's submission revision and requires reevaluation.
+- Current-decision reads check fresh application/source revisions, latest run, live award-conflict state and available matching evaluation evidence. New server-pinned verified snapshots safely establish same-second ordering; legacy decisions without those snapshots retain Task 4's conservative time ordering. A correction, changed submission, missing/corrupted evidence or newly conflicting active award cannot silently leave an older eligible decision current.
+- Separate external-decision entry records the verified authority decision/reference/date, any stated validity, exact assignment/program/student/semester, staff recorder, private accepted proof and verification notes. Approved/rejected/revoked decisions and corrections append with predecessor links. Exact duplicates and stale predecessor forms are rejected. An older approval cannot bypass a later revocation. Assignment-wide legacy approvals are retained without automatic semester carry-forward. EDUKAR/AKLAT external evidence can be recorded while its school eligibility remains review.
+- Award activation is an explicit separate action. A transaction locks the student/application, requires the latest current eligible official-rule school evaluation and its available evidence, the latest verified valid external approval for the exact context, a pending assignment, active scholar, available program and no active-scholarship conflict. Inclusive validity dates are compared as Manila calendar dates. Actor/time and evaluation/approval FKs are retained on the assignment; audit failure rolls activation back.
+- **The old assignment-form activation bypass is closed for every role, including administrator.** New assignments are pending; pending-to-active transitions must use this module. Existing active/historical assignments remain intact, and maintenance/closure/relinquishment still works. Existing records regression tests now reflect this explicitly requested gate rather than expecting ungated activation.
+- No automatic award termination, financial entitlement authorization, bill, payout or report is created. Revocations/corrections are retained and require staff follow-up; future posting must recheck school freshness, latest approval, funding and its own financial requirements.
+
+### Database and permissions
+
+Additive migration `2026_11_11_000003_add_evaluation_and_activation_provenance` adds nullable `evaluated_by`/`evaluated_at` to evaluation runs, plus `activation_evaluation_id`, `activation_approval_id`, `activated_at` to assignments. Actor/source FKs restrict deletion/update and are indexed. Existing uniqueness, contextual FKs and immutability remain in force. SQLite table rebuilds explicitly preserve the existing history/check triggers; rollback removes new indexes before columns. Existing account, session, academic and unrelated-data preservation is exercised through a full migration/rollback/reapply test.
+
+| Role | Read assessments / private supporting evidence | Confirm official semester profile, evaluate, review evidence, record external decisions, activate |
+| --- | --- | --- |
+| `coordinator` | Yes | Yes |
+| `registrar`, `administrator` | Yes | No |
+| `finance`, `viewer`, no staff role | No | No |
+| Guest | Login required | Login required |
+
+Policies, Form Requests and actions enforce the permissions on direct requests and downloads. Facts, rule versions, actors, timestamps, application context, school outcome and activation provenance cannot be mass-assigned by the browser. No existing accounts were granted Coordinator authority automatically. Provision an approved account explicitly through the existing `sms:grant-role` command when needed.
+
+### Verification and local enablement
+
+Browser verification used a disposable MariaDB database and isolated private storage; its server/database were removed afterward. No test scholars or evaluations were inserted in the application database.
+
+| Final check | Result |
+| --- | --- |
+| Full SQLite suite | **144 passed, 1 skipped, 1,225 assertions**. Only the MySQL concurrency test is skipped. |
+| Full isolated MariaDB 10.4.28 suite | **145 passed, 1,243 assertions**, including all four two-writer uniqueness cases and migration rollback/reapply. Temporary databases were removed. |
+| Module feature coverage | **31 evaluation feature tests**: eligible/ineligible TDP/TES, incomplete/missing/corrupt evidence, source provenance, unconfirmed/EDUKAR/historical policies, conditional requirements, duration exceptions, SMART conflict, reevaluation/history, stale forms, external corrections/revocation/expiry, award conflicts, role matrices, IDOR protection, mass-assignment rejection and atomic audit rollback. |
+| Final prerequisite/module/migration rerun | **52 passed / 702 assertions** across Registrar verification, evaluations and migration retention after the last source-snapshot/UI adjustments. |
+| UI / build / formatting | Six browser screenshots and the end-to-end workflow passed; `npm run build`, `php artisan view:cache`, Pint and `git diff --check` passed. |
+| Local enablement | Additive Task 5 migration applied successfully. All existing domain-table values/counts, academic data, user accounts/credentials and role rows were checked before/after and preserved. No rule profile or Coordinator role was automatically granted/confirmed locally. |
+
+- Actual browser workflow passed: Coordinator login, program/semester/assigned-scholar selection, official-profile confirmation, incomplete `needs_review`, private evidence uploads, eligible reevaluation, retained run history, denied activation without approval, separately recorded verified external decision, successful guarded activation, and Registrar read-only access.
+- Six desktop/mobile screenshots were generated; desktop evaluation history and mobile assessment/index layouts were inspected. No page overflow or JavaScript page errors occurred. The existing dashboard design/assets were retained.
+- Database races now cover active-award uniqueness, billing uniqueness, academic revisions and evaluation run numbers. Tests use isolated databases, never the application's records.
+
+### Remaining limits
+
+Numeric Registrar grading format/source-semester policy and EDUKAR rules remain pending R02. National slot prioritization/cross-matching/funding and special PNSL/SARDO guidelines are not simulated. The current HEI evidence path does not automate direct applicant-to-CHEDRO alternatives. Suspension/reactivation and mid-semester policy/financial-rate revisions still require their reviewed design. Confirming a semester's `program_period_terms` uses the existing whole-row immutable confirmation; it does not fill or authorize an unknown monetary amount. Future finance work must review any necessary terms/rate revision before editing a confirmed row. No billing or reporting module was implemented.
+
+## Task 4: Registrar Academic Verification (original delivery; grade entry superseded above)
+
+### Previous task verified
+
+Task 2 and Task 3 migrations were confirmed applied locally, and the unchanged SQLite suite passed **93 tests / 530 assertions**, with the single MySQL-only concurrency test skipped. The existing records controllers, role policies, scholar history, and dashboard layout were reused. The approved mapping remains **`academic_records` / `AcademicRecord`** for the provisional `academic_verifications` name; no competing academic-verification table was created.
+
+### Functionality delivered
+
+- `/academic-verifications`: paginated revision list with scholar, semester, and verification-status filters; links from each scholar's details page; detail screens with Registrar information, private certificates, correction reasons, and revision history.
+- Registrar selection of scholar and academic period; enrollment states `unverified`, `enrolled`, and `not_enrolled`; separately recorded academic standing `unverified`, `passing`, and `failing`. These describe manually checked facts, without deriving a scholarship decision or connecting to a student information system. Closed semesters and historical/archived scholars can still have historical records recorded or corrected.
+- Draft saving and explicit verification. Verification requires an identified Registrar source and at least one checked fact (enrollment or standing). Any remaining `unverified` field stays unverified. Staff identity and verification time come from the authenticated Registrar and server clock; the browser cannot assign actors, revision numbers, status, or timestamps. Dates display in Asia/Manila.
+- An additive migration adds `academic_standing` (default `unverified`), `correction_reason`, and `lock_version`. Existing academic values and verification history are retained. The existing contextual FKs, unique scholar/semester/revision key, and immutable-history triggers remain in force.
+- One initial record per scholar/semester through the workflow. Draft edits use a student/record transaction lock and an optimistic version token to reject stale forms. Completed revisions cannot be edited or deleted. An explicit correction with a reason creates the next revision and links its predecessor; corrections of superseded records and duplicate correction submissions are rejected. No destructive routes exist.
+- Grade certificates use the dedicated **`academic`** private disk at `storage/app/academic-private`. It is outside the public symlink and outside the existing `local` disk's signed serving root; generic signed storage URLs cannot serve it. Hashed server filenames, actual MIME and extension checks, a limit of three PDF/JPG/PNG files per request at 2 MB each, checksums, upload actors, and exactly-one-owner document FKs are used. The limits fit this local PHP installation's 2 MB/file and 8 MB/POST settings; they are technical upload limits, not an academic document checklist.
+- Downloads require authentication, academic-record authorization, matching record/document ownership, and the expected disk/type/path. Responses are attachments with private/no-store caching and `nosniff`. Missing files and mismatched owners return 404. Finance/viewer accounts cannot read academic records or download certificates.
+- Verification accepts and locks attached evidence using the existing document review metadata and immutable-document trigger. Corrections retain the original record and its certificates; certificates are not silently copied to the new revision. New supporting evidence can be uploaded with the correction. Draft files remain private and are retained when that draft is verified.
+- Record and certificate-upload audit events commit atomically with their database changes. File storage is cleaned up if the transaction/audit fails. Scholar identities, scholarship assignments, external approvals, financial records, and dashboard assets/design are not rewritten.
+
+### Academic corrections and current decisions
+
+`EvaluationRun::isCurrent()` and `ScholarshipApplication::currentSchoolDecision()` provide the required authoritative read path for an effective school decision. They query fresh persisted input state rather than trusting a cached relationship or the historical `school_decision` string alone. A decision is unavailable when:
+
+- its source academic revision has been superseded, including by a pending correction;
+- either linked source is missing or not Registrar-verified;
+- source verification does not strictly precede completion and the Coordinator decision;
+- the application's submission revision changed, the application was withdrawn, or a newer evaluation run exists (including a pending run).
+
+Grade-source periods may differ from the benefit/enrollment period: corrections invalidate decisions that actually reference that grade record. No new source-semester rule is inferred. Historical decisions and their snapshots remain immutable. Related decisions on the academic detail page explicitly show when Coordinator reassessment is required. Verifying a correction does **not** revive an older decision; a fresh evaluation run and Coordinator decision are required.
+
+The existing database timestamps have second precision. Same-second verification/decision ordering is treated conservatively as requiring reassessment. Future evaluation/posting services must use this current-decision API inside their posting transaction and coordinate source locks with the student lock used here. They must separately enforce eligibility, external approval, funding, and other posting requirements; freshness alone is not billing authorization. Historical bills/payments continue to retain their original source snapshots. No evaluation engine or posting service was added in this task.
+
+### Grading decision still required — R02
+
+Neither approved document specifies CFCI's actual grade format, scale, precision, special marks, or whether entries are semester averages or subject-level grades. A clarification was requested; no grading policy was supplied during this implementation. **Numeric grade entry is deliberately disabled in the delivered application** (`config/sms.php`, `grading = null`), and forged numeric submissions are rejected. Original grade certificates and manually verified standing can be recorded now.
+
+There is a tested configuration hook for a school-approved decimal average format, including its label, range, precision, and source reference, snapshotted on the academic revision. Synthetic test values are not school policy and have not been enabled locally. Do not enable this hook with guessed values. If CFCI confirms subject-level grades or marks such as INC, implement their reviewed structure/validation instead of forcing them into a numeric average. No passing cutoff, automatic standing conversion, unit requirement, or mandatory certificate checklist has been invented. Full acceptance of the requested grade-entry feature remains pending this answer.
+
+### Permissions and operation
+
+| Role | View records / private certificates | Create, edit draft, verify, correct |
+| --- | --- | --- |
+| `registrar` | Yes | Yes |
+| `coordinator` | Yes | No |
+| `administrator` | Yes | No, unless separately granted `registrar` |
+| `finance`, `viewer`, or no staff role | No | No |
+| Guest | Login required | Login required |
+
+Roles are enforced by policies, controllers, and Form Requests, including direct POST/PATCH and certificate URLs. Administrator status alone does not grant Registrar authority. No existing account was automatically granted `registrar`. A trusted operator can explicitly provision an approved Registrar with the existing `php artisan sms:grant-role user@example.test registrar` command. No account or credential changes are part of this task.
+
+### Verification and local enablement
+
+Browser checks used a disposable MariaDB database, isolated storage, and synthetic Registrar/Coordinator accounts, then removed the server and database. Real application data was not used for UI tests.
+
+| Final check | Result |
+| --- | --- |
+| Full SQLite suite | **113 passed, 1 skipped, 749 assertions**. Only the MySQL concurrency test is skipped. |
+| Full isolated MariaDB 10.4.28 suite | **114 passed, 763 assertions**, including academic-revision race enforcement. Temporary databases were removed. |
+| Registrar feature tests | **20 tests** covering role matrices/direct requests, drafts, verification provenance, duplicates, immutable corrections, private evidence, disguised MIME content, file limits, atomic rollback/cleanup, stale forms, decision freshness, filters, and history links. |
+| Build / views / formatting | `npm run build`, `php artisan view:cache`, `vendor/bin/pint --dirty --test`, and `git diff --check` passed. |
+| Local additive migration | `2026_11_11_000002_add_registrar_verification_fields` applied successfully to the verified local database. All existing business-table counts, academic values, account rows/credentials, and role rows were checked before/after and preserved. No sample records or new roles were inserted. |
+
+- Browser workflow passed: real login, scholar preselection, draft plus PDF upload, verification actor/date, byte-for-byte certificate download, duplicate-context rejection, linked correction, original passing record retained alongside corrected failing record, Coordinator read access without verification authority, and guest download redirection.
+- Six screenshots at 1440px and 390px were generated; desktop details and mobile correction/index layouts were visually inspected. Mobile forms/pages did not overflow and no JavaScript page errors were observed. External font requests were blocked for reproducible local checks.
+- Database tests cover authentication/unrelated-data retention and existing verified academic values through migration → rollback → reapply on both engines, plus competing academic-revision inserts alongside the existing active-assignment/billing races.
+
+### Task boundary and remaining work
+
+The operational Registrar workflow is functional; numeric grades remain gated on R02, so Task 4 is not described as fully accepted. Existing dashboard design is preserved. No Coordinator evaluation UI/engine, external-approval workflow, billing, reports, automatic integration, new staff accounts, or automatic role grants were implemented. Confirm the grading format, then complete/enable only that grade-entry requirement before proceeding to the next module.
+
+### Subsequent user-requested local Registrar test account
+
+On 2026-11-11, the user explicitly requested an account for testing the dashboard. Created **Registrar Test** (`registrar@cfci.test`) in the verified local application database and explicitly granted only `registrar` through the existing trusted role command. Account creation and role provisioning were audited. Existing accounts and their credentials were preserved. The generated password was provided directly to the user and is not stored in this document or application source.
+
+Verified actual HTTP login at `http://127.0.0.1:8000`: dashboard, scholar directory, academic-verification list, and Registrar entry form returned 200; academic-period administration returned 403. The test session was logged out. No scholar, academic, scholarship, or financial test records were created.
 
 ## Task 3: Scholarship and Scholar Records — completed
 
@@ -68,7 +246,7 @@ Implementation locations: `app/Http/Controllers/{Scholar,ScholarshipProgram,Acad
 
 ### Task 3 boundary
 
-Task 3 is complete. No eligibility engine, Registrar academic-verification UI, external-approval workflow, billing UI/posting service, report generation, or live dashboard statistics were implemented. The current staff matrix is for supporting records; future module permissions and school-specific approval, suspension, correction, renewal, and financial rules still require the decisions below. Closed history corrections must be designed explicitly rather than implemented by reopening/deleting past records.
+Task 3 is complete. At that milestone no eligibility engine, Registrar academic-verification UI, external-approval workflow, billing UI/posting service, report generation, or live dashboard statistics had been implemented. Task 4 above subsequently adds academic verification. The Task 3 staff matrix is for supporting records; future module permissions and school-specific approval, suspension, correction, renewal, and financial rules still require the decisions below. Closed assignment-history corrections must be designed explicitly rather than implemented by reopening/deleting past records.
 
 ## Task 2: database foundation completed on 2026-11-11
 
@@ -132,10 +310,10 @@ At Task 2 completion, the additive foundation/reference seed had been verified o
 
 | Official module | Existing implementation | Remaining implementation |
 | --- | --- | --- |
-| Automated Scholarship Validation and Evaluation | Relational records, revision/snapshot storage, independent decisions, and one-active constraint | Registrar/Coordinator screens and policies, confirmed automated checks, decision transitions, renewal/activation workflow, and audit-event production |
+| Automated Scholarship Validation and Evaluation | **Registrar reported subject grades/revisions, configured active/source periods, direct school validation, immutable snapshots/history, private evidence, separate external status, guarded activation and current-decision API** | CFCI grade conversion/threshold/full-scale criteria, applicable special/historical policies, reviewed suspension/reactivation, and future financial integration. EDUKAR applications/requirements are excluded, not pending implementation. |
 | Billing, Liquidation, and Deduction | Billing/funding/payout/deduction/liquidation tables, relationships, constraints, and immutable-history storage | Posting/reconciliation services, aggregate limits, reviewed deduction/settlement/correction rules, evidence upload/review, and UI |
 | Reporting, Analytics, and Overview Dashboard | Custom dashboard presentation and Manila-time greeting/date; sample statistics/charts | Database reporting, real filters/analytics, financial reconciliation, and real dashboard data |
-| Supporting functionality | **Scholar/program/academic-period screens, assignment/history management, staff policies and explicit role provisioning, atomic audit events, linked-account deletion handling**, plus Task 2 persistence | Evidence upload/download, future module permissions, and any reviewed history-correction workflow |
+| Supporting functionality | **Scholar/program/academic-period screens, assignment/history management, staff policies and explicit role provisioning, atomic audit events, linked-account deletion handling, private academic/evaluation/external evidence**, plus Task 2 persistence | Financial evidence/workflows, future financial permissions, and any reviewed assignment-history correction workflow |
 
 Confirmed program facts: TDP PHP 7,500 per semester, TES PHP 13,500 per semester, EDUKAR amount unconfirmed; school planning durations are 4/4/5 years respectively. These durations are not unconditional eligibility cutoffs. One active scholarship per student and semester billing with multiple batches are confirmed.
 
@@ -179,9 +357,9 @@ The original analysis did not validate MySQL. The current foundation has now bee
 | --- | --- | --- |
 | 0. Review schema and baseline decisions | Initial database schema authorized on 2026-11-11 | R01–R14 operational decisions remain open except the now-explicit duplicate-billing rule; deployment DB/version still needs confirmation |
 | Database foundation | **Completed** | Additive migration, models, relational constraints, history storage, optional reference seeder, and SQLite/MySQL tests implemented; no existing application data changed |
-| 1. Supporting records and access / Task 3 | **Completed and tested** | Scholar/program/period CRUD, manual assignments/history, role policies, and local administrator provisioning delivered; future module permissions remain separate |
-| 2. Academic verification and school evaluation | Persistence complete; workflow/UI not started | R02 criteria, verified-source/revision gates, and Registrar/Coordinator policies |
-| 3. External approval and assignments | Manual assignment/history UI and one-active constraint complete; external approval workflow not started | R03/R04 external validity, approval gates, suspension/reactivation, and correction rules remain unresolved |
+| 1. Supporting records and access / Task 3 | **Completed and tested** | Scholar/program/period CRUD, assignments/history and role policies; Task 5 replaces manual new activation with evaluation/approval gates |
+| 2. Academic verification and school evaluation | **Registrar reported columns and direct validation implemented/tested** | Formula, thresholds/full scale and any required academic interpretation remain unconfirmed; source/active periods require real school configuration. EDUKAR intake is excluded. |
+| 3. External approval and assignments | **Verified external decision recording and guarded activation implemented/tested** | Exact-semester scope, validity, supersession and conflict gates implemented; suspension/reactivation and retroactive history repairs still need review |
 | 4. Semester billing and funding | Persistence/uniqueness complete; posting/UI not started | R01/R07/R08/R10/R11; aggregate funding and entitlement checks require transactional services |
 | 5. Payout, deduction, and liquidation | Persistence/history storage complete; workflow/UI not started | R09 plus reviewed posting, corrections, settlements, accepted-coverage checks, and evidence rules |
 | 6. Reporting and dashboard integration | Not started | Persisted source workflows and R14 metric/export definitions; preserve current dashboard design |
@@ -194,28 +372,28 @@ The full questions and schema impacts are recorded in the plan; no school answer
 | Decision | Current state |
 | --- | --- |
 | R01 — Rates, EDUKAR, gross/net meaning, and revisions | School-stated TDP/TES figures known; EDUKAR and financial interpretation pending |
-| R02 — Academic/document eligibility rules and source period | Registrar/Coordinator responsibilities known; thresholds, checklist, scale, and revisions pending |
-| R03 — External approval scope and posting gates | Separate recording confirmed; authority, validity, renewal, and timing pending |
-| R04 — Assignment activity and effective dates | Manual pending/active/closed/relinquished registry states and retained history implemented for Task 3; automatic approval gates, suspension/reactivation, and retrospective corrections still pending |
+| R02 — Academic/document eligibility rules and source period | Reported column format confirmed and implemented; active/source periods explicitly configurable. Conversion, passing/full-scale academic criteria and actual school source-policy mapping remain pending. Verified TDP/TES conditions apply only to direct validation; EDUKAR intake/requirements/exceptions are excluded. |
+| R03 — External approval scope and posting gates | Verified exact-semester external records, stated validity, supersession/revocation and activation gates implemented. Assignment-wide carry-forward, renewal exceptions and financial timing still need review |
+| R04 — Assignment activity and effective dates | Pending/active/closed/relinquished history retained; new activation requires current eligibility, verified external approval and an available active slot. Suspension/reactivation and retrospective corrections still need review |
 | R05 — Academic-period structure | Semester billing confirmed; exact school calendar/codes and evidence-period mapping pending |
-| R06 — Applications, renewals, pending choices, and legacy scholars | Proposed semester application uniqueness and import provenance pending |
+| R06 — Applications, renewals, pending choices, and legacy scholars | Existing semester application uniqueness implemented/reused; duplicate contexts and cross-assignment relinking rejected. Simultaneous pending programs remain possible; import provenance and exceptional renewals still need review |
 | R07 — Batch composition and installments | Multiple batches and one bill per assignment/semester confirmed; repeated semester billing prohibited. Partial payouts, payees, and posting gates remain pending |
 | R08 — Funding scopes, allocation, returns, and transfers | Funding tracking confirmed; earmarking/pooling and movement rules pending |
 | R09 — Deductions and settlement | Tracking confirmed; types, basis, caps, balance sources, and settlement rules pending |
 | R10 — Financial authority and corrections | Posting/approval/reversal responsibilities and failed-payment handling pending |
 | R11 — Liquidation scope and acceptance | Evidence tracking confirmed; batch versus receipt scope, cash/gross basis, and accepted proof pending |
-| R12 — Access, accounts, retention, and evidence | Supporting-record role matrix, trusted console provisioning, and linked-account deletion handling implemented. Future module permissions, verification policy, portal scope, and evidence retention/access remain pending |
-| R13 — MySQL target and constraint verification | Local server confirmed as MariaDB 10.4.28 through Laravel's MySQL driver; all 94 current tests pass on an isolated database there. Earlier MySQL 9.2.0/SQLite checks also passed; production target/setup alignment remains separate |
+| R12 — Access, accounts, retention, and evidence | Supporting-record, Registrar and Coordinator policies, trusted provisioning, private academic/evaluation/external evidence, and linked-account retention implemented. Financial permissions, email verification policy, portals and long-term retention still need review |
+| R13 — MySQL target and constraint verification | Local MariaDB 10.4.28 through Laravel's MySQL driver; all 156 current tests pass on an isolated database there. Earlier MySQL 9.2.0/SQLite checks also passed; production setup alignment remains separate |
 | R14 — Imports and report definitions | Dashboard presentation exists; historical scope, denominators/as-of rules, and export formats pending |
 
 ## Remaining issues and stopping boundary
 
-The database foundation and Task 3 supporting-record functionality are complete. Work stops after the tested records screens and permissions. Dashboard design and sample statistics remain; eligibility, billing, and reporting implementation has not been started.
+The database foundation, supporting records, reported Registrar subject grades and clarified direct-validation/approval/activation safeguards are implemented and tested. Work stops here. Required grading interpretation rules remain pending; EDUKAR application processing is excluded. Dashboard design/sample statistics are preserved; billing/reporting UI and posting work are not implemented.
 
 Remaining issues are explicit:
 
 - R01–R14 still govern unknown business rules. EDUKAR and unconfirmed semester authorization amounts remain null; no grade threshold, income rule, deduction percentage, duration cutoff, external-approval carry-forward, or funding sufficiency rule was invented.
 - Aggregate entitlement, allocation capacity, payout/deduction totals, and cumulative accepted liquidation coverage need transactional posting services with locks and idempotency. This foundation provides the keys, snapshots, and relationships, not permission to post arbitrary financial rows. Reversal amounts/source state and coordinated financial corrections also need those reviewed services.
 - The initial plan's one-program/semester-per-batch, scoped receipts, batch liquidation, and one application per student/program/semester are reflected in the schema. If the school confirms pooled receipts across scopes, receipt-based liquidation, partial deduction settlements, or mid-semester terms revisions, add an explicit follow-up migration before implementing the affected workflow.
-- Supporting-record policies, explicit role provisioning, and transactional audit-event writers are now implemented. Future module policies, student/external portals, and document upload/download/retention workflows remain pending. Existing email-verification enforcement and dependency-advisory findings remain outside this task.
-- The additive Task 3 migration/reference seed/administrator-role grant were applied locally, with account/credential and record-count preservation verified. No database reset or school-record deletion occurred. Production rollout/backups are not established by local or isolated verification.
+- Supporting-record, Registrar and Coordinator policies, explicit provisioning, private evidence and transactional audits are implemented. Financial module policies, student/external portals and long-term evidence retention remain pending. Existing email-verification enforcement and dependency-advisory findings remain outside this task.
+- Additive migrations through the CFCI clarification are applied locally, with account/credential and domain-value/count preservation verified. Existing account roles are retained; no Coordinator role was granted during these changes. No database reset or school-record deletion occurred. Actual active/source-period selection remains a school configuration step. Production rollout/backups are not established by local or isolated verification.

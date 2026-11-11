@@ -47,7 +47,7 @@ class ScholarRecordsTest extends TestCase
 
     private function assignmentData(array $g, array $overrides = []): array
     {
-        return array_replace(['program_id' => $g['program']->id, 'start_period_id' => $g['period']->id, 'status' => 'active', 'starts_on' => '2026-08-01', 'status_reason' => 'Recorded from the school register'], $overrides);
+        return array_replace(['program_id' => $g['program']->id, 'start_period_id' => $g['period']->id, 'status' => 'pending', 'starts_on' => '2026-08-01', 'status_reason' => 'Recorded from the school register'], $overrides);
     }
 
     private function periodData(array $overrides = []): array
@@ -116,7 +116,8 @@ class ScholarRecordsTest extends TestCase
         $this->patch(route('academic-periods.update', $g['period']), $this->periodData(['academic_year' => '2026-2027', 'is_open' => '1']))->assertStatus($catalogWrite ? 302 : 403);
         $this->patch(route('scholars.assignments.update', [$g['scholar'], $assignment]), $this->assignmentData($g))->assertStatus($assignmentWrite ? 302 : 403);
         $this->assertSame($scholarWrite ? 'Updated' : 'Ana', $g['scholar']->fresh()->first_name);
-        $this->assertSame($assignmentWrite ? 'active' : 'pending', $assignment->fresh()->status);
+        $this->assertSame('pending', $assignment->fresh()->status);
+        $this->assertSame($assignmentWrite ? 'Recorded from the school register' : null, $assignment->fresh()->status_reason);
     }
 
     public function test_scholar_creation_and_editing_validate_and_audit_without_mass_assigning_accounts_or_roles(): void
@@ -227,27 +228,28 @@ class ScholarRecordsTest extends TestCase
         $this->actingAs($actor)->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g) + ['activated_by' => 9999, 'student_id' => 9999])->assertSessionHasNoErrors()->assertRedirect(route('scholars.show', $g['scholar']));
         $assignment = ScholarshipAssignment::firstOrFail();
         $this->assertSame($g['scholar']->id, $assignment->student_id);
-        $this->assertSame($actor->id, $assignment->activated_by);
+        $this->assertNull($assignment->activated_by);
         $this->assertSame(1, AuditEvent::where('action', 'scholarship_assigned')->count());
         $this->assertSame(0, EvaluationRun::count());
         $this->assertSame(0, ExternalApproval::count());
         $this->assertSame(0, BillingItem::count());
-        $this->get(route('scholars.show', $g['scholar']))->assertOk()->assertSeeText('Scholarship history')->assertSeeText('Active')->assertSeeText('TDP');
-        $this->get(route('scholars.index', ['program_id' => $g['program']->id]))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->total() === 1);
+        $this->get(route('scholars.show', $g['scholar']))->assertOk()->assertSeeText('Scholarship history')->assertSeeText('Pending')->assertSeeText('TDP');
+        $this->get(route('scholars.index'))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->total() === 1);
     }
 
     public function test_a_second_active_program_is_rejected_with_a_field_error_and_no_extra_history(): void
     {
         $g = $this->fixtures();
         $this->actingAs($this->staff('coordinator'));
-        $this->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g))->assertSessionHasNoErrors();
+        // Retained pre-module active assignment; new activation is tested by the evaluation workflow.
+        ScholarshipAssignment::create(['student_id' => $g['scholar']->id, 'program_id' => $g['program']->id, 'status' => 'active']);
         $tes = ScholarshipProgram::create(['code' => 'TES', 'name' => 'TES']);
-        $this->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g, ['program_id' => $tes->id]))->assertSessionHasErrors('status');
+        $this->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g, ['program_id' => $tes->id, 'status' => 'active']))->assertSessionHasErrors('status');
         $this->assertSame(1, ScholarshipAssignment::count());
-        $this->assertSame(1, AuditEvent::where('subject_type', ScholarshipAssignment::class)->count());
+        $this->assertSame(0, AuditEvent::where('subject_type', ScholarshipAssignment::class)->count());
     }
 
-    public function test_pending_duplicates_are_prevented_and_pending_assignments_can_be_activated(): void
+    public function test_pending_duplicates_are_prevented_and_activation_requires_the_evaluation_workflow(): void
     {
         $g = $this->fixtures();
         $this->actingAs($this->staff('coordinator'));
@@ -256,8 +258,9 @@ class ScholarRecordsTest extends TestCase
         $this->post(route('scholars.assignments.store', $g['scholar']), $pending)->assertSessionHasErrors('program_id');
         $assignment = ScholarshipAssignment::firstOrFail();
         $this->get(route('scholars.assignments.edit', [$g['scholar'], $assignment]))->assertOk();
-        $this->patch(route('scholars.assignments.update', [$g['scholar'], $assignment]), $this->assignmentData($g))->assertSessionHasNoErrors();
-        $this->assertSame('active', $assignment->fresh()->status);
+        $this->patch(route('scholars.assignments.update', [$g['scholar'], $assignment]), $this->assignmentData($g, ['status' => 'active']))->assertSessionHasErrors('status');
+        $this->assertSame('pending', $assignment->fresh()->status);
+        $assignment->update(['status' => 'active']); // Exercise preservation of already-active records.
         $this->patch(route('scholars.assignments.update', [$g['scholar'], $assignment]), $this->assignmentData($g, ['status' => 'pending']))->assertSessionHasErrors('status');
         $this->assertSame('active', $assignment->fresh()->status);
     }
@@ -266,8 +269,7 @@ class ScholarRecordsTest extends TestCase
     {
         $g = $this->fixtures();
         $this->actingAs($this->staff('coordinator'));
-        $this->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g))->assertSessionHasNoErrors();
-        $old = ScholarshipAssignment::firstOrFail();
+        $old = ScholarshipAssignment::create(['student_id' => $g['scholar']->id, 'program_id' => $g['program']->id, 'start_period_id' => $g['period']->id, 'status' => 'active']);
         $closed = $this->assignmentData($g, ['status' => 'relinquished', 'end_period_id' => $g['period']->id, 'ends_on' => '2026-11-11', 'status_reason' => 'Scholar relinquished TDP by written request']);
         $this->patch(route('scholars.assignments.update', [$g['scholar'], $old]), $closed)->assertSessionHasNoErrors();
         $this->assertSame('ended', $old->fresh()->status);
@@ -275,10 +277,11 @@ class ScholarRecordsTest extends TestCase
         $tes = ScholarshipProgram::create(['code' => 'TES', 'name' => 'TES']);
         $this->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g, ['program_id' => $tes->id]))->assertSessionHasNoErrors();
         $this->assertSame(2, $g['scholar']->assignments()->count());
-        $this->assertSame(1, $g['scholar']->assignments()->where('status', 'active')->count());
+        $this->assertSame(0, $g['scholar']->assignments()->where('status', 'active')->count());
+        $this->assertSame(1, $g['scholar']->assignments()->where('status', 'pending')->count());
         $this->get(route('scholars.show', $g['scholar']))->assertOk()->assertSeeText('Relinquished')->assertSeeText('TDP')->assertSeeText('TES')->assertSeeText('Scholar relinquished TDP by written request');
         $this->patch(route('scholars.assignments.update', [$g['scholar'], $old]), $this->assignmentData($g))->assertForbidden();
-        $this->assertSame(3, AuditEvent::where('subject_type', ScholarshipAssignment::class)->count());
+        $this->assertSame(2, AuditEvent::where('subject_type', ScholarshipAssignment::class)->count());
     }
 
     public function test_closed_assignments_cannot_be_changed_or_deleted_even_by_raw_database_writes(): void
@@ -323,10 +326,10 @@ class ScholarRecordsTest extends TestCase
         $g = $this->fixtures();
         $this->actingAs($this->staff());
         $g['scholar']->update(['record_status' => 'archived']);
-        $this->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g))->assertSessionHasErrors('program_id');
+        $this->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g, ['status' => 'active']))->assertSessionHasErrors('status');
         $g['scholar']->update(['record_status' => 'active']);
         $g['program']->update(['is_active' => false]);
-        $this->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g))->assertSessionHasErrors('program_id');
+        $this->post(route('scholars.assignments.store', $g['scholar']), $this->assignmentData($g, ['status' => 'active']))->assertSessionHasErrors('status');
         $this->assertSame(0, ScholarshipAssignment::count());
     }
 

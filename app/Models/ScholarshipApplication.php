@@ -68,6 +68,13 @@ class ScholarshipApplication extends Model
         return $this->hasMany(EvaluationRun::class, 'application_id');
     }
 
+    public function currentSchoolDecision(): ?EvaluationRun
+    {
+        $run = $this->evaluationRuns()->orderByDesc('run_number')->first();
+
+        return $run?->isCurrent() ? $run : null;
+    }
+
     public function externalApprovals(): HasMany
     {
         return $this->hasMany(ExternalApproval::class, 'application_id');

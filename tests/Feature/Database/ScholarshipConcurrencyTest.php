@@ -47,6 +47,10 @@ class ScholarshipConcurrencyTest extends TestCase
             ]);
             $item = $this->billingItemData($g);
             $this->assertCompetingInsertIsRejected('billing_items', $item, array_replace($item, ['billing_batch_id' => $secondBatch->id]), $connection);
+            $revision = ['student_id' => $g['student']->id, 'academic_period_id' => $g['period']->id, 'revision' => 2, 'supersedes_id' => $g['record']->id];
+            $this->assertCompetingInsertIsRejected('academic_records', $revision, $revision, $connection);
+            $evaluation = ['application_id' => $g['application']->id, 'student_id' => $g['student']->id, 'program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'run_number' => 2, 'application_revision' => 1];
+            $this->assertCompetingInsertIsRejected('evaluation_runs', $evaluation, $evaluation, $connection);
         } finally {
             DB::purge('sms_concurrency_test');
             DB::setDefaultConnection($previous);

@@ -30,6 +30,23 @@ return [
 
     'disks' => [
 
+        'scholarship' => [
+            'driver' => 'local',
+            'root' => storage_path('app/scholarship-private'),
+            'visibility' => 'private',
+            'serve' => false,
+            'throw' => true,
+        ],
+
+        // Outside the public symlink and the local disk's signed serving route.
+        'academic' => [
+            'driver' => 'local',
+            'root' => storage_path('app/academic-private'),
+            'visibility' => 'private',
+            'serve' => false,
+            'throw' => true,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),

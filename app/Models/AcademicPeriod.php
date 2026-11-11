@@ -41,7 +41,8 @@ class AcademicPeriod extends Model
 
     public function isInUse(): bool
     {
-        return $this->terms()->exists() || $this->academicRecords()->exists()
+        return AcademicValidationContext::where('active_period_id', $this->id)->orWhere('source_period_id', $this->id)->exists()
+            || $this->terms()->exists() || $this->academicRecords()->exists()
             || $this->applications()->exists() || $this->startingAssignments()->exists()
             || $this->endingAssignments()->exists();
     }

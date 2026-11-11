@@ -29,9 +29,9 @@ class DashboardController extends Controller
                 'dateTime' => $localNow->toDateString(),
             ],
             'stats' => [
-                ['label' => 'Total Applications', 'value' => 286, 'trend' => '12%', 'direction' => 'up', 'comparison' => '+31 from last month', 'tone' => 'green', 'icon' => 'document'],
+                ['label' => 'Total Validations', 'value' => 286, 'trend' => '12%', 'direction' => 'up', 'comparison' => '+31 from last month', 'tone' => 'green', 'icon' => 'document'],
                 ['label' => 'For Evaluation', 'value' => 48, 'trend' => '18%', 'direction' => 'down', 'comparison' => '-11 from last month', 'tone' => 'blue', 'icon' => 'users'],
-                ['label' => 'Qualified Applicants', 'value' => 192, 'trend' => '15%', 'direction' => 'up', 'comparison' => '+25 from last month', 'tone' => 'amber', 'icon' => 'graduation-cap'],
+                ['label' => 'Qualified Scholars', 'value' => 192, 'trend' => '15%', 'direction' => 'up', 'comparison' => '+25 from last month', 'tone' => 'amber', 'icon' => 'graduation-cap'],
                 ['label' => 'Active Scholars', 'value' => 120, 'trend' => '6%', 'direction' => 'up', 'comparison' => '+7 from last year', 'tone' => 'purple', 'icon' => 'user-group'],
             ],
             'applications' => [18, 31, 29, 36, 44, 57, 50, 70, 76, 60, 51, 45],

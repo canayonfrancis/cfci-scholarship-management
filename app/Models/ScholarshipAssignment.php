@@ -20,6 +20,9 @@ class ScholarshipAssignment extends Model
         'closed_by',
         'status_reason',
         'closure_reason',
+        'activation_evaluation_id',
+        'activation_approval_id',
+        'activated_at',
     ];
 
     protected $hidden = ['active_student_id'];
@@ -35,6 +38,7 @@ class ScholarshipAssignment extends Model
         return [
             'starts_on' => 'immutable_date',
             'ends_on' => 'immutable_date',
+            'activated_at' => 'immutable_datetime',
         ];
     }
 
@@ -71,6 +75,16 @@ class ScholarshipAssignment extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(ScholarshipApplication::class, 'assignment_id');
+    }
+
+    public function activationEvaluation(): BelongsTo
+    {
+        return $this->belongsTo(EvaluationRun::class, 'activation_evaluation_id');
+    }
+
+    public function activationApproval(): BelongsTo
+    {
+        return $this->belongsTo(ExternalApproval::class, 'activation_approval_id');
     }
 
     public function externalApprovals(): HasMany

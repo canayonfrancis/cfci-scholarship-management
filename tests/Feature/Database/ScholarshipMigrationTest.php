@@ -41,11 +41,32 @@ class ScholarshipMigrationTest extends TestCase
             $foundation->up();
             $records = require database_path('migrations/2026_11_11_000001_preserve_closed_scholarship_assignments.php');
             $records->up();
+            $academic = require database_path('migrations/2026_11_11_000002_add_registrar_verification_fields.php');
+            // Existing academic content must survive the additive Registrar migration.
+            $student = DB::table('students')->insertGetId(['student_number' => 'LEGACY-1', 'first_name' => 'Existing', 'last_name' => 'Student']);
+            $period = DB::table('academic_periods')->insertGetId(['academic_year' => '2025-2026', 'semester_code' => '1']);
+            $academicId = DB::table('academic_records')->insertGetId(['student_id' => $student, 'academic_period_id' => $period, 'revision' => 1, 'grade_average' => '89.125', 'verification_status' => 'verified', 'verified_by' => 1, 'verified_at' => '2026-01-01 08:00:00']);
+            $academic->up();
+            $evaluation = require database_path('migrations/2026_11_11_000003_add_evaluation_and_activation_provenance.php');
+            $evaluation->up();
+            $clarification = require database_path('migrations/2026_11_11_000004_add_reported_grades_and_academic_context.php');
+            $clarification->up();
+            $this->assertNull(DB::table('academic_validation_context')->where('id', 1)->value('active_period_id'));
+            $this->assertTrue(Schema::hasTable('academic_record_grades'));
+            $this->assertTrue(Schema::hasColumn('evaluation_runs', 'evaluated_by'));
+            $this->assertSame('unverified', DB::table('academic_records')->where('id', $academicId)->value('academic_standing'));
+            $this->assertSame('89.125', (string) DB::table('academic_records')->where('id', $academicId)->value('grade_average'));
             $this->assertTrue(Schema::hasColumn('scholarship_assignments', 'closure_reason'));
             $this->assertTrue(Schema::hasTable('students'));
             $this->assertSame('existing-password-hash', DB::table('users')->where('id', 1)->value('password'));
             $this->assertSame('existing-payload', DB::table('sessions')->value('payload'));
             $this->assertSame('preserve-this', DB::table('legacy_school_records')->value('reference'));
+            $clarification->down();
+            $evaluation->down();
+            $this->assertFalse(Schema::hasColumn('evaluation_runs', 'evaluated_by'));
+            $academic->down();
+            $this->assertFalse(Schema::hasColumn('academic_records', 'academic_standing'));
+            $this->assertSame('verified', DB::table('academic_records')->where('id', $academicId)->value('verification_status'));
             $records->down();
             $this->assertFalse(Schema::hasColumn('scholarship_assignments', 'closure_reason'));
             $foundation->down();
@@ -56,6 +77,10 @@ class ScholarshipMigrationTest extends TestCase
             $this->assertSame('preserve-this', DB::table('legacy_school_records')->value('reference'));
             $foundation->up();
             $records->up();
+            $academic->up();
+            $evaluation->up();
+            $clarification->up();
+            $this->assertTrue(Schema::hasColumn('academic_records', 'academic_standing'));
             $this->assertTrue(Schema::hasTable('liquidation_items'));
             $this->assertSame(1, DB::table('users')->count());
         } finally {

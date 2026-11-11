@@ -41,6 +41,9 @@ class SaveScholarshipAssignment
                     throw ValidationException::withMessages(['status' => 'Close an active scholarship to end it. Pending is reserved for assignments that have not started.']);
                 }
                 if ($status === 'active') {
+                    if (! $current->exists || $current->status !== 'active') {
+                        throw ValidationException::withMessages(['status' => 'Create a pending assignment, then activate the award through its eligible evaluation and verified external approval.']);
+                    }
                     if ($student->record_status !== 'active' || (! $program->is_active && ! ($current->exists && $current->status === 'active'))) {
                         throw ValidationException::withMessages(['program_id' => 'An active assignment requires an active scholar record and a program available for assignment.']);
                     }
