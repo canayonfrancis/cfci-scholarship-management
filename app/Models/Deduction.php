@@ -20,6 +20,7 @@ class Deduction extends Model
         'settlement_status',
         'settled_on',
         'settlement_reference',
+        'authority_reference', 'consent_reference', 'settled_by',
     ];
 
     protected function casts(): array

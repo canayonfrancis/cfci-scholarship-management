@@ -6,6 +6,6 @@
         <td>₱{{ number_format((float) $summary['allocated'], 2) }}<small class="records-muted">{{ $summary['scholar_count'] }} scholars; adjustments ₱{{ number_format((float) $summary['adjustments'], 2) }}</small></td>
         <td>{{ $summary['remaining'] === null ? 'Unconfigured' : '₱'.number_format((float) $summary['remaining'], 2) }}</td>
         <td>{{ $summary['pending'] === null ? 'Unconfirmed' : '₱'.number_format((float) $summary['pending'], 2) }}</td>
-        <td>₱{{ number_format((float) $summary['received'], 2) }}</td><td>₱{{ number_format((float) $summary['released_net'], 2) }}</td></tr>
+        <td>₱{{ number_format((float) $summary['received'], 2) }}</td><td>₱{{ number_format((float) $summary['released_net'], 2) }}<small class="records-muted">Direct-to-student: ₱{{ number_format((float) $summary['direct_paid_net'], 2) }} (excluded from school cash)</small></td></tr>
 @empty<tr><td colspan="7">No semester fund configurations match these filters.</td></tr>@endforelse
 </tbody></table></div>

@@ -684,6 +684,8 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
 
 /* Scholar records use the existing dashboard palette, cards, and navigation. */
 .scholar-form-intro { margin-bottom: 20px; }
+.financial-evidence { margin: 24px 0; padding-block: 16px; border-top: 1px solid var(--border); }
+.financial-evidence .records-actions { margin-block: 12px; }
 .scholar-missing-fields { margin-top: 12px; padding-left: 20px; list-style: disc; color: var(--text-secondary); font-size: 13px; line-height: 1.8; }
 .scholar-section-title { margin-top: 24px; }
 .scholar-program-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }

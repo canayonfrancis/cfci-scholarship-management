@@ -15,6 +15,7 @@ class Liquidation extends Model
         'status',
         'prepared_by',
         'submitted_at',
+        'submitted_by',
         'reviewed_by',
         'reviewed_at',
         'review_notes',

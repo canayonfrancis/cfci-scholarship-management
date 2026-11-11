@@ -312,8 +312,8 @@ class ScholarshipEvaluationTest extends TestCase
         $application = $this->context();
         $run = $this->evaluate($application);
         $data = match ($case) {
-            'expired' => ['valid_until' => now()->subDay()->toDateString()],
-            'future' => ['valid_from' => now()->addDay()->toDateString()],
+            'expired' => ['valid_until' => now('Asia/Manila')->subDay()->toDateString()],
+            'future' => ['valid_from' => now('Asia/Manila')->addDay()->toDateString()],
             'rejected', 'revoked' => ['decision' => $case],
             default => [],
         };
@@ -391,7 +391,7 @@ class ScholarshipEvaluationTest extends TestCase
         $this->assertSame(auth()->id(), $run->evaluated_by);
         $this->assertSame('qualified', $run->school_decision);
         $this->assertSame('UNIFAST-TDP-MC02-2026-v1', $run->rule_version);
-        $this->post(route('evaluations.external', $application), ['authority' => 'School', 'decision' => 'approved', 'reference' => 'X', 'decided_on' => now()->addDay()->toDateString(), 'previous_approval' => 0])->assertSessionHasErrors(['authority', 'decided_on', 'verified', 'certificate', 'verification_notes']);
+        $this->post(route('evaluations.external', $application), ['authority' => 'School', 'decision' => 'approved', 'reference' => 'X', 'decided_on' => now('Asia/Manila')->addDay()->toDateString(), 'previous_approval' => 0])->assertSessionHasErrors(['authority', 'decided_on', 'verified', 'certificate', 'verification_notes']);
         $this->assertDatabaseCount('external_approvals', 0);
         $this->assertDatabaseRejects(fn () => $application->terms->update(['criteria' => []]));
     }

@@ -39,6 +39,12 @@ Mutations use server-side policies, current row locks, transactions, stale rate/
 
 `ScholarshipProgramSeeder` provides corrected initial reference defaults without overwriting local changes. The explicitly invoked, idempotent `ConfirmedScholarshipProgramSeeder` adopts this user's confirmed TES/TDP/CoScho references once, audits previous/current reference values and preserves later administrator edits. It changes no approved semester rate, allocation, budget or academic year.
 
+## Financial recording extension (2026-11-12)
+
+[Funding, payments, deductions and liquidation](financial-records.md) now records actual school receipts, scoped cash allocations, independently verified school/direct student payments, individually authorized deductions, evidenced full settlements, incomplete/complete batch liquidation and printable summaries. These reuse the existing billing item and approved-batch history. Allocation summaries/CSV distinguish school-paid student net from direct-to-student net; neither billing nor budget approval manufactures a receipt or payment. Ordinary allocation adjustments are blocked after accepted liquidation pending a reviewed correction process.
+
+The scope boundary below describes the earlier allocation-only delivery. Task 10 in `progress.md` is current for the implemented basic recording workflows. Pooling, cash returns/transfers, partial deduction settlements, production reversals, automatic disbursement and official provider templates remain outside the delivered scope.
+
 ## Remaining policy and scope boundaries
 
 Required CFCI numeric grading rules remain unconfirmed. No CoScho/custom-program academic profile is invented. Such missing rules continue to produce pending review and block allocations even when their rate/budget is configured. Tests use clearly identified synthetic resolved prerequisites only to exercise downstream financial safeguards.

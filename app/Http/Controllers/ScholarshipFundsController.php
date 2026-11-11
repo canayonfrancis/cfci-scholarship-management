@@ -71,10 +71,10 @@ class ScholarshipFundsController extends Controller
                 $safe = fn ($value) => preg_match('/^[=+@\-\t\r]/', (string) $value) ? "'".$value : $value;
                 $row = fn ($values) => fputcsv($stream, array_map($safe, $values), ',', '"', '');
                 $row(['Scholarship fund summary (PHP); budget and allocations are not cash receipts or payments']);
-                $row(['Program', 'Academic year', 'Semester', 'Budget', 'Approved allocations', 'Adjustments', 'Remaining budget', 'Pending approval', 'Actually received', 'Net cash released']);
+                $row(['Program', 'Academic year', 'Semester', 'Budget', 'Approved allocations', 'Adjustments', 'Remaining budget', 'Pending approval', 'Actually received', 'School-paid student net', 'Verified direct-to-student net']);
                 foreach ($terms as $term) {
                     $s = $summary->forTerms($term);
-                    $row([$term->program->code, $term->academicPeriod->academic_year, $term->academicPeriod->semester_code, $s['budget']?->amount ?? 'Unconfigured', $s['allocated'], $s['adjustments'], $s['remaining'] ?? 'Unconfigured', $s['pending'] ?? 'Unconfirmed', $s['received'], $s['released_net']]);
+                    $row([$term->program->code, $term->academicPeriod->academic_year, $term->academicPeriod->semester_code, $s['budget']?->amount ?? 'Unconfigured', $s['allocated'], $s['adjustments'], $s['remaining'] ?? 'Unconfigured', $s['pending'] ?? 'Unconfirmed', $s['received'], $s['released_net'], $s['direct_paid_net']]);
                 }
                 $row([]);
                 $row(['Student number', 'Scholar', 'Program', 'Academic year', 'Semester', 'Batch', 'Status', 'Original allocation', 'Effective allocation', 'Approval reference', 'Approved by']);

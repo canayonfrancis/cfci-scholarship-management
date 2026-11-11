@@ -10,6 +10,7 @@ use App\Models\ScholarshipProgram;
 use App\Models\Student;
 use App\Policies\AcademicPeriodPolicy;
 use App\Policies\AcademicRecordPolicy;
+use App\Policies\FinancialRecordPolicy;
 use App\Policies\ScholarshipApplicationPolicy;
 use App\Policies\ScholarshipAssignmentPolicy;
 use App\Policies\ScholarshipProgramPolicy;
@@ -32,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::define('financial-view', fn ($user) => app(FinancialRecordPolicy::class)->viewAny($user));
+        Gate::define('financial-prepare', fn ($user) => app(FinancialRecordPolicy::class)->prepare($user));
+        Gate::define('financial-verify', fn ($user) => app(FinancialRecordPolicy::class)->verify($user));
+        Gate::define('financial-evidence', fn ($user) => app(FinancialRecordPolicy::class)->evidence($user));
         Gate::policy(Student::class, StudentPolicy::class);
         Gate::policy(AcademicRecord::class, AcademicRecordPolicy::class);
         Gate::policy(ScholarshipApplication::class, ScholarshipApplicationPolicy::class);

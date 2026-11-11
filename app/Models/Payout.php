@@ -24,6 +24,7 @@ class Payout extends Model
         'posted_at',
         'reversal_of_id',
         'correction_reason',
+        'recorded_by', 'record_key', 'payment_mode', 'institutional_student_id', 'basis_snapshot',
     ];
 
     protected function casts(): array
@@ -33,6 +34,7 @@ class Payout extends Model
             'net_amount' => 'decimal:2',
             'paid_on' => 'immutable_date',
             'posted_at' => 'immutable_datetime',
+            'basis_snapshot' => 'array',
         ];
     }
 

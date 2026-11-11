@@ -1,0 +1,70 @@
+# Funding, student payments, deductions and liquidation
+
+Implemented and verified on **2026-11-12, Asia/Manila**. The user's current request authorizes this recording workflow. It reuses the existing financial models, bill items, approvals, immutable history and private evidence. It records verified events; it does not transfer money through a bank or payment gateway.
+
+## Operation
+
+Open **Payments & liquidation** in the existing primary navigation. Finance, Administrator, Coordinator and Viewer can read financial summaries; Registrar and accounts without the applicable roles cannot access this module. Submitted batches are visible, but funding allocation and student-payment drafts require an independently approved batch.
+
+1. **Record actual school receipts.** Finance selects the scholarship program/year/semester and enters the actual amount, date received, source and receipt/bank reference. The record starts as a draft. Upload private receipt evidence; a different Administrator reviews the proof and verifies/posts the receipt. Only posted records enter received totals. Source/reference duplicates within the scope are rejected. Budgets, billing and expected funding never create a receipt.
+2. **Allocate received cash to a batch.** Finance selects an unreversed, verified receipt in the same program/semester. The allocation is limited by both unallocated receipt money and the batch's effective approved amount. An operation UUID makes retries idempotent. This reserves received cash; it does not record a payment to a student.
+3. **Record a student payment draft.** Finance selects the original billing item, school-paid or direct-to-student path, gross benefit applied, amount actually paid to the student, actual date, method and transaction reference. The beneficiary name and existing institutional Student ID are retained as snapshots. A second Student identity is not created. Reusing the same method/reference for the item is rejected.
+4. **Verify actual payment.** Upload a signed acknowledgment or other approved payment proof. A different Administrator reviews the proof and posts the payment. Posting rechecks current billing eligibility/semester approval, the effective allocation and all earlier verified payments. School payments additionally need enough verified receipts allocated to the batch by the payment date. Direct-to-student payments require proof but create no school receipt, allocation or school cash release. Both paths consume the same student benefit cap.
+5. **Authorize only specifically permitted deductions.** Finance cannot insert an arbitrary deduction. Before a school-payment draft is posted, another Administrator must enter the exact type/amount, specific reason, applicable written program/provider authority, beneficiary consent or approved-basis reference, destination and supporting authority file. The Administrator explicitly verifies applicability to this beneficiary/program/semester. The supplied authority evidence is accepted as part of that case authorization. There are no default deduction types, tuition offsets, percentages, thresholds or inferred school permissions. Missing authority means no authorized deduction. No school deduction is allowed on a provider's direct-to-student payment.
+6. **Reconcile gross and actual student amount.** Gross benefit applied must equal the actual student payment plus the specifically authorized deductions, in exact centavos. Authorizations cannot exceed that difference. A retained deduction is a liability, not a settled payment. Gross benefit is reserved against school funding so retained deductions cannot be spent again.
+7. **Record actual full settlement of an authorized deduction.** Finance uploads settlement proof. An Administrator independently reviews it and records the actual settlement date/reference after the school payment. Withholding alone never changes settlement status. Partial deduction settlement, automatic collection and guessed settlement rules are not implemented.
+8. **Prepare and track liquidation drafts.** Finance opens a batch report. Its lines come from verified net student payments and separately settled deductions, preserving the correct bill/payment relationships. Missing payments, identity/date/reference data, intact accepted proof, unresolved deductions, stale report lines, unspent allocated school cash or unreconciled amounts are listed as incomplete. Drafts remain saveable and printable. Refresh a draft after new payments/settlements; it never invents missing evidence.
+9. **Submit and review.** A full batch must reconcile before submission. The submitted report and lines are frozen. A different Administrator from both preparer and submitter accepts the complete report or returns it with reasons. Returned reports remain unchanged; Finance creates a new sequence. A batch already covered by an accepted report cannot be liquidated again. An accepted report also blocks ordinary allocation adjustments pending a reviewed correction process.
+10. **Print a simple summary.** Each report offers a standalone printable page with school/program/semester/batch, institutional IDs, retained beneficiary names, actual dates, methods/references, net student amounts, settled deductions, separate school/direct totals and review status. Incomplete/draft states are clearly identified. It is a local reconciliation summary, not an invented provider filing template or certification.
+
+Partial student-payment events can be recorded against the original bill up to its approved remaining amount. This creates no additional semester bill or guaranteed benefit. A partially paid batch remains incomplete for liquidation. Historical posted records remain readable after student/assignment changes; new posting does not bypass current eligibility for an archived student or a stale validation.
+
+## Authority and evidence
+
+| Responsibility | Finance | Administrator | Coordinator / Viewer |
+| --- | --- | --- | --- |
+| Read batches, totals and printable summaries | Yes | Yes | Yes |
+| Record receipts/payment drafts and allocate verified receipts | Yes | Requires explicit Finance role | No |
+| Upload/read private financial evidence | Yes | Yes | No |
+| Verify receipt/payment/settlement evidence and posting | No | Yes, with separation from recorder/uploader | No |
+| Authorize a program-permitted deduction | No | Yes, separate from payment recorder, with exact-case authority proof | No |
+| Prepare/refresh/submit liquidation | Yes | Requires explicit Finance role | No |
+| Accept/return liquidation | No | Yes, separate from preparer and submitter | No |
+
+Dual membership never permits self-verification. Role memberships and credentials were not changed by this implementation. Ordinary receipt/payment/settlement evidence needs an Administrator different from the uploader. The exact-case deduction authority is verified by the authorizing Administrator as part of that separate authorization operation.
+
+Files use the existing private `scholarship` disk outside public storage. Only authenticated Finance/Administrator downloads are permitted, with an allowed financial owner, matching document ownership, correct private prefix and intact SHA-256 checksum. The download is an attachment with private/no-store and nosniff headers. PDF/JPG/PNG uploads are limited to 2 MB; executable/wrong-format and oversized uploads are rejected. Accepted evidence is immutable and retained. Submitted liquidation evidence/lines cannot be replaced through the draft controls. New failed uploads/authorization transactions clean up only their own generated files.
+
+## Data and accurate totals
+
+No duplicate financial or Student tables were added. Migration **`2026_11_12_000008_add_financial_recording_workflows.php`** adds nullable provenance/duplicate keys to existing receipts and payouts; payout path, institutional-ID and eligibility snapshots; deduction authority/beneficiary-basis/settler fields; and the liquidation submitter. Existing rows are not backfilled or rewritten. Existing FKs, one-owner documents, unique posting keys, signed original/reversal entries and posted-history guards are reused. Additional database guards freeze submitted/returned liquidation lines, prevent self-verification and duplicate accepted coverage, and protect deduction authority history. SQLite adds nullable FKs directly to retain existing history triggers instead of rebuilding their tables.
+
+`RecordFinancialActivity`, `ManageLiquidation`, `FinancialEvidence` and `LiquidationSummary` handle transactional operations and derived amounts. Existing `Money` uses integer centavos. There is no mutable student balance and no automatic deduction formula. Scope, receipt, batch, student and payment locks serialize competing work. Balance queries use **locking reads** so MariaDB repeatable-read snapshots cannot reuse a balance established before a competing transaction commits. Immutable scope metadata is resolved before opening the transaction; file-writing transactions are not retried.
+
+School receipt totals count only posted actual receipts. School-paid student net, settled deductions and retained deductions remain separate. Direct-to-student net is excluded from school cash and is also shown separately in allocation summaries/CSV. Gross benefit caps include both payment paths. Net student payout plus settled deductions accounts for school cash outflow; a retained deduction is not added a second time to gross benefit. The new module also labels retained legacy reversal history instead of presenting it as another positive payment.
+
+## Verified behavior
+
+- Billing prerequisite: **53 billing/budget/approval tests passed / 581 assertions** before implementation.
+- Full SQLite regression suite: **289 passed, three MySQL-only concurrency skips / 2,986 assertions**.
+- New financial feature coverage: **29 cases** covering records/totals, missing cash, direct versus school payments, explicit deduction authority, full settlement, incomplete/returned/accepted reports, submitted/posted immutability, duplicate references/idempotency, private access/checksums, upload validation, forged actor/status fields, current eligibility and audit/file rollback.
+- New automated **`FinancialPostingConcurrencyTest` passed on MariaDB 10.11.16 / 13 assertions**. A real second verifier waits for the first transaction, then rejects another PHP 4,000 payment against a PHP 7,500 allocation. This detects the repeatable-read race that sequential tests cannot establish. The test requires an isolated `_test` connection, creates its own schema additively and retains it; it does not reset or delete a database.
+- The first prototype race reproduced an over-post in the fictional financial demo. The locking-read correction passed both a repeated two-process check and the automated regression. Original synthetic records were retained with an explicit, evidenced fixture-only reversal of the duplicate; no application payment was affected. That fixture correction does not add an unreviewed production reversal endpoint.
+- Real Chrome verification passed for receipt evidence/verification, school-cash allocation, actual payment acknowledgment, exact-case deduction authority, incomplete-to-accepted liquidation, full settlement, printable summary, separate direct payment and responsive mobile layout. Screenshots were inspected; no JavaScript exceptions were recorded. Browser/server processes were stopped afterward.
+- Migration applied normally to the application and both earlier demo databases. Before/after fingerprints across **30 original non-infrastructure tables per database** confirmed values/counts, credentials and history preserved, apart from migration bookkeeping. The original databases still have **zero posted receipts and zero payouts**. `.env` is unchanged; no destructive database reset was used.
+- A separate **`cfci_sms_financial_demo`** holds the fictional browser/race examples. **107 FKs and 320 private-file checksums passed**. Effective posted benefit totals stay within every billing item's cap, including the retained fixture correction. The accepted school report reconciles **PHP 7,000 student net + PHP 500 settled deduction = PHP 7,500 actual school cash**, with no retained balance. Verified direct payments are separate; in the final fixture they total PHP 15,500 and do not increase school receipts or releases.
+- Two existing future-date test cases were corrected to use Manila dates, matching the existing production validation across UTC/local midnight. Scholarship rules were not weakened. Production build, Blade compilation, Pint and whitespace checks passed.
+
+## Commands and boundaries
+
+```powershell
+php artisan migrate --no-interaction
+php artisan test --filter=FinancialRecordingTest
+php artisan test
+# On an isolated MySQL/MariaDB connection ending in _test:
+php artisan test --filter=FinancialPostingConcurrencyTest
+```
+
+The dedicated browser demo uses the same sample role accounts/password documented in `sample-data.md`. Open a separate local terminal, set `DB_DATABASE=cfci_sms_financial_demo` and `DB_URL=''`, then run `php artisan serve --port=8001`. Closing that terminal leaves the ordinary application connection unchanged. Demo cash and evidence are explicitly fictional.
+
+School grading rules, CoScho eligibility and actual source-period configuration remain unchanged. There are no invented deduction permissions, automated disbursements, payment gateways, chart-of-accounts formulas, cash pooling, unspent-fund returns/transfers, partial deduction settlement, production cash reversals or official provider deadlines/templates. Unreconciled cash, legacy reversals and unknown proof remain explicit review/incomplete states. Those broader policies need school direction; the requested basic recording, evidence, reconciliation and printable-liquidation module is implemented and tested.

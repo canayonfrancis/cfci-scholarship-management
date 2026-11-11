@@ -90,6 +90,9 @@ class ManageScholarshipFunds
             $terms = ProgramPeriodTerm::whereKey($item->batch->program_period_term_id)->lockForUpdate()->firstOrFail();
             $batch = $item->batch()->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize('adjust', $batch);
+            if ($batch->liquidations()->where('status', 'accepted')->exists()) {
+                $this->fail('Accepted liquidation history cannot be changed through an allocation adjustment. A reviewed financial correction workflow is required.');
+            }
             $last = $item->adjustments()->orderByDesc('sequence')->first();
             if ((int) ($last?->sequence ?? 0) !== (int) $data['previous_adjustment']) {
                 $this->fail('This allocation has a newer adjustment. Reload its history.');
@@ -99,7 +102,7 @@ class ManageScholarshipFunds
             if ($before === $after) {
                 $this->fail('The adjustment must change the effective allocation amount.');
             }
-            $released = Money::signedTotal($item->payouts()->where('status', 'posted')->get(), 'gross_amount');
+            $released = Money::signedTotal($item->payouts()->where('status', 'posted')->lockForUpdate()->get(), 'gross_amount');
             if ($after < $released) {
                 $this->fail('An allocation cannot be reduced below funds already released. Reconcile the release through its authorized correction workflow first.');
             }

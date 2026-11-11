@@ -7,6 +7,16 @@ Status: baseline design with CFCI's subsequent direct-validation clarification a
 
 This plan is based on the repository and the school's requirements supplied in this conversation. It does not establish external scholarship policy. Confirmed requirements, implementation proposals, and unresolved decisions are identified separately. See [progress.md](progress.md) for verification results and the work tracker.
 
+## Financial recording and liquidation delivered (2026-11-12)
+
+The user's current request authorizes the basic funding/payment/deduction/liquidation recording workflow. Task 10 in [progress.md](progress.md) and [financial-records.md](financial-records.md) supersede earlier “posting not started” descriptions for this specific scope. Existing financial relationships and restrictive/immutable history are reused, with additive migration `000008`.
+
+Finance records real receipts and payment drafts; separate Administrator verification and intact evidence are required before posting. Received cash, batch cash allocations, school-paid student net, verified direct-to-student payments, authorized retained deductions and actual settlement remain distinct. Student IDs are snapshotted from the existing identity. No budget or bill becomes received/paid automatically. Transactions use current locking reads and scope locks to reject competing overspending under MariaDB repeatable-read isolation.
+
+Deduction permission is never inferred from school charges or a percentage: each exact case requires applicable program/provider written authority, beneficiary consent/approved basis, reason and evidence verified by another Administrator. Unknown permission blocks it. Existing batch-scoped liquidation stores actual net/settlement coverage, shows incomplete cases, freezes submissions and supports independent accept/return plus simple printing. These are local reconciliation summaries, not an assumed official provider filing template.
+
+R08/R09/R10/R11 remain open for broader pooling, transfers/returns, partial settlements, production reversals, provider-specific restrictions and official liquidation scope/deadlines. No additional policy or complex accounting engine is introduced. Verification, including real concurrent posting and preservation of all existing application/demo records, is recorded under Task 10.
+
 ## Scholar Information enhancement delivered (2026-11-11)
 
 The user's complete Scholar Information requirements are implemented in the existing module. [Scholar Information field mapping and operation](scholar-information.md) and Task 9 in [progress.md](progress.md) are the current references; historical minimal Student definitions below are superseded only for this supporting function.

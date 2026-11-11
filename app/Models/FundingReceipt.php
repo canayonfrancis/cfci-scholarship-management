@@ -23,6 +23,7 @@ class FundingReceipt extends Model
         'posted_at',
         'reversal_of_id',
         'correction_reason',
+        'recorded_by', 'record_key',
     ];
 
     protected function casts(): array

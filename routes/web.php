@@ -5,6 +5,7 @@ use App\Http\Controllers\AcademicProgramController;
 use App\Http\Controllers\AcademicVerificationController;
 use App\Http\Controllers\BillingBatchController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FinancialRecordController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScholarController;
 use App\Http\Controllers\ScholarshipAssignmentController;
@@ -20,6 +21,28 @@ Route::get('/dashboard', DashboardController::class)
     ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::prefix('financial-records')->name('financial.')->middleware('cache.headers:no_store;private')->controller(FinancialRecordController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('batches/{batch}', 'batch')->name('batch');
+        Route::post('receipts', 'createReceipt')->name('receipts.store');
+        Route::get('receipts/{receipt}', 'receipt')->name('receipt');
+        Route::post('receipts/{receipt}/post', 'postReceipt')->name('receipts.post');
+        Route::post('batches/{batch}/funding', 'allocate')->name('allocate');
+        Route::post('payments', 'createPayout')->name('payouts.store');
+        Route::get('payments/{payout}', 'payout')->name('payout');
+        Route::post('payments/{payout}/post', 'postPayout')->name('payouts.post');
+        Route::post('payments/{payout}/deductions', 'deduct')->name('deduct');
+        Route::post('deductions/{deduction}/settle', 'settle')->name('settle');
+        Route::post('batches/{batch}/liquidations', 'prepareLiquidation')->name('liquidations.store');
+        Route::get('liquidations/{liquidation}', 'liquidation')->name('liquidation');
+        Route::get('liquidations/{liquidation}/print', 'printLiquidation')->name('liquidations.print');
+        Route::post('liquidations/{liquidation}/refresh', 'refreshLiquidation')->name('liquidations.refresh');
+        Route::post('liquidations/{liquidation}/submit', 'submitLiquidation')->name('liquidations.submit');
+        Route::post('liquidations/{liquidation}/review', 'reviewLiquidation')->name('liquidations.review');
+        Route::post('evidence/{type}/{id}', 'uploadEvidence')->whereNumber('id')->name('evidence.store');
+        Route::get('evidence/{type}/{id}/{document}', 'download')->whereNumber('id')->name('evidence.download');
+        Route::post('evidence/{type}/{id}/{document}/review', 'reviewEvidence')->whereNumber('id')->name('evidence.review');
+    });
     Route::resource('academic-programs', AcademicProgramController::class)->only(['index', 'store', 'update']);
     Route::get('billing-batches', [BillingBatchController::class, 'index'])->name('billing-batches.index');
     Route::post('billing-batches/terms', [BillingBatchController::class, 'configure'])->name('billing-batches.terms');

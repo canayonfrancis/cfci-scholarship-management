@@ -29,6 +29,9 @@
                 if (auth()->user()->can('viewAny', \App\Models\BillingBatch::class)) {
                     $navItems[] = ['Billing batches', 'clipboard', route('billing-batches.index'), request()->routeIs('billing-batches.*')];
                 }
+                if (auth()->user()->can('financial-view')) {
+                    $navItems[] = ['Payments & liquidation', 'clipboard', route('financial.index'), request()->routeIs('financial.*')];
+                }
                 $roleLabels = auth()->user()->roles->pluck('role')->map(fn ($role) => Str::headline($role));
                 $initials = Str::of(auth()->user()->name)->trim()->explode(' ')->filter()->take(2)->map(fn ($part) => Str::upper(Str::substr($part, 0, 1)))->implode('');
             @endphp
