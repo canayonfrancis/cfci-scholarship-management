@@ -19,6 +19,7 @@ use App\Models\ScholarshipBatchMembership;
 use App\Models\ScholarshipProgram;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\Billing\BillingRoster;
 use App\Services\Billing\LiquidationSummary;
 use App\Services\DashboardAnalytics;
 use App\Services\Eligibility\OfficialRuleCatalog;
@@ -149,7 +150,7 @@ class ScholarshipLifecycleTest extends TestCase
         $this->login($g['coordinator']);
         $this->post(route('billing-batches.terms'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'semester_gross_amount' => '7500.25', 'billing_source_reference' => 'SYNTHETIC rate does not waive eligibility', 'confirm_billing_policy' => 1])->assertSessionHasNoErrors();
         $this->login($g['registrar']);
-        $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id])->assertSessionHasNoErrors();
+        $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $g['roster']->id])->assertSessionHasNoErrors();
         $batch = BillingBatch::sole();
         $this->post(route('billing-batches.items.store', $batch), ['application_id' => $g['application']->id, 'lock_version' => $batch->lock_version])->assertSessionHasErrors('billing');
         $this->assertDatabaseCount('billing_items', 0);
@@ -186,6 +187,8 @@ class ScholarshipLifecycleTest extends TestCase
         Http::preventStrayRequests();
         // Never enabled in production; this isolates downstream integration from an unconfirmed school rule.
         $this->mock(SchoolGradingPolicy::class)->shouldReceive('check')->andReturn(['status' => 'pass', 'reason' => 'SYNTHETIC resolved prerequisite for integration test only']);
+        // Isolate downstream finances from CR-02; no production classification is invented.
+        $this->partialMock(BillingRoster::class)->shouldReceive('submissionClassification')->andReturnNull();
         $g = $this->evaluatedScholar($recordingRole, $reviewingRole);
         $this->assertSame('passed', $g['run']->automatic_outcome);
         $this->assertSame(1, app(ScholarshipReports::class)->build('not-billed')['counts']['rows']);
@@ -194,7 +197,7 @@ class ScholarshipLifecycleTest extends TestCase
         $this->post(route('evaluations.activate', $g['application']), ['evaluation_id' => $g['run']->id, 'approval_id' => $g['approval']->id])->assertSessionHasErrors('award');
         $terms = $g['application']->terms;
         $this->login($g['admin']);
-        $scope = ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id];
+        $scope = ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $g['roster']->id];
         $this->post(route('billing-batches.terms'), $scope + ['semester_gross_amount' => '7500.25', 'billing_source_reference' => 'SYNTHETIC approved semester amount and exact policy', 'confirm_billing_policy' => 1])->assertSessionHasNoErrors();
         $this->post(route('billing-batches.budget'), $scope + ['previous_budget' => 0, 'amount' => '7500.25', 'source_reference' => 'SYNTHETIC approved budget'])->assertSessionHasNoErrors();
         $this->login($g['finance']);
@@ -273,9 +276,9 @@ class ScholarshipLifecycleTest extends TestCase
             $this->get(route('scholarship-reports.index', ['report' => $kind]))->assertOk()->assertViewHas('result', fn ($r) => $r['counts']['rows'] === $expected);
         }
         $this->assertSame('7500.25', app(ScholarshipReports::class)->build('liquidated')['totals']['Verified liquidated coverage (PHP)']);
-        // Actual HTTP billing remains separate from its roster; approved form integration is unresolved.
-        $this->assertNull($batch->fresh()->scholarship_batch_id);
-        $this->assertSame('Unlinked historical submission', app(ScholarshipReports::class)->build('billed')['rows']->sole()['roster']);
+        // Actual HTTP creation persists its independent roster; final form rules remain unresolved.
+        $this->assertSame($g['roster']->id, $batch->fresh()->scholarship_batch_id);
+        $this->assertSame($g['roster']->batch_number, app(ScholarshipReports::class)->build('billed')['rows']->sole()['roster']);
         $this->get(route('financial.liquidations.print', $report))->assertOk()->assertSee('7500.25');
         $this->get(route('billing-batches.report', $scope))->assertOk();
         $this->get(route('billing-batches.report', $scope + ['export' => 'csv']))->assertOk()->assertDownload('scholarship-allocations.csv');

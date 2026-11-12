@@ -98,7 +98,7 @@ class ScholarshipReports
 
     private function base(BillingItem $item): array
     {
-        return ['program' => $item->program->code, 'roster' => $item->batch->scholarshipBatch?->batch_number ?? 'Unlinked historical submission',
+        return ['program' => $item->program->code, 'roster' => $item->batch->scholarshipBatch?->batch_number ?? 'No recorded roster link',
             'academic_year' => $item->academicPeriod->academic_year, 'semester' => $item->academicPeriod->semester_code,
             'student_number' => $item->student->student_number, 'scholar' => $item->student->full_name,
             'billing' => $item->batch->batch_number, 'billing_item' => $item->id,
@@ -277,7 +277,7 @@ class ScholarshipReports
             ->with(['batch.program', 'batch.academicPeriod', 'batch.scholarshipBatch', 'items', 'reviewedBy'])->orderBy('billing_batch_id')->orderBy('id')->get();
         foreach ($reports as $report) {
             $batch = $report->batch;
-            $base = ['program' => $batch->program->code, 'roster' => $batch->scholarshipBatch?->batch_number ?? 'Unlinked historical submission',
+            $base = ['program' => $batch->program->code, 'roster' => $batch->scholarshipBatch?->batch_number ?? 'No recorded roster link',
                 'academic_year' => $batch->academicPeriod->academic_year, 'semester' => $batch->academicPeriod->semester_code, 'billing' => $batch->batch_number,
                 '_roster_id' => $batch->scholarship_batch_id, '_billing_id' => $batch->id, '_url' => route('financial.liquidation', $report)];
             $issues = [];

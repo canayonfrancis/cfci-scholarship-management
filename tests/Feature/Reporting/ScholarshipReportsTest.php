@@ -8,6 +8,7 @@ use App\Actions\Billing\RecordFinancialActivity;
 use App\Actions\Records\ManageScholarshipRoster;
 use App\Models\AcademicPeriod;
 use App\Models\AcademicRecord;
+use App\Models\BillingBatch;
 use App\Models\BillingItem;
 use App\Models\Liquidation;
 use App\Models\Payout;
@@ -16,6 +17,7 @@ use App\Models\ScholarshipBatch;
 use App\Models\ScholarshipProgram;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\Billing\BillingEligibility;
 use App\Services\Reporting\ScholarshipReports;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
@@ -47,6 +49,51 @@ class ScholarshipReportsTest extends TestCase
         return route('scholarship-reports.index', ['report' => $report] + $filters);
     }
 
+    public static function rosterFilteredModes(): array
+    {
+        return array_map(fn ($mode) => [$mode], array_keys(ScholarshipReports::TITLES));
+    }
+
+    #[DataProvider('rosterFilteredModes')]
+    public function test_all_six_modes_filter_real_http_roster_links_without_other_roster_totals(string $mode): void
+    {
+        $first = $this->submission(submit: $mode !== 'not-billed');
+        $second = $this->submission(submit: $mode !== 'not-billed');
+        if (in_array($mode, ['paid-signed', 'liquidated'], true)) {
+            foreach ([$first, $second] as $g) {
+                $payment = $this->payrollPayment($g, '7500.25', 'direct');
+                $this->makeSignedAcknowledgment($payment, $g['recorder'], $g['reviewer']);
+                if ($mode === 'liquidated') {
+                    $action = app(ManageLiquidation::class);
+                    $liquidation = $action->prepare($g['batch'], $g['recorder'], 'SYNTHETIC roster-filter liquidation');
+                    $this->makeLiquidationSupport($liquidation, $g['recorder'], $g['reviewer']);
+                    $action->submit($liquidation, $g['recorder']);
+                    $action->review($liquidation, $g['reviewer'], 'accepted', 'Synthetic independent acceptance');
+                }
+            }
+        }
+        $all = $this->report($mode);
+        $filtered = $this->report($mode, ['scholarship_batch_id' => $first['roster']->id]);
+        $this->assertSame(2, $all['counts']['rows']);
+        $this->assertSame(1, $filtered['counts']['rows']);
+        $this->assertSame($first['roster']->id, $filtered['rows']->sole()['_roster_id']);
+        $this->assertSame(1, $filtered['counts']['scholars']);
+        $this->assertSame($first['roster']->id, $first['batch']->fresh()->scholarship_batch_id);
+        $totalField = match ($mode) {
+            'billed' => 'Total billing amount (original PHP)',
+            'awaiting-funds' => 'Batch funding shortfall counted once (PHP)',
+            'paid-signed' => 'Signed student net (PHP)',
+            'liquidated' => 'Verified liquidated coverage (PHP)',
+            default => null,
+        };
+        if ($totalField) {
+            $this->assertSame('7500.25', $filtered['totals'][$totalField]);
+            $this->assertSame('15000.50', $all['totals'][$totalField]);
+        }
+        $this->actingAs($first['recorder'])->get($this->url($mode, ['scholarship_batch_id' => $first['roster']->id]))->assertOk()
+            ->assertViewHas('result', fn ($result) => $result['counts']['rows'] === 1);
+    }
+
     private function roster(array $g, string $name = 'Semester roster'): ScholarshipBatch
     {
         return app(ManageScholarshipRoster::class)->create($g['reviewer'] ?? $g['actor'], ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'batch_number' => $name]);
@@ -54,25 +101,36 @@ class ScholarshipReportsTest extends TestCase
 
     private function submission(int $students = 1, ?ScholarshipBatch $roster = null, bool $submit = true, bool $linked = true): array
     {
-        $g = $this->ready('TES', '7500.25');
+        $g = $this->ready('TES', '7500.25', false);
         $g['recorder'] = $this->staff('registrar');
         $g['reviewer'] = $this->staff('coordinator');
         $g['roster'] = $roster ?? $this->roster($g, 'Roster '.$g['student']->id);
-        // Explicit fixture link while still draft; never relink submitted history.
+        // Linked records use the real creation workflow. Unlinked records below are legacy-only fixtures.
         if ($linked) {
-            $g['batch']->forceFill(['scholarship_batch_id' => $g['roster']->id])->save();
+            $this->actingAs($g['recorder'])->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $g['roster']->id])->assertSessionHasNoErrors();
+            $g['batch'] = BillingBatch::latest('id')->firstOrFail();
         }
         $contexts = [$g];
         for ($i = 1; $i < $students; $i++) {
-            $contexts[] = $this->ready('TES', '7500.25');
+            $contexts[] = $this->ready('TES', '7500.25', false);
         }
         foreach ($contexts as $context) {
             app(ManageScholarshipRoster::class)->join($context['student'], $g['roster'], $g['reviewer'], $context['assignment']->id);
             $this->actingAs($g['recorder']);
-            $this->add($context, $g['batch'])->assertSessionHasNoErrors();
+            if ($linked) {
+                $this->add($context, $g['batch'])->assertSessionHasNoErrors();
+            } else {
+                // Reproduce retained pre-integration history without weakening current application gates.
+                BillingItem::create(array_replace($this->billingItemData($context), ['billing_batch_id' => $g['batch']->id], app(BillingEligibility::class)->basis($context['application'], $g['terms'])));
+            }
         }
         if ($submit) {
-            $this->submit($g['batch'])->assertSessionHasNoErrors();
+            if ($linked) {
+                $this->submit($g['batch'])->assertSessionHasNoErrors();
+            } else {
+                $g['batch']->items()->update(['status' => 'finalized', 'finalized_by' => $g['recorder']->id, 'finalized_at' => now()]);
+                $g['batch']->update(['status' => 'submitted', 'submitted_by' => $g['recorder']->id, 'submitted_at' => now(), 'reference' => 'SYNTHETIC retained legacy submission']);
+            }
             $this->actingAs($g['reviewer']);
             if (! $g['terms']->budgets()->exists()) {
                 $this->post(route('billing-batches.budget'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'previous_budget' => 0, 'amount' => '1000000.00', 'source_reference' => 'Synthetic report test budget'])->assertSessionHasNoErrors();
@@ -281,7 +339,7 @@ class ScholarshipReportsTest extends TestCase
         $this->get($this->url('billed', ['academic_year' => '2026-2027', 'semester_code' => '2']))->assertSessionHasErrors('semester_code');
         $legacy = $this->submission(linked: false);
         $all = $this->report('billed');
-        $this->assertSame('Unlinked historical submission', $all['rows']->firstWhere('_billing_id', $legacy['batch']->id)['roster']);
+        $this->assertSame('No recorded roster link', $all['rows']->firstWhere('_billing_id', $legacy['batch']->id)['roster']);
         $this->assertSame(1, $this->report('billed', ['scholarship_batch_id' => $g['roster']->id])['counts']['rows']);
     }
 

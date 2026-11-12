@@ -12,6 +12,7 @@ The primary process is program -> semester batch -> student/program/batch member
 6. [Liquidation](06-liquidation.md).
 7. [The six required reports](07-required-reports.md).
 8. [Implementation gaps, clarification register and minimal migration proposals](08-implementation-gap-analysis.md).
+9. [Final system readiness audit, evidence and manual UAT cases](09-final-system-readiness-audit.md).
 
 Each guide separates current capabilities from target steps. Task 24 in [progress](../sms/progress.md) adds independent semester rosters/membership, the Registrar queue, unbilled members and funding monitoring. One roster supports multiple submissions; submitted billing is billed and drafts are not. Task 25 adds a [basic internal school payroll register](../sms/payroll-preparation.md). Task 26 adds [signed acknowledgment and required liquidation evidence](../sms/signed-payroll-and-liquidation.md), preserving past acceptance. Task 27 delivers [all six internal reports with filters, CSV and complete print](../sms/six-reports.md). Form 2/Form 3 classification/gating, direct payroll preparation, official provider forms and historical as-of reconstruction remain separate work. Existing ledgers, authentication, roles and Cronasia styling are retained.
 
@@ -38,6 +39,8 @@ flowchart TD
 ```
 
 The diagram shows the target process, not a claim that all screens already exist. Form 2 alone does not establish payability; Form 3 is not payable in this workflow. Payroll preparation and receipt posting cannot mark a student paid or a billing liquidated. Reports can also be generated at intermediate stages.
+
+Task 30 subsequently implements [billing roster integration](../sms/billing-roster-integration.md): new financial drafts select/persist an existing compatible roster, and candidates/add/submission enforce exact membership. Unlinked history stays unknown. Final submission explicitly blocks until approved Form 2/Form 3 classification is implemented; production grading also remains unresolved. See the latest progress entry for verification.
 
 ## Retained guides for current screens
 

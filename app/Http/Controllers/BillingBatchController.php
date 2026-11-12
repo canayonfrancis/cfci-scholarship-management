@@ -8,6 +8,8 @@ use App\Models\BillingBatch;
 use App\Models\BillingItem;
 use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipApplication;
+use App\Models\ScholarshipBatch;
+use App\Models\ScholarshipBatchMembership;
 use App\Models\ScholarshipProgram;
 use App\Rules\PositiveBatchNumber;
 use App\Services\Billing\AllocationSummary;
@@ -26,7 +28,7 @@ class BillingBatchController extends Controller
     {
         Gate::authorize('viewAny', BillingBatch::class);
         $filters = $request->validate([...$this->filterRules(), 'billing_batch_id' => ['nullable', 'integer', 'exists:billing_batches,id']]);
-        $query = $options->query($filters)->with(['program', 'academicPeriod', 'approval'])->withCount('items');
+        $query = $options->query($filters)->with(['program', 'academicPeriod', 'approval', 'scholarshipBatch'])->withCount('items');
         if (filled($filters['billing_batch_id'] ?? null)) {
             $batch = (clone $query)->whereKey($filters['billing_batch_id'])->first();
             if (! $batch) {
@@ -54,7 +56,7 @@ class BillingBatchController extends Controller
     public function store(Request $request, ManageBillingBatch $manage): RedirectResponse
     {
         Gate::authorize('create', BillingBatch::class);
-        $data = $request->validate([...$this->scopeRules(), 'reference' => ['nullable', 'string', 'max:255'], 'batch_number' => ['nullable', new PositiveBatchNumber], 'billing_batch_id' => ['prohibited']], ['billing_batch_id.prohibited' => 'An existing batch cannot be used to create a new batch. Select it in the semester filters to view its records.']);
+        $data = $request->validate([...$this->scopeRules(), 'scholarship_batch_id' => ['required', 'integer', 'exists:scholarship_batches,id'], 'reference' => ['nullable', 'string', 'max:255'], 'batch_number' => ['nullable', new PositiveBatchNumber], 'billing_batch_id' => ['prohibited']], ['billing_batch_id.prohibited' => 'An existing batch cannot be used to create a new batch. Select it in the semester filters to view its records.']);
 
         return to_route('billing-batches.show', $manage->create($request->user(), $data));
     }
@@ -75,11 +77,17 @@ class BillingBatchController extends Controller
     {
         Gate::authorize('view', $batch);
         $search = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
-        $batch->load(['program', 'academicPeriod', 'terms.billingConfirmedBy', 'preparedBy', 'submittedBy', 'rate.approvedBy', 'approval.approvedBy']);
+        $batch->load(['program', 'academicPeriod', 'scholarshipBatch', 'terms.billingConfirmedBy', 'preparedBy', 'submittedBy', 'rate.approvedBy', 'approval.approvedBy']);
         $candidates = collect();
         if (Gate::allows('update', $batch)) {
             $query = ScholarshipApplication::with(['student', 'assignment', 'program', 'academicPeriod'])
                 ->where('program_period_term_id', $batch->program_period_term_id)
+                ->whereExists(ScholarshipBatchMembership::selectRaw('1')
+                    ->where('scholarship_batch_id', $batch->scholarship_batch_id ?? 0)
+                    ->whereColumn('student_id', 'scholarship_applications.student_id')
+                    ->whereColumn('assignment_id', 'scholarship_applications.assignment_id')
+                    ->whereColumn('program_id', 'scholarship_applications.program_id')
+                    ->whereColumn('academic_period_id', 'scholarship_applications.academic_period_id'))
                 ->whereDoesntHave('billingItems');
             if (filled($search['q'] ?? null)) {
                 $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], trim($search['q'])).'%';
@@ -157,6 +165,7 @@ class BillingBatchController extends Controller
     {
         return [
             'programs' => ScholarshipProgram::orderBy('code')->get(),
+            'rosters' => ScholarshipBatch::with(['program', 'academicPeriod'])->orderBy('program_id')->orderBy('academic_period_id')->orderBy('batch_number')->get(),
             'periods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),
             'years' => AcademicPeriod::distinct()->orderByDesc('academic_year')->pluck('academic_year'),
             'terms' => ProgramPeriodTerm::with(['program', 'academicPeriod', 'billingConfirmedBy'])->whereNotNull('billing_confirmed_at')->get(),

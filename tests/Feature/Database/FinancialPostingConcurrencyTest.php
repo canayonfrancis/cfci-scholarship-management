@@ -45,7 +45,7 @@ class FinancialPostingConcurrencyTest extends TestCase
             Storage::fake('scholarship');
             $g = $this->ready('TES', '7500.00');
             $finance = auth()->user();
-            $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id])->assertSessionHasNoErrors();
+            $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $g['roster']->id])->assertSessionHasNoErrors();
             $g['batch'] = BillingBatch::latest('id')->firstOrFail();
             $this->add($g)->assertSessionHasNoErrors();
             $this->submit($g['batch'])->assertSessionHasNoErrors();

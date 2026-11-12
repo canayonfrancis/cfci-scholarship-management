@@ -1,5 +1,7 @@
 # 08 - Implementation gap analysis
 
+Task 30 HI-01 amendment (2026-11-13): [billing roster integration](../sms/billing-roster-integration.md) implements existing roster selection/persistence and exact membership enforcement for new financial preparation, including submit-time rechecks, multi-submission support and accurate unlinked labels. No migration or historical association/backfill is introduced. CR-01 grading and CR-02 final classification remain unresolved; final submission fails closed on unavailable classification. See the current progress entry for fresh database tests. The audit and baseline descriptions below retain their historical findings.
+
 Review date: 2026-11-13 (Asia/Manila). Scope: analysis and documentation only.
 
 Task 28 QA amendment (2026-11-13): [BPM coverage/testing report](../sms/bpm-coverage-and-testing-report.md) verifies available workflow components and identifies remaining production acceptance blockers. Fixed a reproduced inconsistency where liquidation certified reversed/oversubscribed receipts already rejected by funding monitoring; it now reuses the existing scoped source checks without changing historical decisions or actual payments. Expanded real HTTP roster/payroll/signature/report and negative enrollment/security coverage. Approved grading/Form 2/Form 3 classification and final roster-to-billing integration remain blocked; successful synthetic financial fixtures do not resolve them. See [progress](../sms/progress.md) for current SQLite/MariaDB results and preserved-data evidence.

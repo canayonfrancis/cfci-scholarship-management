@@ -36,8 +36,7 @@ class AllocationApprovalConcurrencyTest extends TestCase
         Schema::clearResolvedInstance('db.schema');
         $process = null;
         try {
-            (require database_path('migrations/0001_01_01_000000_create_users_table.php'))->up();
-            foreach (glob(database_path('migrations/2026_11_11_*.php')) as $file) {
+            foreach (glob(database_path('migrations/*.php')) as $file) {
                 (require $file)->up();
             }
             Storage::fake('scholarship');
@@ -102,7 +101,7 @@ class AllocationApprovalConcurrencyTest extends TestCase
     private function submitted(): array
     {
         $g = $this->ready('TES', '7500.00');
-        $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id])->assertSessionHasNoErrors();
+        $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $g['roster']->id])->assertSessionHasNoErrors();
         $g['batch'] = BillingBatch::latest('id')->firstOrFail();
         $this->add($g)->assertSessionHasNoErrors();
         $this->submit($g['batch'])->assertSessionHasNoErrors();

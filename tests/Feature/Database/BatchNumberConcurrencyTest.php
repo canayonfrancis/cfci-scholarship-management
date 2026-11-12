@@ -5,6 +5,7 @@ namespace Tests\Feature\Database;
 use App\Actions\Billing\ManageBillingBatch;
 use App\Models\AcademicPeriod;
 use App\Models\BillingBatch;
+use App\Models\ScholarshipBatch;
 use App\Models\ScholarshipProgram;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,8 @@ class BatchNumberConcurrencyTest extends TestCase
             $actor->roles()->create(['role' => 'coordinator']);
             $program = ScholarshipProgram::create(['code' => 'SAMPLEBN', 'name' => 'Synthetic concurrency fixture']);
             $period = AcademicPeriod::create(['academic_year' => '2026-2027', 'semester_code' => '1']);
-            $data = ['program_id' => $program->id, 'academic_period_id' => $period->id];
+            $roster = ScholarshipBatch::create(['program_id' => $program->id, 'academic_period_id' => $period->id, 'batch_number' => 'SYNTHETIC-RACE', 'created_by' => $actor->id]);
+            $data = ['program_id' => $program->id, 'academic_period_id' => $period->id, 'scholarship_batch_id' => $roster->id];
             app(ManageBillingBatch::class)->configure($actor, $data + ['semester_gross_amount' => '7500.00', 'billing_source_reference' => 'SYNTHETIC batch-number test rate']);
             $script = <<<'PHP'
                 require 'vendor/autoload.php';
@@ -67,6 +69,7 @@ class BatchNumberConcurrencyTest extends TestCase
             $process->setTimeout(20);
             DB::beginTransaction();
             app(ManageBillingBatch::class)->create($actor, $data + ['batch_number' => 3]);
+            $this->assertSame($roster->id, BillingBatch::sole()->scholarship_batch_id);
             $output = '';
             $process->start(function ($type, $chunk) use (&$output) {
                 if ($type === Process::OUT) {

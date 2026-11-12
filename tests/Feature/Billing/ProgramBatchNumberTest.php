@@ -5,6 +5,7 @@ namespace Tests\Feature\Billing;
 use App\Actions\Records\RecordAudit;
 use App\Models\AcademicPeriod;
 use App\Models\BillingBatch;
+use App\Models\ScholarshipBatch;
 use App\Models\ScholarshipProgram;
 use App\Models\User;
 use App\Rules\PositiveBatchNumber;
@@ -42,7 +43,9 @@ class ProgramBatchNumberTest extends TestCase
         $scope = ['program_id' => $program->id, 'academic_period_id' => $period->id];
         $this->post(route('billing-batches.terms'), $scope + ['semester_gross_amount' => '7500.00', 'billing_source_reference' => 'SYNTHETIC approved rate fixture; no academic policy inferred', 'confirm_billing_policy' => 1])->assertSessionHasNoErrors();
 
-        return $scope;
+        $roster = ScholarshipBatch::firstOrCreate($scope + ['batch_number' => 'SYNTHETIC-NUMBERS'], ['created_by' => auth()->id()]);
+
+        return $scope + ['scholarship_batch_id' => $roster->id];
     }
 
     public static function authorizedRoles(): array
@@ -67,6 +70,8 @@ class ProgramBatchNumberTest extends TestCase
         $this->assertDatabaseCount('scholarship_rates', 0);
         $scope = ['program_id' => $program->id, 'academic_period_id' => $period->id];
         $billing = route('billing-batches.index', $scope);
+        $roster = ScholarshipBatch::create($scope + ['batch_number' => 'SYNTHETIC-NUMBERS', 'created_by' => $actor->id]);
+        $scope['scholarship_batch_id'] = $roster->id;
         $this->get($billing)->assertOk()->assertSee('<select id="billing_batch_id" name="billing_batch_id"', false)->assertSee('No matching billing batches');
         $this->from($billing)->post(route('billing-batches.store'), $scope)->assertSessionHasErrors('billing');
         $this->assertDatabaseCount('billing_batches', 0);

@@ -4,7 +4,9 @@ namespace Tests\Concerns;
 
 use App\Models\AcademicValidationContext;
 use App\Models\BillingBatch;
+use App\Models\ScholarshipBatch;
 use App\Models\User;
+use App\Services\Billing\BillingRoster;
 use App\Services\Eligibility\OfficialRuleCatalog;
 use App\Services\Eligibility\PrivateEvidence;
 use App\Services\Eligibility\SchoolGradingPolicy;
@@ -21,9 +23,21 @@ trait BuildsBillableAllocations
     }
 
     /** Synthetic resolved academic prerequisite, never a production school-policy default. */
-    private function ready(string $code = 'TDP', string $amount = '7500.00'): array
+    private function ready(string $code = 'TDP', string $amount = '7500.00', bool $withRoster = true): array
     {
         $g = $this->applicationContext($code);
+        // Downstream financial tests assume a resolved form prerequisite, never a production classification.
+        $this->partialMock(BillingRoster::class)->shouldReceive('submissionClassification')->andReturnNull();
+        if ($withRoster) {
+            $g['roster'] = ScholarshipBatch::firstOrCreate([
+                'program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'batch_number' => 'SYNTHETIC-BILLING-ROSTER',
+            ], ['created_by' => $g['actor']->id]);
+            $g['roster']->memberships()->create([
+                'student_id' => $g['student']->id, 'assignment_id' => $g['assignment']->id, 'program_id' => $g['program']->id,
+                'academic_period_id' => $g['period']->id, 'assigned_by' => $g['actor']->id, 'assigned_at' => now(),
+            ]);
+            $g['batch']->update(['scholarship_batch_id' => $g['roster']->id]);
+        }
         $context = AcademicValidationContext::current();
         $context->update(['active_period_id' => $g['period']->id, 'source_period_id' => $g['period']->id, 'source_policy_reference' => 'Synthetic test source', 'confirmed_by' => $g['actor']->id, 'confirmed_at' => now()]);
         $policy = app(OfficialRuleCatalog::class)->forProgram($code);

@@ -7,6 +7,7 @@ use App\Actions\Billing\ManageScholarshipFunds;
 use App\Actions\Eligibility\ActivateAward;
 use App\Actions\Eligibility\EvaluateApplication;
 use App\Actions\Eligibility\RecordExternalApproval;
+use App\Actions\Records\ManageScholarshipRoster;
 use App\Actions\Records\RecordAudit;
 use App\Actions\Records\SaveAcademicVerification;
 use App\Models\AcademicPeriod;
@@ -18,12 +19,14 @@ use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipBudget;
 use App\Models\ScholarshipRate;
 use App\Models\Student;
+use App\Services\Billing\BillingRoster;
 use App\Services\Billing\Money;
 use App\Services\Eligibility\OfficialRuleCatalog;
 use App\Services\Eligibility\PrivateEvidence;
 use App\Services\Eligibility\SchoolGradingPolicy;
 use Database\Seeders\Support\SampleData;
 use Database\Seeders\Support\SyntheticAcademicPolicy;
+use Database\Seeders\Support\SyntheticBillingRoster;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -42,9 +45,11 @@ class SyntheticDemoSeeder extends Seeder
         // Commit the production-policy baseline separately, so a demo failure is safely retryable.
         $this->callSilent(DevelopmentSampleSeeder::class);
         $originalPolicy = app(SchoolGradingPolicy::class);
+        $originalRoster = app(BillingRoster::class);
         $files = [];
         try {
             app()->instance(SchoolGradingPolicy::class, new SyntheticAcademicPolicy);
+            app()->instance(BillingRoster::class, new SyntheticBillingRoster);
             DB::transaction(function () use (&$files) {
                 if (BillingBatch::exists() || ScholarshipRate::exists() || ScholarshipBudget::exists()) {
                     throw new RuntimeException('The incomplete demo contains existing financial configuration. Use a new demo database; no existing financial records were overwritten.');
@@ -157,8 +162,14 @@ class SyntheticDemoSeeder extends Seeder
                 }
                 $approvedItems = [];
                 foreach ($eligible as $index => $assessment) {
+                    $roster = app(ManageScholarshipRoster::class)->create($coordinator, [
+                        'program_id' => $assessment->program_id, 'academic_period_id' => $period->id,
+                        'batch_number' => 'SAMPLE-ROSTER-'.($index + 1),
+                    ]);
+                    app(ManageScholarshipRoster::class)->join($assessment->student, $roster, $coordinator, $assessment->assignment_id);
                     $batch = app(ManageBillingBatch::class)->create($finance, [
                         'program_id' => $assessment->program_id, 'academic_period_id' => $period->id,
+                        'scholarship_batch_id' => $roster->id,
                         'reference' => 'SAMPLE: fictional finance batch '.$year.' / '.($index + 1),
                     ]);
                     $batch = app(ManageBillingBatch::class)->change($batch, $finance, 0, 'add', ['application_id' => $assessment->id]);
@@ -185,6 +196,7 @@ class SyntheticDemoSeeder extends Seeder
             throw $error;
         } finally {
             app()->instance(SchoolGradingPolicy::class, $originalPolicy);
+            app()->instance(BillingRoster::class, $originalRoster);
         }
     }
 

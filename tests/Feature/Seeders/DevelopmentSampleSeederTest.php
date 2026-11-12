@@ -18,6 +18,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\Billing\AllocationSummary;
 use App\Services\Billing\BillingEligibility;
+use App\Services\Billing\BillingRoster;
 use App\Services\Eligibility\SchoolGradingPolicy;
 use Database\Seeders\AcademicYearSeeder;
 use Database\Seeders\DatabaseSeeder;
@@ -279,7 +280,7 @@ class DevelopmentSampleSeederTest extends TestCase
         $this->seed(DevelopmentSampleSeeder::class);
         $before = $this->fingerprint();
         $files = Storage::disk('academic')->allFiles();
-        $service = \Mockery::mock(ManageBillingBatch::class, [app(BillingEligibility::class), app(RecordAudit::class)])->makePartial();
+        $service = \Mockery::mock(ManageBillingBatch::class, [app(BillingEligibility::class), app(RecordAudit::class), app(BillingRoster::class)])->makePartial();
         $service->shouldReceive('create')->once()->andThrow(new RuntimeException('Simulated demo billing failure'));
         app()->instance(ManageBillingBatch::class, $service);
         config(['sample-data.synthetic_demo' => true]);

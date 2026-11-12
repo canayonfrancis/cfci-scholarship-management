@@ -2,6 +2,12 @@
     <x-slot:actions><a class="records-button" href="{{ route('billing-batches.index') }}">Scholarship funds</a></x-slot:actions>
     <section class="dashboard-card records-card">
         <h2>{{ $batch->program->code }} · {{ $batch->academicPeriod->academic_year }} · Semester {{ $batch->academicPeriod->semester_code }}</h2>
+        @if($batch->scholarshipBatch)
+            <p>Semester roster: <a class="records-link" href="{{ route('scholarship-batches.show', $batch->scholarshipBatch) }}">{{ $batch->scholarshipBatch->batch_number }}</a>. Only members with the matching scholarship assignment can be added.</p>
+        @else
+            <p class="records-notice">No recorded roster link. Existing financial history is retained; the original roster is unknown. No roster is inferred.</p>
+            @if($batch->status === 'draft')<p class="records-notice">This unlinked draft cannot add scholars or be submitted. Create a new linked draft to prepare new billing.</p>@endif
+        @endif
         <dl class="records-details"><dt>Status</dt><dd>{{ ucfirst($batch->allocationStatus()) }}</dd><dt>Prepared total</dt><dd>{{ $batch->totalAmount() === null ? 'Unconfirmed total' : '₱'.number_format((float) $batch->totalAmount(), 2) }}</dd><dt>Prepared by</dt><dd>{{ $batch->preparedBy?->name ?? 'Not recorded' }}</dd><dt>Submission reference</dt><dd>{{ $batch->reference ?? 'Not recorded' }}</dd><dt>Submitted by</dt><dd>{{ $batch->submittedBy?->name ?? 'Not submitted' }}</dd><dt>Submitted at (Manila)</dt><dd>{{ $batch->submitted_at?->timezone('Asia/Manila')->format('M j, Y g:i A') ?? 'Not submitted' }}</dd><dt>Approved semester amount</dt><dd>{{ $batch->appliedRate() === null ? 'Unconfirmed' : '₱'.number_format((float) $batch->appliedRate()->amount, 2) }}</dd><dt>Amount / policy reference</dt><dd>{{ $batch->appliedRate()?->source_reference ?? $batch->terms->billing_source_reference }}</dd></dl>
         @if($batch->status !== 'draft')<p class="records-notice">Submitted records are retained. A Coordinator must approve the allocation; later corrections use a separate authorized adjustment.</p>@endif
     </section>
@@ -34,7 +40,8 @@
                 @empty<tr><td colspan="4">No unbilled semester validations match this search.</td></tr>@endforelse
             </tbody></table></div>@if($candidates instanceof \Illuminate\Contracts\Pagination\Paginator)<div class="records-pagination">{{ $candidates->links() }}</div>@endif
         </section>
-        <section class="dashboard-card records-card"><h2>Submit for Coordinator approval</h2><p>Every scholar, amount, validation and verified semester approval is checked again. Submission requests Coordinator approval and does not release funds. Submitted records cannot be edited.</p>
+        <section class="dashboard-card records-card"><h2>Submit for Coordinator approval</h2><p>Roster membership, every scholar, amount, validation and verified semester approval are checked again. Submission requests Coordinator approval and does not release funds. Submitted records cannot be edited.</p>
+            <p class="records-notice">Final submission remains blocked until approved Form 2/Form 3 templates and current payable classification are implemented. Membership alone does not establish payability.</p>
             <form class="records-form" method="POST" action="{{ route('billing-batches.submit', $batch) }}">@csrf<input type="hidden" name="lock_version" value="{{ $batch->lock_version }}"><div class="record-field"><label for="submission-reference">Submission reference</label><input class="record-input" id="submission-reference" name="reference" value="{{ old('reference', $batch->reference) }}" maxlength="255" required></div><button class="records-button is-primary" type="submit">Validate and submit batch</button></form>
         </section>
     @endcan

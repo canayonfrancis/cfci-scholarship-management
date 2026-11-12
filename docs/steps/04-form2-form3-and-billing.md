@@ -1,5 +1,7 @@
 # 04 - Form 2, Form 3 and billing
 
+Task 30 amendment: [billing roster integration](../sms/billing-roster-integration.md) now requires a compatible existing semester roster for new financial drafts, persists the existing FK, filters candidates by exact membership and checks membership again at add/submit. One roster supports multiple submissions. Legacy unlinked history remains unchanged and labeled as lacking a recorded link. Final submission explicitly blocks while approved Form 2/Form 3 classification is unavailable; no template rule or eligibility bypass is introduced. Older descriptions below of the missing roster integration are historical.
+
 Reviewed: 2026-11-13 (Asia/Manila). Teacher workflow steps 5-7.
 
 ## Purpose

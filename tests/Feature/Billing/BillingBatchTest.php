@@ -9,6 +9,7 @@ use App\Models\AuditEvent;
 use App\Models\BillingBatch;
 use App\Models\BillingItem;
 use App\Models\ExternalApproval;
+use App\Models\ScholarshipBatch;
 use App\Models\User;
 use App\Services\Billing\BillingEligibility;
 use App\Services\Eligibility\OfficialRuleCatalog;
@@ -51,7 +52,7 @@ class BillingBatchTest extends TestCase
     public function test_draft_creation_numbers_batches_and_rejects_unknown_amounts(): void
     {
         $g = $this->ready();
-        $data = ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'status' => 'submitted', 'submitted_by' => auth()->id(), 'gross_amount' => '1.00'];
+        $data = ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $g['roster']->id, 'status' => 'submitted', 'submitted_by' => auth()->id(), 'gross_amount' => '1.00'];
         $this->post(route('billing-batches.store'), $data)->assertSessionHasNoErrors()->assertRedirect();
         $first = BillingBatch::latest('id')->firstOrFail();
         $this->assertSame('Batch 1', $first->batch_number);
@@ -61,7 +62,8 @@ class BillingBatchTest extends TestCase
         $this->post(route('billing-batches.store'), $data)->assertSessionHasNoErrors();
         $this->assertSame('Batch 2', BillingBatch::latest('id')->value('batch_number'));
         $unknown = $this->applicationContext('EDUKAR');
-        $this->post(route('billing-batches.store'), ['program_id' => $unknown['program']->id, 'academic_period_id' => $unknown['period']->id])->assertSessionHasErrors('billing');
+        $roster = ScholarshipBatch::create(['program_id' => $unknown['program']->id, 'academic_period_id' => $unknown['period']->id, 'batch_number' => 'SYNTHETIC-UNKNOWN', 'created_by' => $unknown['actor']->id]);
+        $this->post(route('billing-batches.store'), ['program_id' => $unknown['program']->id, 'academic_period_id' => $unknown['period']->id, 'scholarship_batch_id' => $roster->id])->assertSessionHasErrors('billing');
         $this->assertNull($unknown['terms']->fresh()->semester_gross_amount);
     }
 
@@ -298,6 +300,9 @@ class BillingBatchTest extends TestCase
         $this->actingAs($this->staff('coordinator'))->post(route('evaluations.policy', $g['application']), ['confirm_policy' => 1])->assertSessionHasNoErrors();
         $this->assertNotNull($g['terms']->fresh()->confirmed_at);
         $this->assertSame('7500.00', $g['terms']->fresh()->semester_gross_amount);
+        $roster = ScholarshipBatch::create(['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'batch_number' => 'SYNTHETIC-FINANCIAL-ONLY', 'created_by' => $admin->id]);
+        $roster->memberships()->create(['student_id' => $g['student']->id, 'assignment_id' => $g['assignment']->id, 'program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'assigned_by' => $admin->id, 'assigned_at' => now()]);
+        $g['batch']->update(['scholarship_batch_id' => $roster->id]);
         $this->actingAs($this->staff('finance'));
         $this->add($g)->assertSessionHasErrors('billing');
     }
@@ -335,7 +340,7 @@ class BillingBatchTest extends TestCase
         $this->actingAs($this->staff('finance'));
         $this->get(route('billing-batches.show', $g['batch']))->assertOk()->assertSee('Unconfirmed total');
         $this->get(route('billing-batches.index'))->assertOk()->assertSee('Unconfirmed total');
-        $this->submit($g['batch'])->assertSessionHasErrors('billing');
+        $this->submit($g['batch'])->assertSessionHasErrors('scholarship_batch_id');
         $this->assertSame('draft', $g['batch']->fresh()->status);
         $this->assertNull($g['batch']->items()->firstOrFail()->gross_amount);
     }

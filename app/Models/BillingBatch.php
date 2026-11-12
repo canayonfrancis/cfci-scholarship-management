@@ -12,6 +12,7 @@ class BillingBatch extends Model
     protected $fillable = [
         'program_period_term_id',
         'scholarship_rate_id',
+        'scholarship_batch_id',
         'program_id',
         'academic_period_id',
         'batch_number',

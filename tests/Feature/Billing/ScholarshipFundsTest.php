@@ -12,6 +12,7 @@ use App\Models\FundingReceipt;
 use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipAssignment;
+use App\Models\ScholarshipBatch;
 use App\Models\ScholarshipProgram;
 use App\Services\Billing\AllocationSummary;
 use Database\Seeders\ConfirmedScholarshipProgramSeeder;
@@ -38,7 +39,7 @@ class ScholarshipFundsTest extends TestCase
     {
         $g = $this->ready($code, $amount);
         $g['finance'] = auth()->user();
-        $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id])->assertSessionHasNoErrors();
+        $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $g['roster']->id])->assertSessionHasNoErrors();
         $g['batch'] = BillingBatch::latest('id')->firstOrFail();
         $this->add($g)->assertSessionHasNoErrors();
         $this->submit($g['batch'])->assertSessionHasNoErrors();
@@ -273,7 +274,9 @@ class ScholarshipFundsTest extends TestCase
         $terms = ProgramPeriodTerm::where('program_id', $program->id)->firstOrFail();
         $application = ScholarshipApplication::create(['student_id' => $g['student']->id, 'program_id' => $program->id, 'academic_period_id' => $g['period']->id, 'assignment_id' => $assignment->id, 'program_period_term_id' => $terms->id]);
         $this->actingAs($g['finance']);
-        $this->post(route('billing-batches.store'), ['program_id' => $program->id, 'academic_period_id' => $g['period']->id])->assertSessionHasNoErrors();
+        $roster = ScholarshipBatch::create(['program_id' => $program->id, 'academic_period_id' => $g['period']->id, 'batch_number' => 'SYNTHETIC-TRANSFER', 'created_by' => $admin->id]);
+        $roster->memberships()->create(['student_id' => $g['student']->id, 'assignment_id' => $assignment->id, 'program_id' => $program->id, 'academic_period_id' => $g['period']->id, 'assigned_by' => $admin->id, 'assigned_at' => now()]);
+        $this->post(route('billing-batches.store'), ['program_id' => $program->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $roster->id])->assertSessionHasNoErrors();
         $batch = BillingBatch::latest('id')->firstOrFail();
         $this->post(route('billing-batches.items.store', $batch), ['lock_version' => 0, 'application_id' => $application->id])->assertSessionHasErrors('billing');
         $this->assertDatabaseRejects(fn () => BillingItem::create(['billing_batch_id' => $batch->id, 'application_id' => $application->id, 'assignment_id' => $assignment->id, 'student_id' => $g['student']->id, 'program_id' => $program->id, 'academic_period_id' => $g['period']->id]));
@@ -335,7 +338,7 @@ class ScholarshipFundsTest extends TestCase
     public function test_fractional_rates_and_adjustments_use_exact_centavos_for_whole_batches(): void
     {
         $g = $this->ready('TES', '0.10');
-        $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id])->assertSessionHasNoErrors();
+        $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $g['roster']->id])->assertSessionHasNoErrors();
         $g['batch'] = BillingBatch::latest('id')->firstOrFail();
         $this->add($g)->assertSessionHasNoErrors();
         for ($i = 0; $i < 2; $i++) {

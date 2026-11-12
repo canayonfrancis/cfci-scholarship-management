@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Billing;
 
-use App\Actions\Records\ManageScholarshipRoster;
 use App\Actions\Records\RecordAudit;
 use App\Models\BillingBatch;
 use App\Models\Deduction;
@@ -37,8 +36,7 @@ class FinancialRecordingTest extends TestCase
     {
         $g = $this->ready('TES', '7500.25');
         $coordinator = $this->staff('coordinator');
-        $roster = app(ManageScholarshipRoster::class)->create($coordinator, ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'batch_number' => 'Semester roster']);
-        app(ManageScholarshipRoster::class)->join($g['student'], $roster, $coordinator, $g['assignment']->id);
+        $roster = $g['roster'];
         $this->add($g)->assertSessionHasNoErrors();
         $url = route('scholarship-batches.show', [$roster, 'view' => 'unbilled']);
         $this->actingAs($coordinator)->get($url)->assertOk()->assertViewHas('members', fn ($m) => $m->total() === 1);
@@ -68,7 +66,7 @@ class FinancialRecordingTest extends TestCase
         $this->assertSame('7500.25', $g['item']->fresh()->gross_amount);
     }
 
-    public function test_roster_migration_round_trip_retains_submitted_history_credentials_and_history_triggers(): void
+    public function test_populated_roster_rollback_is_rejected_and_retains_submitted_history_credentials_and_triggers(): void
     {
         $g = $this->approved();
         $before = $g['batch']->fresh()->getAttributes();
@@ -76,8 +74,12 @@ class FinancialRecordingTest extends TestCase
         $students = DB::table('students')->orderBy('id')->get()->toJson();
         $item = $g['item']->fresh()->getAttributes();
         $migration = require database_path('migrations/2026_11_13_000009_add_independent_scholarship_rosters.php');
-        $migration->down();
-        $migration->up();
+        try {
+            $migration->down();
+            $this->fail('Populated roster history must not be dropped.');
+        } catch (RuntimeException $error) {
+            $this->assertStringContainsString('Retain recorded roster history', $error->getMessage());
+        }
         $this->assertSame($before, $g['batch']->fresh()->getAttributes());
         $this->assertSame($item, $g['item']->fresh()->getAttributes());
         $this->assertSame($users, DB::table('users')->orderBy('id')->get()->toJson());
@@ -203,7 +205,7 @@ class FinancialRecordingTest extends TestCase
     {
         $g = $this->ready('TES', '7500.25');
         $g['finance'] = auth()->user();
-        $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id])->assertSessionHasNoErrors();
+        $this->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $g['roster']->id])->assertSessionHasNoErrors();
         $g['batch'] = BillingBatch::latest('id')->firstOrFail();
         $this->add($g)->assertSessionHasNoErrors();
         $this->submit($g['batch'])->assertSessionHasNoErrors();

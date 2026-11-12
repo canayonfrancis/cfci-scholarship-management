@@ -14,6 +14,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Rules\PositiveBatchNumber;
 use App\Services\Billing\BillingEligibility;
+use App\Services\Billing\BillingRoster;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -22,7 +23,7 @@ use Illuminate\Validation\ValidationException;
 
 class ManageBillingBatch
 {
-    public function __construct(private BillingEligibility $eligibility, private RecordAudit $audit) {}
+    public function __construct(private BillingEligibility $eligibility, private RecordAudit $audit, private BillingRoster $roster) {}
 
     public function configure(User $actor, array $data): ProgramPeriodTerm
     {
@@ -62,8 +63,10 @@ class ManageBillingBatch
 
         try {
             return DB::transaction(function () use ($actor, $data) {
+                Validator::make($data, ['scholarship_batch_id' => ['required', 'integer', 'min:1']])->validate();
                 $program = ScholarshipProgram::whereKey($data['program_id'])->lockForUpdate()->firstOrFail();
                 $period = AcademicPeriod::whereKey($data['academic_period_id'])->lockForUpdate()->firstOrFail();
+                $roster = $this->roster->selection((int) $data['scholarship_batch_id'], $program->id, $period->id);
                 $terms = ProgramPeriodTerm::where('program_id', $program->id)->where('academic_period_id', $period->id)->lockForUpdate()->first();
                 $rate = $terms?->rates()->orderByDesc('revision')->lockForUpdate()->first();
                 if (! $program->is_active || ! $rate) {
@@ -84,6 +87,7 @@ class ManageBillingBatch
                 }
                 $batch = $terms->billingBatches()->create([
                     'program_id' => $program->id, 'academic_period_id' => $period->id, 'scholarship_rate_id' => $rate->id,
+                    'scholarship_batch_id' => $roster->id,
                     'batch_number' => 'Batch '.$number,
                     'reference' => $data['reference'] ?? null, 'prepared_by' => $actor->id,
                 ]);
@@ -125,6 +129,7 @@ class ManageBillingBatch
                 } elseif ($operation === 'add') {
                     $application = ScholarshipApplication::whereKey($data['application_id'])->lockForUpdate()->firstOrFail();
                     $application->assignment()->lockForUpdate()->first();
+                    $this->roster->member($batch, $application);
                     if (BillingItem::where('student_id', $application->student_id)->where('academic_period_id', $application->academic_period_id)->exists()) {
                         $this->fail('This scholar already has a semester allocation or draft reservation, including under a previous scholarship program. Use an authorized adjustment for approved records.');
                     }
@@ -150,6 +155,11 @@ class ManageBillingBatch
                     foreach ($items as $item) {
                         $application = $item->application()->lockForUpdate()->firstOrFail();
                         $application->assignment()->lockForUpdate()->first();
+                        $this->roster->member($batch, $application);
+                        if ($item->student_id !== $application->student_id || $item->assignment_id !== $application->assignment_id ||
+                            $item->program_id !== $batch->program_id || $item->academic_period_id !== $batch->academic_period_id) {
+                            $this->fail('The billing item no longer matches its roster assignment, student, program and academic period.');
+                        }
                         $basis = $this->eligibility->basis($application, $terms, $batch->appliedRate());
                         if ($item->status !== 'draft' || $item->gross_amount !== $basis['gross_amount'] || $item->entitlement_snapshot !== $basis['entitlement_snapshot'] ||
                             $item->evaluation_run_id !== $basis['evaluation_run_id'] || $item->external_approval_id !== $basis['external_approval_id']) {
@@ -158,6 +168,7 @@ class ManageBillingBatch
                         $item->update([...$basis, 'status' => 'finalized', 'finalized_by' => $actor->id, 'finalized_at' => now()]);
                         $this->audit->record($actor, $item, 'billing_item_submitted');
                     }
+                    $this->roster->submissionClassification($batch);
                     $batch->fill(['reference' => $reference, 'status' => 'submitted', 'submitted_by' => $actor->id, 'submitted_at' => now()]);
                 } else {
                     throw new \LogicException('Unknown billing operation.');

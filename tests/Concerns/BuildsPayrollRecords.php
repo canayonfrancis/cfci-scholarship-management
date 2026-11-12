@@ -18,7 +18,7 @@ trait BuildsPayrollRecords
         $g = $this->ready('TES', '7500.25');
         $g['recorder'] = $this->staff('registrar');
         $g['reviewer'] = $this->staff('coordinator');
-        $this->actingAs($g['recorder'])->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id])->assertSessionHasNoErrors();
+        $this->actingAs($g['recorder'])->post(route('billing-batches.store'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'scholarship_batch_id' => $g['roster']->id])->assertSessionHasNoErrors();
         $g['batch'] = BillingBatch::latest('id')->firstOrFail();
         $this->add($g)->assertSessionHasNoErrors();
         for ($i = 1; $i < $students; $i++) {

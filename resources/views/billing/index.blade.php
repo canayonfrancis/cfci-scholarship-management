@@ -24,7 +24,26 @@
     @can('create', \App\Models\BillingBatch::class)
         <section class="dashboard-card records-card"><h2>Prepare a semester allocation batch</h2><p>Choose a program and semester with an approved rate. A Registrar or Coordinator records and submits; a different Coordinator reviews and approves.</p>
             <p class="record-help">New batches receive the next available batch number for the chosen program and semester. To view an existing batch, use Batch Number in the filters above.</p>
-            <form class="records-form" method="POST" action="{{ route('billing-batches.store') }}">@csrf<div class="records-form-grid"><x-billing-scope :programs="$programs" :periods="$periods" prefix="create" :selected-program="old('program_id', $filters['program_id'] ?? '')" :selected-period="old('academic_period_id', $filters['academic_period_id'] ?? '')" /><x-record-field name="reference" label="Preparation reference (optional)" :value="old('reference')" maxlength="255" /></div><button class="records-button is-primary" type="submit">Create draft allocation batch</button></form>
+            <form class="records-form" method="POST" action="{{ route('billing-batches.store') }}"
+                x-data="{ program: @js((string) old('program_id', $filters['program_id'] ?? '')), period: @js((string) old('academic_period_id', $filters['academic_period_id'] ?? '')) }"
+                @change="if ($event.target.name === 'program_id') { program = $event.target.value; $refs.roster.value = ''; } if ($event.target.name === 'academic_period_id') { period = $event.target.value; $refs.roster.value = ''; }">
+                @csrf
+                <div class="records-form-grid">
+                    <x-billing-scope :programs="$programs" :periods="$periods" prefix="create" :selected-program="old('program_id', $filters['program_id'] ?? '')" :selected-period="old('academic_period_id', $filters['academic_period_id'] ?? '')" />
+                    <div class="record-field"><label for="create-roster">Scholarship semester roster</label>
+                        <select class="record-input" id="create-roster" name="scholarship_batch_id" x-ref="roster" required>
+                            <option value="">Select a matching semester roster</option>
+                            @foreach($rosters as $roster)
+                                <option value="{{ $roster->id }}" @selected((string) old('scholarship_batch_id') === (string) $roster->id)
+                                    x-show="program === '{{ $roster->program_id }}' && period === '{{ $roster->academic_period_id }}'"
+                                    x-bind:disabled="program !== '{{ $roster->program_id }}' || period !== '{{ $roster->academic_period_id }}'">{{ $roster->program->code }} · {{ $roster->batch_number }} · {{ $roster->academicPeriod->academic_year }} / {{ $roster->academicPeriod->semester_code }}</option>
+                            @endforeach
+                        </select>
+                        <p class="record-help">Select the program and semester first. One roster can support several submissions. Create a missing roster under <a class="records-link" href="{{ route('scholarship-batches.index') }}">Semester rosters</a>.</p>
+                    </div>
+                    <x-record-field name="reference" label="Preparation reference (optional)" :value="old('reference')" maxlength="255" />
+                </div><button class="records-button is-primary" type="submit">Create draft allocation batch</button>
+            </form>
         </section>
     @endcan
     @can('configure', \App\Models\BillingBatch::class)
