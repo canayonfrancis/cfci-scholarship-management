@@ -16,7 +16,7 @@
     @endphp
     @endif
 
-    <div class="dashboard-page" x-data="{ periodOpen: false, yearOpen: false }">
+    <div class="dashboard-page">
         <section
             class="dashboard-hero"
             aria-labelledby="welcome-heading"
@@ -49,9 +49,8 @@
         </section>
 
         @if(!$canReport)
-            <section class="dashboard-card dashboard-filters"><p>Your account does not have staff reporting access. Contact an Administrator to assign the appropriate role.</p></section>
+            <section class="dashboard-card dashboard-access-notice"><p>Your account does not have staff reporting access. Contact an Administrator to assign the appropriate role.</p></section>
         @else
-        <section class="dashboard-card records-page dashboard-filters" aria-label="Dashboard filters">@include('dashboard.filters', ['filterAction' => route('dashboard')])<p class="record-help">Current recorded state for the selected program/year/semester. Historical records are retained; older decisions do not automatically remain eligible.</p></section>
         <section class="stats-grid" aria-label="Scholarship validation overview">
             @foreach ($stats as $stat)
                 <article class="stat-card stat-{{ $stat['tone'] }}">
@@ -91,7 +90,7 @@
                         <h2><span class="title-icon"><x-dashboard-icon name="trend" :size="20" /></span>Validations Trend</h2>
                         <p>Latest semester evaluations · last 12 calendar months (Manila)</p>
                     </div>
-                    <div class="chart-controls"><span class="record-help">Filters applied above</span></div></header>
+                </header>
 
                 <template x-if="chartState === 'loading'"><x-dashboard-skeleton type="chart" /></template>
                 <div x-cloak x-show="chartState === 'error'" class="dashboard-error"><p>Unable to load validation statistics.</p><button type="button" @click="chartState = 'ready'"><x-dashboard-icon name="reload" :size="15" /> Retry</button></div>
@@ -163,7 +162,7 @@
             <article id="recent-applications" class="dashboard-card recent-card" x-data="{ tableState: 'ready' }">
                 <header class="card-header card-header-inline">
                     <h2><span class="title-icon"><x-dashboard-icon name="document" :size="20" /></span>Recent Validations</h2>
-                    @can('viewAny', \App\Models\ScholarshipApplication::class)<a href="{{ route('evaluations.index', $evaluationFilters) }}" class="text-link">View All <x-dashboard-icon name="arrow-right" :size="15" /></a>@endcan
+                    @can('viewAny', \App\Models\ScholarshipApplication::class)<a href="{{ route('evaluations.index') }}" class="text-link">View All <x-dashboard-icon name="arrow-right" :size="15" /></a>@endcan
                 </header>
                 <template x-if="tableState === 'loading'"><x-dashboard-skeleton type="table" /></template>
                 <div x-cloak x-show="tableState === 'error'" class="dashboard-error"><p>Unable to load recent validations.</p><button type="button" @click="tableState = 'ready'"><x-dashboard-icon name="reload" :size="15" /> Retry</button></div>
@@ -172,7 +171,7 @@
                 @elseif (count($recentApplications))
                     <div class="table-wrap" x-show="tableState === 'ready'" tabindex="0" role="region" aria-label="Recent validations table, scroll horizontally for more columns">
                         <table class="recent-validations-table">
-                            <caption class="sr-only">Five most recently recorded semester checks in the selected scope</caption>
+                            <caption class="sr-only">Five most recently recorded semester checks</caption>
                             <thead><tr><th scope="col">Student ID</th><th scope="col">Name</th><th scope="col">Program</th><th scope="col">Status</th><th scope="col">Date Recorded</th><th scope="col">View</th></tr></thead>
                             <tbody>
                                 @foreach ($recentApplications as $application)

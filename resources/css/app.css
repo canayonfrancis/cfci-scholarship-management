@@ -695,8 +695,7 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
 }
 
 /* Scholar records use the existing dashboard palette, cards, and navigation. */
-.dashboard-filters { margin-top: 16px; padding: 18px; }
-.dashboard-filters .records-filters { padding-bottom: 0; }
+.dashboard-access-notice { margin-top: 16px; padding: 18px; }
 .dashboard-page .stat-content > p, .dashboard-page .stat-content small { white-space: normal; overflow-wrap: anywhere; }
 .dashboard-page .stat-value-row { flex-wrap: wrap; }
 .stats-grid.dashboard-secondary-stats { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }

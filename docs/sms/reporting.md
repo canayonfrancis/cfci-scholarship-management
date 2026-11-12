@@ -2,22 +2,22 @@
 
 Implemented 2026-11-12. Per the latest request, analytics are presented through **Dashboard** indicators and graphs only. The separate Reports pages, printable report views and navigation links have been removed. The existing Cronasia hero, red accents, cards, chart geometry, responsive layouts and scrolling navigation are reused.
 
-## Filters and scope
+## Dashboard scope
 
-Scholarship program, academic year and semester are optional, conjunctive filters drawn from registered records. Blank means all; there is no default active year or guessed semester. Semester-only filtering includes that semester code across registered years. Invalid choices are rejected.
+The dashboard filter panel was removed at the user's request. Dashboard indicators and graphs now use all programs and periods; old program/year/semester query parameters do not silently narrow the overview. Individual records modules retain their own filters.
 
-Unfiltered scholar counts include every registered Student identity, including archived and unassigned students. A filtered cohort is the union of matching assignments, non-withdrawn validation contexts and billing items. Without a scholarship-program filter, matching current academic profiles or Registrar records also establish membership. Each Student ID counts once, regardless of the number of semesters, assignments, evaluations or billing rows.
+Scholar counts include every registered Student identity, including archived and unassigned students. Each Student ID counts once, regardless of the number of semesters, assignments, evaluations or billing rows.
 
 Assignment coverage uses existing start/end academic periods. Codes `1` and `2` are compared within the stored academic-year range; other semester codes match explicit endpoints only because their ordering is unconfirmed. Unknown boundaries do not acquire invented calendar dates. Closed assignments remain cohort history but never count as active awards.
 
-The dashboard describes **current recorded state for selected benefit periods**, not a reconstructed historical snapshot. Selecting an earlier year does not claim a student had today's status in that year.
+The dashboard describes **current recorded state across all benefit periods**, not a reconstructed historical snapshot.
 
 ## Indicator counting rules
 
 | Indicator | Source and counting unit |
 | --- | --- |
 | Total scholars | Distinct Student identities in the cohort above |
-| Active scholarship awards | Currently active ScholarshipAssignment rows for active students, covering any selected period. Existing database uniqueness permits one active assignment per student |
+| Active scholarship awards | Currently active ScholarshipAssignment rows for active students. Existing database uniqueness permits one active assignment per student |
 | Pending evaluations | Non-withdrawn student/program/semester contexts without a run, or whose latest run has no reusable completed school decision. Old runs never add counts |
 | School-eligible scholars | Distinct active students whose latest run is current according to `EvaluationRun::isCurrent()`, automatically passed and school-qualified. This does not constitute external approval |
 | Pending external approvals | Contexts with no exact-semester approval, a latest pending decision, or a latest approved decision whose assignment, provenance, authority, validity or private evidence needs verification. Rejected/revoked decisions are excluded from this pending count; it is independent of school qualification |
@@ -33,7 +33,7 @@ The line chart groups each context's **latest completed run only** by its comple
 
 ## Recent validations and source records
 
-Recent Validations shows the five most recently recorded contexts in the selected scope, with institutional ID, name, scholarship program, current school status and recorded date. Historical reruns do not add rows. Each row opens its existing evaluation detail; **View All** opens the established evaluation queue, retaining the scholarship program and exact academic period when both year and semester are selected. The program graph links to the existing Scholar directory.
+Recent Validations shows the five most recently recorded contexts, with institutional ID, name, scholarship program, current school status and recorded date. Historical reruns do not add rows. Each row opens its existing evaluation detail; **View All** opens the established evaluation queue. The program graph links to the existing Scholar directory.
 
 The table retains a normal header and six columns on every screen size. Its card grows to contain the rows; long IDs/names/statuses wrap within cells, and constrained widths scroll the table horizontally inside its card. A direct view link avoids dropdowns being clipped by the scroll container. Loading error panels are cloaked until their actual Alpine state is known, preventing a temporary overlap during initialization.
 

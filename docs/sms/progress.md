@@ -7,6 +7,8 @@ Current milestone: Complete integration review verified all three official modul
 
 The design and decision register are in [implementation-plan.md](implementation-plan.md); verified national-rule sources and execution boundaries are in [eligibility-rules.md](eligibility-rules.md). Task 2 authorized the database foundation; Task 3 supporting records; Task 4 Registrar verification; Task 5 school evaluation, external-decision recording and guarded activation. Unknown school grading, EDUKAR and financial rules remain unresolved. School eligibility never constitutes external approval or financial authorization.
 
+Latest dashboard presentation changes: removed the top-bar search control and dashboard filter panel. Overview statistics/graphs use all programs and periods; obsolete filter URL parameters are ignored. Existing module-specific filters, role permissions, charts and the Recent Validations layout remain intact.
+
 ## Task 12: Complete integration review and deployment readiness (2026-11-12)
 
 Final review, three-module status, ten-step BPM coverage, findings and deployment requirements: [integration-review.md](integration-review.md).

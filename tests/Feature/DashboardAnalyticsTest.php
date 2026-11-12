@@ -82,7 +82,7 @@ class DashboardAnalyticsTest extends TestCase
         $this->assertSame(1, $data['metrics']['pending_evaluations']);
         $this->assertSame(0, $data['metrics']['school_eligible']);
         $this->assertSame(100.0, (float) $data['programs']->sole()['percent']);
-        $this->actingAs($this->staff('administrator'))->get(route('dashboard', $f))->assertOk()->assertViewHas('metrics', fn ($m) => $m === $data['metrics']);
+        $this->actingAs($this->staff('administrator'))->get(route('dashboard', $f))->assertOk()->assertViewHas('metrics', fn ($m) => $m === $service->build([])['metrics']);
         $this->assertSame(0, $service->build(['academic_year' => '2007-2008', 'semester_code' => '1'])['metrics']['total_scholars']);
     }
 
@@ -166,12 +166,12 @@ class DashboardAnalyticsTest extends TestCase
         $this->get(route('dashboard'))->assertOk()->assertSee('does not have staff reporting access')->assertDontSee('Total scholars');
     }
 
-    public function test_empty_data_and_invalid_scope_filters_are_handled(): void
+    public function test_empty_dashboard_and_obsolete_scope_parameters_are_handled(): void
     {
         $this->actingAs($this->staff('administrator'));
         $this->get(route('dashboard'))->assertOk()->assertViewHas('metrics', fn ($m) => $m['total_scholars'] === 0 && $m['billing_total'] === '0.00')->assertViewHas('donutStyle', '#e6e8ec');
         foreach ([['program_id' => 99999], ['academic_year' => '2026-2028'], ['semester_code' => 'not-a-semester']] as $f) {
-            $this->get(route('dashboard', $f))->assertSessionHasErrors(array_key_first($f));
+            $this->get(route('dashboard', $f))->assertOk()->assertSessionHasNoErrors()->assertViewHas('metrics', fn ($m) => $m['total_scholars'] === 0);
         }
         foreach (['/reports', '/reports/scholars', '/reports/evaluations', '/reports/billing', '/reports/funds?print=1'] as $path) {
             $this->get($path)->assertNotFound();

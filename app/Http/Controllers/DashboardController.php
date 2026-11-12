@@ -2,17 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\DashboardRequest;
-use App\Models\AcademicPeriod;
 use App\Models\ScholarshipApplication;
-use App\Models\ScholarshipProgram;
 use App\Models\User;
 use App\Services\DashboardAnalytics;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class DashboardController extends Controller
 {
-    public function __invoke(DashboardRequest $request, DashboardAnalytics $analytics)
+    public function __invoke(Request $request, DashboardAnalytics $analytics)
     {
         $now = now('Asia/Manila');
         $hero = ['greeting' => $now->hour < 12 ? 'Good morning' : ($now->hour < 18 ? 'Good afternoon' : 'Good evening'), 'firstName' => Str::of($request->user()->name)->trim()->before(' ')->value(), 'date' => $now->format('D, M j, Y'), 'dateTime' => $now->toDateString()];
@@ -20,12 +18,11 @@ class DashboardController extends Controller
         if (! $canReport) {
             return view('dashboard', compact('hero', 'canReport'));
         }
-        $filters = $request->validated();
         $canFinancial = $request->user()->can('financial-view');
-        $data = $analytics->build($filters, $canFinancial);
+        $data = $analytics->build([], $canFinancial);
         $metrics = $data['metrics'];
         $stats = [];
-        foreach ([['total_scholars', 'Total scholars', 'green', 'users', 'Distinct registered identities, including archived'], ['active_awards', 'Active scholarship awards', 'purple', 'user-group', 'Currently active awards covering the selected period'], ['pending_evaluations', 'Pending evaluations', 'blue', 'document', 'Latest semester checks needing evaluation or reassessment'], ['school_eligible', 'School-eligible scholars', 'amber', 'graduation-cap', 'Distinct active students with a current qualified decision']] as [$key, $label, $tone, $icon, $comparison]) {
+        foreach ([['total_scholars', 'Total scholars', 'green', 'users', 'Distinct registered identities, including archived'], ['active_awards', 'Active scholarship awards', 'purple', 'user-group', 'Currently active awards for active scholars'], ['pending_evaluations', 'Pending evaluations', 'blue', 'document', 'Latest semester checks needing evaluation or reassessment'], ['school_eligible', 'School-eligible scholars', 'amber', 'graduation-cap', 'Distinct active students with a current qualified decision']] as [$key, $label, $tone, $icon, $comparison]) {
             $stats[] = compact('key', 'label', 'tone', 'icon', 'comparison') + ['value' => $metrics[$key], 'money' => false];
         }
         $additionalStats = [['label' => 'Pending external approvals', 'value' => $metrics['pending_external'], 'tone' => 'blue', 'icon' => 'clipboard', 'comparison' => 'Semester decisions awaiting verification', 'money' => false]];
@@ -68,15 +65,6 @@ class DashboardController extends Controller
             $quickLinks[] = ['label' => 'Payments & liquidation', 'icon' => 'document', 'href' => route('financial.index')];
         }
 
-        $evaluationFilters = array_filter(['program_id' => $filters['program_id'] ?? null]);
-        if (filled($filters['academic_year'] ?? null) && filled($filters['semester_code'] ?? null)) {
-            $evaluationFilters['academic_period_id'] = AcademicPeriod::where('academic_year', $filters['academic_year'])->where('semester_code', $filters['semester_code'])->value('id');
-        }
-
-        return view('dashboard', [...compact('hero', 'canReport', 'filters', 'metrics', 'stats', 'additionalStats', 'statuses', 'donutStyle', 'months', 'applications', 'qualified', 'chartMax', 'recentApplications', 'programs', 'quickLinks', 'evaluationFilters'),
-            'scholarshipPrograms' => ScholarshipProgram::orderBy('code')->get(),
-            'academicYears' => AcademicPeriod::distinct()->orderByDesc('academic_year')->pluck('academic_year'),
-            'semesters' => AcademicPeriod::distinct()->orderBy('semester_code')->pluck('semester_code'),
-        ]);
+        return view('dashboard', compact('hero', 'canReport', 'metrics', 'stats', 'additionalStats', 'statuses', 'donutStyle', 'months', 'applications', 'qualified', 'chartMax', 'recentApplications', 'programs', 'quickLinks'));
     }
 }
