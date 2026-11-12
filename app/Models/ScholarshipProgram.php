@@ -50,6 +50,11 @@ class ScholarshipProgram extends Model
         return $this->hasMany(BillingBatch::class, 'program_id');
     }
 
+    public function scholarshipBatches(): HasMany
+    {
+        return $this->hasMany(ScholarshipBatch::class, 'program_id');
+    }
+
     public function fundingReceipts(): HasMany
     {
         return $this->hasMany(FundingReceipt::class, 'program_id');

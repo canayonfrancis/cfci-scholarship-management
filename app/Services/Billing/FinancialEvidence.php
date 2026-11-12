@@ -21,7 +21,7 @@ use Throwable;
 class FinancialEvidence
 {
     public const TYPES = [
-        'receipt' => ['receipt_evidence'], 'payout' => ['payment_evidence'],
+        'receipt' => ['receipt_evidence'], 'payout' => ['payment_evidence', 'signed_acknowledgment'],
         'deduction' => ['deduction_authority', 'deduction_settlement'], 'liquidation' => ['liquidation_support'],
     ];
 

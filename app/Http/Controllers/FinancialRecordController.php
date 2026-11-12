@@ -12,15 +12,42 @@ use App\Models\FundingReceipt;
 use App\Models\Liquidation;
 use App\Models\Payout;
 use App\Models\ProgramPeriodTerm;
+use App\Services\Billing\BatchFundingStatus;
 use App\Services\Billing\FinancialEvidence;
 use App\Services\Billing\LiquidationSummary;
+use App\Services\Billing\Money;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class FinancialRecordController extends Controller
 {
+    public function fundingStatus(Request $request, BatchFundingStatus $status)
+    {
+        Gate::authorize('financial-view');
+        $filters = $request->validate([
+            'program_period_term_id' => ['nullable', 'integer', 'exists:program_period_terms,id'],
+            'stage' => ['nullable', Rule::in(array_keys(BatchFundingStatus::LABELS))],
+        ]);
+        $rows = $status->rows(isset($filters['program_period_term_id']) ? (int) $filters['program_period_term_id'] : null);
+        if (filled($filters['stage'] ?? null)) {
+            $rows = $rows->where('state', $filters['stage'])->values();
+        }
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $total = $rows->count();
+        $shortfall = $rows->where('state', 'awaiting_funds')->sum(fn ($row) => Money::cents($row['shortfall']));
+
+        return view('financial.funding-status', [
+            'filters' => $filters, 'stages' => BatchFundingStatus::LABELS,
+            'rows' => (new LengthAwarePaginator($rows->forPage($page, 25)->values(), $total, 25, $page, ['path' => $request->url()]))->withQueryString(),
+            'shortfall' => Money::decimal($shortfall),
+            'terms' => ProgramPeriodTerm::with(['program', 'academicPeriod'])->orderByDesc('academic_period_id')->get(),
+        ]);
+    }
+
     public function index(Request $request)
     {
         Gate::authorize('financial-view');
@@ -39,7 +66,7 @@ class FinancialRecordController extends Controller
     {
         Gate::authorize('financial-view');
         abort_unless(in_array($batch->status, ['submitted', 'finalized'], true), 404);
-        $batch->load(['program', 'academicPeriod', 'fundingAllocations.receipt', 'liquidations']);
+        $batch->load(['program', 'academicPeriod', 'fundingAllocations.receipt', 'liquidations', 'payroll']);
 
         return view('financial.batch', ['batch' => $batch, 'summary' => $summary->forBatch($batch), 'receipts' => FundingReceipt::where('program_period_term_id', $batch->program_period_term_id)->where('status', 'posted')->where('entry_type', 'original')->get()]);
     }
@@ -79,7 +106,7 @@ class FinancialRecordController extends Controller
     public function payout(Payout $payout)
     {
         Gate::authorize('financial-view');
-        $payout->load(['batch.program', 'billingItem.student', 'documents', 'deductions.documents']);
+        $payout->load(['batch.program', 'billingItem.student', 'documents', 'deductions.documents', 'acknowledgments.document', 'acknowledgments.verifiedBy']);
 
         return view('financial.payout', compact('payout'));
     }

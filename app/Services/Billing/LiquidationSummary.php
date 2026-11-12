@@ -5,21 +5,27 @@ namespace App\Services\Billing;
 use App\Actions\Billing\RecordFinancialActivity;
 use App\Models\BillingBatch;
 use App\Models\Liquidation;
+use App\Services\Eligibility\PrivateEvidence;
 
 class LiquidationSummary
 {
-    public function __construct(private FinancialEvidence $evidence) {}
+    public function __construct(private FinancialEvidence $evidence, private SignedAcknowledgment $signatures, private PrivateEvidence $files, private BatchFundingStatus $funding) {}
 
     public function forBatch(BillingBatch $batch, ?Liquidation $report = null): array
     {
         $batch = BillingBatch::findOrFail($batch->id);
         $issues = [];
         $expected = [];
+        $acknowledgments = [];
+        $saved = $report?->compliance_snapshot;
+        if ($saved && ($saved['policy'] ?? null) !== SignedAcknowledgment::POLICY) {
+            $issues[] = 'The retained liquidation checklist version is not supported.';
+        }
         $gross = $school = $direct = $withheld = $settled = $effective = 0;
         if (! RecordFinancialActivity::approved($batch)) {
             $issues[] = 'The billing batch has not received Coordinator approval.';
         }
-        $items = $batch->items()->with(['student', 'payouts.deductions', 'payouts.documents'])->orderBy('id')->get();
+        $items = $batch->items()->with(['student', 'payouts.deductions', 'payouts.documents', 'payouts.acknowledgments.document'])->orderBy('id')->get();
         if ($items->isEmpty()) {
             $issues[] = 'No billing items are present.';
         }
@@ -48,7 +54,15 @@ class LiquidationSummary
                     $issues[] = 'Payment '.$payout->id.': institutional ID, payment details or verifier is missing.';
                 }
                 if (! $this->evidence->approved($payout, 'payment_evidence')) {
-                    $issues[] = 'Payment '.$payout->id.': accepted signed acknowledgment/approved payment proof is missing or unavailable.';
+                    $issues[] = 'Payment '.$payout->id.': accepted payment proof is missing or unavailable.';
+                }
+                $pinned = $saved ? collect($saved['acknowledgments'] ?? [])->firstWhere('payout_id', $payout->id) : null;
+                $candidates = $saved ? $payout->acknowledgments->where('id', $pinned['id'] ?? 0) : $payout->acknowledgments;
+                $ack = $candidates->first(fn ($a) => $this->signatures->usable($a, $payout));
+                if (! $ack) {
+                    $issues[] = 'Payment '.$payout->id.': verified signed acknowledgment covering this student and actual payout is missing or unavailable.';
+                } else {
+                    $acknowledgments[] = $this->signatures->snapshot($ack);
                 }
                 $deductions = $payout->deductions;
                 if ($net + Money::signedTotal($deductions) !== Money::cents($payout->gross_amount)) {
@@ -93,9 +107,39 @@ class LiquidationSummary
                 $issues[] = 'This batch is already covered by an accepted liquidation; it cannot be claimed twice.';
             }
         }
-        $funded = Money::signedTotal($batch->fundingAllocations()->where('status', 'posted')->get());
+        $allocations = $batch->fundingAllocations()->where('status', 'posted')->with('receipt.documents')->get();
+        $funded = Money::signedTotal($allocations);
+        foreach ($allocations->pluck('receipt')->unique('id') as $receipt) {
+            if (! $this->evidence->approved($receipt, 'receipt_evidence')) {
+                $issues[] = 'Allocated receipt '.$receipt->id.': accepted intact receipt evidence is missing or unavailable.';
+            }
+        }
         if ($funded - $school - $settled !== 0) {
             $issues[] = 'Allocated school cash remains unspent or does not reconcile. A reviewed return/reallocation is required before this batch can be fully liquidated.';
+        }
+        // A reconciled allocation total does not make reversed or oversubscribed
+        // receipt cash usable. Share the existing funding monitor's source checks.
+        $funding = $this->funding->rows($batch->program_period_term_id, [$batch->id])->first();
+        foreach ($funding['issues'] ?? [] as $issue) {
+            $issues[] = 'Funding source: '.$issue;
+        }
+        $support = null;
+        if ($report) {
+            $documents = $report->documents()->where('document_type', 'liquidation_support')->orderBy('id')->get();
+            if ($saved) {
+                $pinnedSupport = $saved['support_document'] ?? [];
+                $documents = $documents->where('id', $pinnedSupport['id'] ?? 0)->filter(fn ($d) => $d->checksum === ($pinnedSupport['checksum'] ?? null));
+                if (count($saved['acknowledgments'] ?? []) !== count($acknowledgments)) {
+                    $issues[] = 'Retained signed acknowledgment coverage no longer matches the actual payment sources.';
+                }
+            }
+            $support = $documents->first(fn ($d) => $this->files->usable($d));
+            if ($report->status === 'accepted' && ! $saved) {
+                $issues[] = 'Historical acceptance is retained; signed acknowledgment and required-document checklist verification at acceptance is unconfirmed.';
+            }
+        }
+        if (! $support) {
+            $issues[] = 'An accepted, intact liquidation-support document owned by this liquidation is required.';
         }
 
         return [
@@ -103,6 +147,7 @@ class LiquidationSummary
             'effective' => Money::decimal($effective), 'gross' => Money::decimal($gross), 'school_net' => Money::decimal($school), 'direct_net' => Money::decimal($direct),
             'retained' => Money::decimal($withheld), 'settled' => Money::decimal($settled), 'funded' => Money::decimal($funded),
             'school_cash_remaining' => Money::decimal($funded - $school - $settled),
+            'compliance' => ['policy' => SignedAcknowledgment::POLICY, 'acknowledgments' => $acknowledgments, 'support_document' => $support ? $this->files->snapshot($support) : null],
         ];
     }
 }

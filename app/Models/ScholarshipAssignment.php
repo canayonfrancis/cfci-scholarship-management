@@ -99,4 +99,9 @@ class ScholarshipAssignment extends Model
     {
         return $this->hasMany(BillingItem::class, 'assignment_id');
     }
+
+    public function batchMemberships(): HasMany
+    {
+        return $this->hasMany(ScholarshipBatchMembership::class, 'assignment_id');
+    }
 }

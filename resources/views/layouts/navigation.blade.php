@@ -32,6 +32,7 @@
                 }
                 if (auth()->user()->can('financial-view')) {
                     $navItems[] = ['Payments & liquidation', 'clipboard', route('financial.index'), request()->routeIs('financial.*')];
+                    $navItems[] = ['Scholarship reports', 'clipboard', route('scholarship-reports.index', ['report' => auth()->user()->can('viewAny', \App\Models\ScholarshipBatch::class) ? 'grants' : 'billed']), request()->routeIs('scholarship-reports.*')];
                 }
                 $roleLabels = auth()->user()->roles->pluck('role')->map(fn ($role) => match ($role) {
                     'coordinator' => 'School Scholarship Coordinator',

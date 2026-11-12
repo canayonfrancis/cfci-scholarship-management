@@ -85,6 +85,11 @@ class Student extends Model
         return $this->hasMany(ScholarshipAssignment::class, 'student_id');
     }
 
+    public function batchMemberships(): HasMany
+    {
+        return $this->hasMany(ScholarshipBatchMembership::class);
+    }
+
     public function academicRecords(): HasMany
     {
         return $this->hasMany(AcademicRecord::class, 'student_id');

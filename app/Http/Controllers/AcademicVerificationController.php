@@ -40,9 +40,9 @@ class AcademicVerificationController extends Controller
     public function create(Request $request): View
     {
         Gate::authorize('create', AcademicRecord::class);
-        $data = $request->validate(['student_id' => ['nullable', 'integer', 'exists:students,id']]);
+        $data = $request->validate(['student_id' => ['nullable', 'integer', 'exists:students,id'], 'academic_period_id' => ['nullable', 'integer', 'exists:academic_periods,id']]);
 
-        return view('academic-verifications.form', ['record' => new AcademicRecord(['student_id' => $data['student_id'] ?? null, 'enrollment_status' => 'unverified', 'academic_standing' => 'unverified']), 'correction' => false, ...$this->choices()]);
+        return view('academic-verifications.form', ['record' => new AcademicRecord(['student_id' => $data['student_id'] ?? null, 'academic_period_id' => $data['academic_period_id'] ?? null, 'enrollment_status' => 'unverified', 'academic_standing' => 'unverified']), 'correction' => false, ...$this->choices()]);
     }
 
     public function store(AcademicVerificationRequest $request, SaveAcademicVerification $save): RedirectResponse

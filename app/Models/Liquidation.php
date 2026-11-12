@@ -19,6 +19,7 @@ class Liquidation extends Model
         'reviewed_by',
         'reviewed_at',
         'review_notes',
+        'compliance_snapshot',
     ];
 
     protected function casts(): array
@@ -27,6 +28,7 @@ class Liquidation extends Model
             'sequence' => 'integer',
             'submitted_at' => 'immutable_datetime',
             'reviewed_at' => 'immutable_datetime',
+            'compliance_snapshot' => 'array',
         ];
     }
 

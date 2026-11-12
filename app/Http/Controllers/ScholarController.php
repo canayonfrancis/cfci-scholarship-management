@@ -8,6 +8,7 @@ use App\Models\AcademicPeriod;
 use App\Models\AcademicProgram;
 use App\Models\AuditEvent;
 use App\Models\ScholarshipAssignment;
+use App\Models\ScholarshipBatch;
 use App\Models\ScholarshipProgram;
 use App\Models\Student;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -84,7 +85,10 @@ class ScholarController extends Controller
             ->whereIn('action', ['scholar_created', 'scholar_updated', 'sample_profile_created'])
             ->whereNotNull('after_state->academic_period_id')->latest('id')->paginate(10, ['*'], 'profile_history_page');
 
-        return view('scholars.show', compact('scholar', 'history', 'profileHistory'));
+        $memberships = $scholar->batchMemberships()->with(['batch.program', 'batch.academicPeriod'])->latest('id')->paginate(10, ['*'], 'roster_page')->withQueryString();
+        $rosters = ScholarshipBatch::with(['program', 'academicPeriod'])->whereIn('program_id', $scholar->assignments->whereIn('status', ['pending', 'active'])->pluck('program_id'))->latest('id')->get();
+
+        return view('scholars.show', compact('scholar', 'history', 'profileHistory', 'memberships', 'rosters'));
     }
 
     public function edit(Student $scholar): View

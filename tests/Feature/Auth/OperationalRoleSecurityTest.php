@@ -56,7 +56,7 @@ class OperationalRoleSecurityTest extends TestCase
             'document_type' => 'receipt_evidence', 'mime_type' => 'application/pdf', 'size_bytes' => 10,
         ]);
         $this->actingAs($this->staff('registrar'));
-        $tables = ['scholarship_programs', 'academic_periods', 'academic_programs', 'scholarship_assignments', 'scholarship_applications', 'evaluation_runs', 'external_approvals', 'billing_batches', 'billing_items', 'funding_receipts', 'funding_allocations', 'payouts', 'deductions', 'liquidations', 'documents', 'audit_events', 'user_roles'];
+        $tables = ['scholarship_programs', 'academic_periods', 'academic_programs', 'scholarship_assignments', 'scholarship_applications', 'evaluation_runs', 'external_approvals', 'scholarship_batches', 'scholarship_batch_memberships', 'billing_batches', 'billing_items', 'funding_receipts', 'funding_allocations', 'payrolls', 'payroll_items', 'payouts', 'payment_acknowledgments', 'deductions', 'liquidations', 'documents', 'audit_events', 'user_roles'];
         $before = [];
         foreach ($tables as $table) {
             $before[$table] = DB::table($table)->orderBy('id')->get()->toJson();
@@ -66,6 +66,7 @@ class OperationalRoleSecurityTest extends TestCase
             ['POST', 'academic-periods.store', []], ['PUT', 'academic-periods.update', [$g['period']]],
             ['POST', 'academic-periods.context', []], ['POST', 'academic-programs.store', []], ['PUT', 'academic-programs.update', [$course]],
             ['POST', 'scholars.assignments.store', [$g['student']]], ['PATCH', 'scholars.assignments.update', [$g['student'], $g['assignment']]],
+            ['POST', 'scholarship-batches.store', []], ['POST', 'scholars.batch-memberships.store', [$g['student']]],
             ['POST', 'evaluations.store', []], ['POST', 'evaluations.policy', [$g['application']]], ['POST', 'evaluations.run', [$g['application']]],
             ['POST', 'evaluations.evidence', [$g['application']]], ['PATCH', 'evaluations.evidence.review', [$g['application'], $document]],
             ['POST', 'evaluations.external', [$g['application']]], ['POST', 'evaluations.activate', [$g['application']]],
@@ -73,6 +74,7 @@ class OperationalRoleSecurityTest extends TestCase
             ['POST', 'billing-batches.budget', []], ['POST', 'billing-batches.items.adjust', [$g['batch'], $g['item']]],
             ['POST', 'financial.receipts.post', [$g['receipt']]],
             ['POST', 'financial.payouts.post', [$g['payout']]], ['POST', 'financial.deduct', [$g['payout']]],
+            ['POST', 'financial.acknowledgments.store', [$g['payout']]],
             ['POST', 'financial.settle', [$g['deduction']]],
             ['POST', 'financial.liquidations.review', [$g['liquidation']]],
             ['POST', 'financial.evidence.review', ['receipt', $g['receipt'], $document]],
@@ -97,12 +99,18 @@ class OperationalRoleSecurityTest extends TestCase
         $g = $this->applicationContext();
         $user = $role === null ? User::factory()->create() : $this->staff($role);
         $this->actingAs($user)->get(route('dashboard'))->assertOk()->assertViewHas('canReport', false)->assertDontSeeText('Total scholars');
-        foreach (['scholars.index', 'scholarship-programs.index', 'academic-verifications.index', 'evaluations.index', 'billing-batches.index', 'financial.index'] as $route) {
+        foreach (['scholars.index', 'scholarship-programs.index', 'academic-verifications.index', 'evaluations.index', 'billing-batches.index', 'financial.index', 'scholarship-batches.index', 'scholarship-reports.index'] as $route) {
             $this->get(route($route))->assertForbidden();
         }
         $this->post(route('evaluations.external', $g['application']), [])->assertForbidden();
         $this->post(route('billing-batches.store'), [])->assertForbidden();
         $this->post(route('financial.receipts.store'), [])->assertForbidden();
+        $this->post(route('financial.payrolls.store', $g['batch']), [])->assertForbidden();
+        foreach (['grants', 'billed', 'liquidated'] as $report) {
+            foreach (['csv', 'print'] as $format) {
+                $this->get(route('scholarship-reports.index', compact('report', 'format')))->assertForbidden();
+            }
+        }
     }
 
     public function test_profile_and_login_payloads_cannot_assign_roles_or_change_accounts(): void

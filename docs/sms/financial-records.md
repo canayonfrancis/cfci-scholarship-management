@@ -2,6 +2,8 @@
 
 Implemented and verified on **2026-11-12, Asia/Manila**. The user's current request authorizes this recording workflow. It reuses the existing financial models, bill items, approvals, immutable history and private evidence. It records verified events; it does not transfer money through a bank or payment gateway.
 
+Current amendments: Task 15's two-role workflow allows Registrar recording and Coordinator verification, retaining the Test Administrator exception; older Finance/Administrator wording below is historical. Task 25 adds separate payroll preparation. Task 26 adds [explicit signed acknowledgment and required liquidation support](signed-payroll-and-liquidation.md) for all future submission/acceptance decisions, preserving past accepted history. Generic payment proof alone does not satisfy those new liquidation requirements. See [progress](progress.md) for current tests and scope.
+
 ## Operation
 
 Open **Payments & liquidation** in the existing primary navigation. Finance, Administrator, Coordinator and Viewer can read financial summaries; Registrar and accounts without the applicable roles cannot access this module. Submitted batches are visible, but funding allocation and student-payment drafts require an independently approved batch.

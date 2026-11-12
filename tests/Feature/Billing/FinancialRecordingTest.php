@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Billing;
 
+use App\Actions\Records\ManageScholarshipRoster;
 use App\Actions\Records\RecordAudit;
 use App\Models\BillingBatch;
 use App\Models\Deduction;
@@ -12,6 +13,7 @@ use App\Models\Liquidation;
 use App\Models\Payout;
 use App\Models\User;
 use App\Services\Billing\AllocationSummary;
+use App\Services\Billing\BatchFundingStatus;
 use App\Services\Billing\LiquidationSummary;
 use App\Services\Billing\Money;
 use Illuminate\Database\QueryException;
@@ -22,13 +24,174 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Tests\Concerns\BuildsAcknowledgmentRecords;
 use Tests\Concerns\BuildsBillableAllocations;
 use Tests\Concerns\BuildsScholarshipRecords;
 use Tests\TestCase;
 
 class FinancialRecordingTest extends TestCase
 {
-    use BuildsBillableAllocations, BuildsScholarshipRecords, RefreshDatabase;
+    use BuildsAcknowledgmentRecords, BuildsBillableAllocations, BuildsScholarshipRecords, RefreshDatabase;
+
+    public function test_unbilled_roster_includes_draft_reservations_until_actual_submission(): void
+    {
+        $g = $this->ready('TES', '7500.25');
+        $coordinator = $this->staff('coordinator');
+        $roster = app(ManageScholarshipRoster::class)->create($coordinator, ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'batch_number' => 'Semester roster']);
+        app(ManageScholarshipRoster::class)->join($g['student'], $roster, $coordinator, $g['assignment']->id);
+        $this->add($g)->assertSessionHasNoErrors();
+        $url = route('scholarship-batches.show', [$roster, 'view' => 'unbilled']);
+        $this->actingAs($coordinator)->get($url)->assertOk()->assertViewHas('members', fn ($m) => $m->total() === 1);
+        $this->submit($g['batch'])->assertSessionHasNoErrors();
+        $this->get($url)->assertViewHas('members', fn ($m) => $m->total() === 0);
+        $this->assertDatabaseCount('scholarship_batch_memberships', 1);
+    }
+
+    public function test_funding_monitor_applies_retained_allocation_reversal_once_and_effective_adjustments(): void
+    {
+        $g = $this->approved();
+        $this->funds($g, '1000.00');
+        $allocation = FundingAllocation::sole();
+        FundingAllocation::create([
+            'funding_receipt_id' => $allocation->funding_receipt_id, 'billing_batch_id' => $allocation->billing_batch_id,
+            'program_id' => $allocation->program_id, 'academic_period_id' => $allocation->academic_period_id,
+            'amount' => '200.10', 'entry_type' => 'reversal', 'reversal_of_id' => $allocation->id,
+            'correction_reason' => 'Synthetic retained correction fixture', 'status' => 'posted',
+            'posting_key' => 'synthetic-reversal', 'posted_by' => $g['admin']->id, 'posted_at' => now(),
+        ]);
+        $this->actingAs($g['admin'])->post(route('billing-batches.items.adjust', [$g['batch'], $g['item']]), ['previous_adjustment' => 0, 'new_amount' => '7000.00', 'reason' => 'Synthetic authorized correction', 'reference' => 'TEST-ADJUST'])->assertSessionHasNoErrors();
+        $row = app(BatchFundingStatus::class)->rows()->firstWhere('batch.id', $g['batch']->id);
+        $this->assertSame('799.90', $row['allocated']);
+        $this->assertSame('799.90', $row['usable_funding']);
+        $this->assertSame('7000.00', $row['effective']);
+        $this->assertSame('6200.10', $row['shortfall']);
+        $this->assertSame('7500.25', $g['item']->fresh()->gross_amount);
+    }
+
+    public function test_roster_migration_round_trip_retains_submitted_history_credentials_and_history_triggers(): void
+    {
+        $g = $this->approved();
+        $before = $g['batch']->fresh()->getAttributes();
+        $users = DB::table('users')->orderBy('id')->get()->toJson();
+        $students = DB::table('students')->orderBy('id')->get()->toJson();
+        $item = $g['item']->fresh()->getAttributes();
+        $migration = require database_path('migrations/2026_11_13_000009_add_independent_scholarship_rosters.php');
+        $migration->down();
+        $migration->up();
+        $this->assertSame($before, $g['batch']->fresh()->getAttributes());
+        $this->assertSame($item, $g['item']->fresh()->getAttributes());
+        $this->assertSame($users, DB::table('users')->orderBy('id')->get()->toJson());
+        $this->assertSame($students, DB::table('students')->orderBy('id')->get()->toJson());
+        $this->assertDatabaseRejects(fn () => DB::table('billing_batches')->where('id', $g['batch']->id)->update(['reference' => 'Changed history']));
+        $this->assertDatabaseRejects(fn () => DB::table('billing_items')->where('id', $g['item']->id)->delete());
+    }
+
+    public function test_legacy_overallocated_receipt_is_flagged_instead_of_overstating_funding(): void
+    {
+        $g = $this->approved();
+        $receipt = $this->funds($g, '1000.00');
+        FundingAllocation::create([
+            'funding_receipt_id' => $receipt->id, 'billing_batch_id' => $g['batch']->id, 'program_id' => $g['program']->id,
+            'academic_period_id' => $g['period']->id, 'amount' => '1000.00', 'status' => 'posted',
+            'posting_key' => 'synthetic-legacy-capacity', 'posted_by' => $g['admin']->id, 'posted_at' => now(),
+        ]);
+        $row = app(BatchFundingStatus::class)->rows()->firstWhere('batch.id', $g['batch']->id);
+        $this->assertSame('review', $row['state']);
+        $this->assertSame('2000.00', $row['allocated']);
+        $this->assertSame('0.00', $row['usable_funding']);
+        $this->assertStringContainsString('allocation capacity', implode(' ', $row['issues']));
+    }
+
+    public function test_funding_monitor_separates_draft_submitted_and_approved_from_budget_and_actual_cash(): void
+    {
+        $g = $this->approved();
+        $rows = app(BatchFundingStatus::class)->rows();
+        $this->assertSame('awaiting_funds', $rows->firstWhere('batch.id', $g['batch']->id)['state']);
+        $this->assertSame('7500.25', $rows->firstWhere('batch.id', $g['batch']->id)['shortfall']);
+        $this->assertSame('draft', $rows->firstWhere('batch.id', $g['batch']->id - 1)['state']);
+        $this->get(route('financial.funding-status', ['stage' => 'awaiting_funds']))->assertOk()->assertViewHas('rows', fn ($r) => $r->total() === 1)->assertViewHas('shortfall', '7500.25');
+        $this->assertDatabaseCount('funding_receipts', 0);
+        $this->assertDatabaseCount('payouts', 0);
+        $other = $this->ready('TDP', '13500.00');
+        $this->add($other)->assertSessionHasNoErrors();
+        $this->submit($other['batch'])->assertSessionHasNoErrors();
+        $row = app(BatchFundingStatus::class)->rows()->firstWhere('batch.id', $other['batch']->id);
+        $this->assertSame('submitted', $row['state']);
+        $this->assertNull($row['shortfall']);
+    }
+
+    public function test_only_allocated_verified_cash_counts_and_school_payments_do_not_reduce_the_funding_target_twice(): void
+    {
+        $g = $this->approved();
+        $receipt = $this->funds($g, '4000.00');
+        $payment = $this->payment($g, ['payment_mode' => 'school', 'gross_amount' => '1000.10', 'net_amount' => '1000.10']);
+        $this->proof($g, 'payout', $payment, 'payment_evidence');
+        $this->post(route('financial.payouts.post', $payment))->assertSessionHasNoErrors();
+        $this->proof($g, 'receipt', $receipt, 'receipt_evidence');
+        $row = app(BatchFundingStatus::class)->rows()->firstWhere('batch.id', $g['batch']->id);
+        $this->assertSame('4000.00', $row['usable_funding']);
+        $this->assertSame('3500.25', $row['shortfall']);
+        $this->assertSame('6500.15', $row['outstanding']);
+        $this->funds($g, '3500.25');
+        $row = app(BatchFundingStatus::class)->rows()->firstWhere('batch.id', $g['batch']->id);
+        $this->assertSame('funded', $row['state']);
+        $this->assertSame('0.00', $row['shortfall']);
+    }
+
+    public function test_unallocated_posted_receipt_and_draft_allocation_do_not_fund_a_batch(): void
+    {
+        $g = $this->approved();
+        $this->actingAs($g['finance'])->post(route('financial.receipts.store'), ['program_period_term_id' => $g['terms']->id, 'amount' => '7500.25', 'received_on' => now('Asia/Manila')->toDateString(), 'source' => 'Synthetic provider', 'reference' => 'UNALLOCATED'])->assertSessionHasNoErrors();
+        $receipt = FundingReceipt::sole();
+        $this->proof($g, 'receipt', $receipt, 'receipt_evidence');
+        $this->post(route('financial.receipts.post', $receipt))->assertSessionHasNoErrors();
+        FundingAllocation::create(['funding_receipt_id' => $receipt->id, 'billing_batch_id' => $g['batch']->id, 'program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'amount' => '7500.25']);
+        $row = app(BatchFundingStatus::class)->rows()->firstWhere('batch.id', $g['batch']->id);
+        $this->assertSame('0.00', $row['usable_funding']);
+        $this->assertSame('7500.25', $row['shortfall']);
+    }
+
+    public function test_direct_payments_reduce_school_funding_need_without_inventing_school_cash(): void
+    {
+        $g = $this->approved();
+        $payment = $this->payment($g);
+        $this->proof($g, 'payout', $payment, 'payment_evidence');
+        $this->post(route('financial.payouts.post', $payment))->assertSessionHasNoErrors();
+        $row = app(BatchFundingStatus::class)->rows()->firstWhere('batch.id', $g['batch']->id);
+        $this->assertSame('applied', $row['state']);
+        $this->assertSame('0.00', $row['usable_funding']);
+        $this->assertSame('0.00', $row['shortfall']);
+        $this->assertSame('7500.25', $row['direct_applied']);
+        $this->assertDatabaseCount('funding_receipts', 0);
+    }
+
+    public function test_lost_receipt_proof_requires_review_without_rewriting_posted_history(): void
+    {
+        $g = $this->approved();
+        $receipt = $this->funds($g);
+        $attributes = $receipt->getAttributes();
+        Storage::disk('scholarship')->put($receipt->documents()->firstOrFail()->storage_path, 'corrupted');
+        $row = app(BatchFundingStatus::class)->rows()->firstWhere('batch.id', $g['batch']->id);
+        $this->assertSame('review', $row['state']);
+        $this->assertSame('7500.25', $row['allocated']);
+        $this->assertSame('0.00', $row['usable_funding']);
+        $this->assertSame($attributes, $receipt->fresh()->getAttributes());
+    }
+
+    public function test_funding_view_validates_scope_and_authority_and_does_not_write_financial_records(): void
+    {
+        $g = $this->approved();
+        $before = DB::table('audit_events')->count();
+        foreach (['registrar', 'coordinator', 'administrator', 'viewer'] as $role) {
+            $this->actingAs($this->staff($role))->get(route('financial.funding-status', ['program_period_term_id' => $g['terms']->id]))->assertOk()->assertViewHas('rows', fn ($r) => $r->total() === 2)->assertHeader('Cache-Control', 'no-store, private');
+        }
+        $this->get(route('financial.funding-status', ['stage' => 'paid']))->assertSessionHasErrors('stage');
+        $this->get(route('financial.funding-status', ['program_period_term_id' => 999999]))->assertSessionHasErrors('program_period_term_id');
+        $this->actingAs(User::factory()->create())->get(route('financial.funding-status'))->assertForbidden();
+        $this->assertSame($before, DB::table('audit_events')->count());
+        $this->assertDatabaseCount('funding_receipts', 0);
+        $this->assertDatabaseCount('payouts', 0);
+    }
 
     protected function setUp(): void
     {
@@ -200,6 +363,8 @@ class FinancialRecordingTest extends TestCase
         $this->actingAs($g['finance'])->post(route('financial.liquidations.store', $g['batch']), ['reference' => 'SAMPLE-LIQUIDATION'])->assertSessionHasNoErrors();
         $report = Liquidation::sole();
         $this->post(route('financial.liquidations.submit', $report))->assertSessionHasErrors('liquidation');
+        $this->makeSignedAcknowledgment($payment, $g['finance'], $g['admin']);
+        $this->makeLiquidationSupport($report, $g['finance'], $g['admin']);
         $this->actingAs($g['admin'])->post(route('financial.settle', $deduction), ['settled_on' => now('Asia/Manila')->toDateString(), 'settlement_reference' => 'SAMPLE-SETTLED'])->assertSessionHasErrors('finance');
         $this->proof($g, 'deduction', $deduction, 'deduction_settlement');
         $this->post(route('financial.settle', $deduction), ['settled_on' => now('Asia/Manila')->toDateString(), 'settlement_reference' => 'SAMPLE-SETTLED'])->assertSessionHasNoErrors();
@@ -234,6 +399,32 @@ class FinancialRecordingTest extends TestCase
         Storage::disk('scholarship')->put($document->storage_path, 'tampered');
         $this->actingAs($g['admin'])->get(route('financial.evidence.download', ['payout', $payment->id, $document]))->assertNotFound();
         $this->post(route('financial.payouts.post', $payment))->assertSessionHasErrors('finance');
+    }
+
+    public function test_accepted_evidence_cannot_be_borrowed_by_another_actual_payment_for_the_same_student(): void
+    {
+        $g = $this->approved();
+        $first = $this->payment($g, ['gross_amount' => '4000.00', 'net_amount' => '4000.00']);
+        $document = $this->proof($g, 'payout', $first, 'payment_evidence');
+        $this->post(route('financial.payouts.post', $first))->assertSessionHasNoErrors();
+        $second = $this->payment($g, ['gross_amount' => '3500.25', 'net_amount' => '3500.25']);
+        $before = $document->getAttributes();
+        $posted = $first->fresh()->getAttributes();
+
+        $this->actingAs($g['admin'])->get(route('financial.evidence.download', ['payout', $second->id, $document]))->assertNotFound();
+        $this->post(route('financial.evidence.review', ['payout', $second->id, $document]), ['decision' => 'accepted', 'review_notes' => 'Wrong payment coverage'])->assertNotFound();
+        $this->post(route('financial.payouts.post', $second))->assertSessionHasErrors('finance');
+        $this->assertSame('draft', $second->fresh()->status);
+        $this->assertSame(0, $second->documents()->count());
+        $this->assertSame($before, $document->fresh()->getAttributes());
+        $this->assertSame($posted, $first->fresh()->getAttributes());
+        $this->assertSame('payment_evidence', $document->fresh()->document_type);
+        $this->assertFalse(app(LiquidationSummary::class)->forBatch($g['batch'])['complete']);
+
+        $this->actingAs($this->staff('registrar'))->post(route('financial.evidence.review', ['payout', $first->id, $document]), ['decision' => 'accepted', 'review_notes' => 'Not an authorized reviewer'])->assertForbidden();
+        $this->actingAs($this->staff('viewer'))->get(route('financial.evidence.download', ['payout', $first->id, $document]))->assertForbidden();
+        auth()->logout();
+        $this->get(route('financial.evidence.download', ['payout', $first->id, $document]))->assertRedirect(route('login'));
     }
 
     public function test_unpaid_batch_is_incomplete_and_draft_print_never_claims_payment_or_acceptance(): void
@@ -317,6 +508,8 @@ class FinancialRecordingTest extends TestCase
         $this->post(route('financial.payouts.post', $payment))->assertSessionHasNoErrors();
         $this->actingAs($g['finance'])->post(route('financial.liquidations.store', $g['batch']), ['reference' => 'SAMPLE-FIRST'])->assertSessionHasNoErrors();
         $first = Liquidation::sole();
+        $this->makeSignedAcknowledgment($payment, $g['finance'], $g['admin']);
+        $this->makeLiquidationSupport($first, $g['finance'], $g['admin']);
         $lines = $first->items()->get()->toJson();
         $this->post(route('financial.liquidations.submit', $first))->assertSessionHasNoErrors();
         $g['finance']->roles()->create(['role' => 'administrator']);
@@ -325,6 +518,7 @@ class FinancialRecordingTest extends TestCase
         $this->actingAs($g['finance']->fresh())->post(route('financial.liquidations.refresh', $first))->assertSessionHasErrors('liquidation');
         $this->post(route('financial.liquidations.store', $g['batch']), ['reference' => 'SAMPLE-REVISED'])->assertSessionHasNoErrors();
         $second = Liquidation::latest('id')->firstOrFail();
+        $this->makeLiquidationSupport($second, $g['finance'], $g['admin']);
         $this->assertSame(2, $second->sequence);
         $this->assertSame('returned', $first->fresh()->status);
         $this->assertSame($lines, $first->items()->get()->toJson());
@@ -341,6 +535,8 @@ class FinancialRecordingTest extends TestCase
         $this->post(route('financial.payouts.post', $payment))->assertSessionHasNoErrors();
         $this->actingAs($g['finance'])->post(route('financial.liquidations.store', $g['batch']), ['reference' => 'SAMPLE-FROZEN'])->assertSessionHasNoErrors();
         $report = Liquidation::sole();
+        $this->makeSignedAcknowledgment($payment, $g['finance'], $g['admin']);
+        $this->makeLiquidationSupport($report, $g['finance'], $g['admin']);
         $this->post(route('financial.liquidations.submit', $report))->assertSessionHasNoErrors();
         $this->expectException(QueryException::class);
         DB::table('liquidation_items')->where('liquidation_id', $report->id)->update(['amount' => '1.00']);

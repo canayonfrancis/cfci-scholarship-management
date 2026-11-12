@@ -1,6 +1,17 @@
 <x-records-page :title="$scholar->full_name" :description="'Student number '.$scholar->student_number">
     <x-slot:actions><a class="records-button" href="{{ route('scholars.index') }}">Back to scholars</a>@can('update', $scholar)<a class="records-button" href="{{ route('scholars.edit', $scholar) }}">Edit record</a>@endcan @can('create', \App\Models\ScholarshipAssignment::class)<a class="records-button is-primary" href="{{ route('scholars.assignments.create', $scholar) }}">Assign scholarship</a>@endcan</x-slot:actions>
     @include('scholars.profile-details')
+    @can('viewAny', \App\Models\ScholarshipBatch::class)
+        <section class="dashboard-card records-card"><h2>Semester batch memberships</h2><p class="record-help">Roster membership is independent of enrollment verification, eligibility and billing.</p>
+            <ul class="records-timeline">@forelse($memberships as $member)<li><a class="records-link" href="{{ route('scholarship-batches.show', $member->batch) }}">{{ $member->batch->batch_number }} · {{ $member->batch->program->code }} · {{ $member->batch->academicPeriod->academic_year }} / {{ $member->batch->academicPeriod->semester_code }}</a></li>@empty<li>No semester roster membership recorded.</li>@endforelse</ul><div class="records-pagination">{{ $memberships->links() }}</div>
+            @can('create', \App\Models\ScholarshipBatch::class)
+                <form method="POST" action="{{ route('scholars.batch-memberships.store', $scholar) }}">@csrf<div class="records-form-grid">
+                    <x-record-field name="assignment_id" label="Pending or active scholarship assignment" type="select" required><option value="">Select assignment</option>@foreach($scholar->assignments->whereIn('status', ['pending', 'active']) as $assignment)<option value="{{ $assignment->id }}" @selected(old('assignment_id') == $assignment->id)>#{{ $assignment->id }} · {{ $assignment->program->code }} · {{ $assignment->statusLabel() }}</option>@endforeach</x-record-field>
+                    <x-record-field name="scholarship_batch_id" label="Semester roster batch" type="select" required><option value="">Select matching program and semester</option>@foreach($rosters as $roster)<option value="{{ $roster->id }}" @selected(old('scholarship_batch_id') == $roster->id)>{{ $roster->batch_number }} · {{ $roster->program->code }} · {{ $roster->academicPeriod->academic_year }} / {{ $roster->academicPeriod->semester_code }}</option>@endforeach</x-record-field>
+                </div><button class="records-button is-primary" type="submit">Assign to roster without billing</button><a class="records-button" href="{{ route('scholarship-batches.index') }}">Create or view rosters</a></form>
+            @endcan
+        </section>
+    @endcan
     @can('viewAny', \App\Models\AcademicRecord::class)
         <section class="dashboard-card records-card"><h2 class="records-section-title">Academic records</h2><p class="record-help">Enrollment, academic standing, certificates, and Registrar verification history.</p><div class="records-actions"><a class="records-button" href="{{ route('academic-verifications.index', ['student_id' => $scholar->id]) }}">View academic history</a>@can('create', \App\Models\AcademicRecord::class)<a class="records-button" href="{{ route('academic-verifications.create', ['student_id' => $scholar->id]) }}">Add academic record</a>@endcan</div></section>
     @endcan

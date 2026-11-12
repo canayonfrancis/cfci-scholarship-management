@@ -93,7 +93,7 @@ trait BuildsScholarshipRecords
         } catch (QueryException $exception) {
             // MariaDB strict mode rejects invalid ENUM values with 1265 before CHECK guards run.
             // Keep unrelated SQL errors, such as missing tables/columns, as test failures.
-            $this->assertMatchesRegularExpression('/constraint|foreign key|unique|duplicate|sms_|SMS .*(immutable|mismatch)|1265 Data truncated for column \'academic_standing\'/i', $exception->getMessage());
+            $this->assertMatchesRegularExpression('/constraint|foreign key|unique|duplicate|sms_|SMS .*(immutable|mismatch)|1265 Data truncated for column \'(?:academic_standing|status)\'/i', $exception->getMessage());
             if ($message !== null) {
                 $this->assertStringContainsString($message, $exception->getMessage());
             }

@@ -86,6 +86,11 @@ class BillingItem extends Model
         return $this->hasMany(Payout::class, 'billing_item_id');
     }
 
+    public function payrollItems(): HasMany
+    {
+        return $this->hasMany(PayrollItem::class);
+    }
+
     public function adjustments(): HasMany
     {
         return $this->hasMany(BillingAdjustment::class, 'billing_item_id');

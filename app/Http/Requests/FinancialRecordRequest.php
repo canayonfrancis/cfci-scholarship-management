@@ -31,7 +31,7 @@ class FinancialRecordRequest extends FormRequest
             'settle' => ['settled_on' => $date, 'settlement_reference' => $text],
             'prepareLiquidation' => ['reference' => $text],
             'reviewLiquidation' => ['decision' => ['required', Rule::in(['accepted', 'returned'])], 'review_notes' => ['required', 'string', 'max:4000']],
-            'uploadEvidence' => ['document_type' => ['required', Rule::in(['receipt_evidence', 'payment_evidence', 'deduction_authority', 'deduction_settlement', 'liquidation_support'])], 'evidence' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'extensions:pdf,jpg,jpeg,png', 'max:2048']],
+            'uploadEvidence' => ['document_type' => ['required', Rule::in(['receipt_evidence', 'payment_evidence', 'signed_acknowledgment', 'deduction_authority', 'deduction_settlement', 'liquidation_support'])], 'evidence' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'extensions:pdf,jpg,jpeg,png', 'max:2048']],
             'reviewEvidence' => ['decision' => ['required', Rule::in(['accepted', 'rejected'])], 'review_notes' => ['required', 'string', 'max:4000']],
             default => [],
         };

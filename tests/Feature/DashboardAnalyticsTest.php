@@ -21,13 +21,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\BuildsAcknowledgmentRecords;
 use Tests\Concerns\BuildsBillableAllocations;
 use Tests\Concerns\BuildsScholarshipRecords;
 use Tests\TestCase;
 
 class DashboardAnalyticsTest extends TestCase
 {
-    use BuildsBillableAllocations, BuildsScholarshipRecords, RefreshDatabase;
+    use BuildsAcknowledgmentRecords, BuildsBillableAllocations, BuildsScholarshipRecords, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -202,10 +203,12 @@ class DashboardAnalyticsTest extends TestCase
         $this->actingAs($admin)->post(route('billing-batches.budget'), ['program_id' => $g['program']->id, 'academic_period_id' => $g['period']->id, 'previous_budget' => 0, 'amount' => '7500.00', 'source_reference' => 'SAMPLE'])->assertSessionHasNoErrors();
         $this->post(route('billing-batches.approve', $g['batch']), ['reference' => 'SAMPLE'])->assertSessionHasNoErrors();
         $item = $g['batch']->items()->sole();
-        $payment = Payout::create(['billing_item_id' => $item->id, 'billing_batch_id' => $g['batch']->id, 'payment_mode' => 'direct', 'gross_amount' => '7500.00', 'net_amount' => '7500.00', 'paid_on' => now('Asia/Manila')->toDateString(), 'institutional_student_id' => $g['student']->student_number, 'method' => 'bank_transfer', 'reference' => 'SAMPLE', 'status' => 'posted', 'posted_by' => $admin->id, 'posted_at' => now(), 'posting_key' => 'SAMPLE-direct']);
+        $payment = Payout::create(['billing_item_id' => $item->id, 'billing_batch_id' => $g['batch']->id, 'payment_mode' => 'direct', 'gross_amount' => '7500.00', 'net_amount' => '7500.00', 'paid_on' => now('Asia/Manila')->toDateString(), 'institutional_student_id' => $g['student']->student_number, 'payee' => $g['student']->full_name, 'method' => 'bank_transfer', 'reference' => 'SAMPLE', 'status' => 'posted', 'posted_by' => $admin->id, 'posted_at' => now(), 'posting_key' => 'SAMPLE-direct']);
         $proof = app(PrivateEvidence::class)->store($payment, $admin, UploadedFile::fake()->createWithContent('proof.pdf', "%PDF-1.4\nSAMPLE\n%%EOF"), 'payment_evidence', true);
         $this->actingAs($finance)->post(route('financial.liquidations.store', $g['batch']), ['reference' => 'SAMPLE'])->assertSessionHasNoErrors();
         $report = Liquidation::sole();
+        $this->makeSignedAcknowledgment($payment, $finance, $admin);
+        $this->makeLiquidationSupport($report, $finance, $admin);
         $this->post(route('financial.liquidations.submit', $report))->assertSessionHasNoErrors();
         $this->actingAs($admin)->post(route('financial.liquidations.review', $report), ['decision' => 'accepted', 'review_notes' => 'SAMPLE'])->assertSessionHasNoErrors();
         $service = app(DashboardAnalytics::class);

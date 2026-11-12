@@ -309,6 +309,10 @@ class BillingBatchTest extends TestCase
         $counts = DB::table('users')->count();
         $migration = require database_path('migrations/2026_11_11_000005_add_semester_billing_management.php');
         $allocations = require database_path('migrations/2026_11_11_000006_add_scholarship_allocation_approvals.php');
+        $payrolls = require database_path('migrations/2026_11_13_000010_add_payroll_preparation.php');
+        $acknowledgments = require database_path('migrations/2026_11_13_000011_add_signed_payment_acknowledgments.php');
+        $acknowledgments->down();
+        $payrolls->down();
         $allocations->down();
         $migration->down();
         $this->assertSame($counts, DB::table('users')->count());
@@ -316,6 +320,8 @@ class BillingBatchTest extends TestCase
         $this->assertDatabaseRejects(fn () => DB::table('program_period_terms')->where('id', $g['terms']->id)->update(['semester_gross_amount' => '1.00']));
         $migration->up();
         $allocations->up();
+        $payrolls->up();
+        $acknowledgments->up();
         $this->assertNull($g['terms']->fresh()->billing_confirmed_at);
         $this->assertDatabaseRejects(fn () => DB::table('program_period_terms')->where('id', $g['terms']->id)->update(['criteria' => '{}']));
         $this->assertDatabaseRejects(fn () => DB::table('billing_batches')->where('id', $g['batch']->id)->update(['status' => 'submitted']));

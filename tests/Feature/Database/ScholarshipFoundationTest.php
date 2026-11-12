@@ -326,6 +326,9 @@ class ScholarshipFoundationTest extends TestCase
 
     public function test_liquidation_supports_student_payout_and_deduction_evidence_without_ambiguous_targets(): void
     {
+        // A legacy accepted parent must remain immutable after the additive upgrade.
+        $checklist = require database_path('migrations/2026_11_13_000011_add_signed_payment_acknowledgments.php');
+        $checklist->down();
         $g = $this->financialContext();
         $base = ['liquidation_id' => $g['liquidation']->id, 'billing_batch_id' => $g['batch']->id, 'amount' => '1.00'];
         $this->assertDatabaseRejects(fn () => LiquidationItem::create($base));
@@ -334,6 +337,7 @@ class ScholarshipFoundationTest extends TestCase
         $this->assertTrue($line->payout->billingItem->student->is($g['student']));
         $this->assertDatabaseRejects(fn () => LiquidationItem::create($base + ['payout_id' => $g['payout']->id]));
         $g['liquidation']->update(['status' => 'accepted', 'reviewed_by' => $g['actor']->id, 'reviewed_at' => now()]);
+        $checklist->up();
         $this->assertDatabaseRejects(fn () => $line->update(['amount' => '2.00']), 'history is immutable');
         $this->assertDatabaseRejects(fn () => $line->delete(), 'SMS history is immutable');
         $this->assertDatabaseRejects(fn () => LiquidationItem::create($base + ['deduction_id' => $g['deduction']->id]), 'SMS parent history is immutable');

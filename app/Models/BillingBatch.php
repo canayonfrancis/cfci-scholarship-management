@@ -44,6 +44,11 @@ class BillingBatch extends Model
         return $this->belongsTo(ScholarshipProgram::class, 'program_id');
     }
 
+    public function scholarshipBatch(): BelongsTo
+    {
+        return $this->belongsTo(ScholarshipBatch::class);
+    }
+
     public function academicPeriod(): BelongsTo
     {
         return $this->belongsTo(AcademicPeriod::class, 'academic_period_id');
@@ -107,6 +112,11 @@ class BillingBatch extends Model
     public function approval(): HasOne
     {
         return $this->hasOne(BillingBatchApproval::class, 'billing_batch_id');
+    }
+
+    public function payroll(): HasOne
+    {
+        return $this->hasOne(Payroll::class);
     }
 
     public function allocationStatus(): string

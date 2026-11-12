@@ -6,12 +6,16 @@ use App\Http\Controllers\AcademicVerificationController;
 use App\Http\Controllers\BillingBatchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinancialRecordController;
+use App\Http\Controllers\PaymentAcknowledgmentController;
+use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScholarController;
 use App\Http\Controllers\ScholarshipAssignmentController;
+use App\Http\Controllers\ScholarshipBatchController;
 use App\Http\Controllers\ScholarshipEvaluationController;
 use App\Http\Controllers\ScholarshipFundsController;
 use App\Http\Controllers\ScholarshipProgramController;
+use App\Http\Controllers\ScholarshipReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -21,9 +25,16 @@ Route::get('/dashboard', DashboardController::class)
     ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::get('scholarship-reports/{report?}', [ScholarshipReportController::class, 'index'])->middleware('cache.headers:no_store;private')->name('scholarship-reports.index');
+    Route::resource('scholarship-batches', ScholarshipBatchController::class)->parameters(['scholarship-batches' => 'batch'])->only(['index', 'store', 'show'])->middleware('cache.headers:no_store;private');
+    Route::post('scholars/{scholar}/batch-memberships', [ScholarshipBatchController::class, 'join'])->name('scholars.batch-memberships.store');
     Route::prefix('financial-records')->name('financial.')->middleware('cache.headers:no_store;private')->controller(FinancialRecordController::class)->group(function () {
         Route::get('/', 'index')->name('index');
+        Route::get('funding-status', 'fundingStatus')->name('funding-status');
         Route::get('batches/{batch}', 'batch')->name('batch');
+        Route::post('batches/{batch}/payroll', [PayrollController::class, 'store'])->name('payrolls.store');
+        Route::get('payrolls/{payroll}', [PayrollController::class, 'show'])->name('payrolls.show');
+        Route::get('payrolls/{payroll}/print', [PayrollController::class, 'print'])->name('payrolls.print');
         Route::post('receipts', 'createReceipt')->name('receipts.store');
         Route::get('receipts/{receipt}', 'receipt')->name('receipt');
         Route::post('receipts/{receipt}/post', 'postReceipt')->name('receipts.post');
@@ -31,6 +42,7 @@ Route::middleware('auth')->group(function () {
         Route::post('payments', 'createPayout')->name('payouts.store');
         Route::get('payments/{payout}', 'payout')->name('payout');
         Route::post('payments/{payout}/post', 'postPayout')->name('payouts.post');
+        Route::post('payments/{payout}/acknowledgments', [PaymentAcknowledgmentController::class, 'store'])->name('acknowledgments.store');
         Route::post('payments/{payout}/deductions', 'deduct')->name('deduct');
         Route::post('deductions/{deduction}/settle', 'settle')->name('settle');
         Route::post('batches/{batch}/liquidations', 'prepareLiquidation')->name('liquidations.store');

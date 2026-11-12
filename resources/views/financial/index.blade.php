@@ -1,5 +1,5 @@
 <x-records-page title="Funding, payments & liquidation" description="Record receipts and payments made outside this system, separately from scholarship billing and budgets. This system does not send money.">
-    <x-slot:actions><a class="records-button" href="{{ route('billing-batches.index') }}">Billing batches</a></x-slot:actions>
+    <x-slot:actions><a class="records-button" href="{{ route('billing-batches.index') }}">Billing batches</a><a class="records-button" href="{{ route('financial.funding-status') }}">Billing stages / awaiting funds</a></x-slot:actions>
     <section class="dashboard-card records-card">
         <form method="GET" class="records-filters"><div class="record-field"><label for="financial-filter">Program / academic year / semester</label><select class="record-input" id="financial-filter" name="program_period_term_id"><option value="">All scopes</option>@foreach($terms as $term)<option value="{{ $term->id }}" @selected(($filters['program_period_term_id'] ?? '') == $term->id)>{{ $term->program->code }} · {{ $term->academicPeriod->academic_year }} / {{ $term->academicPeriod->semester_code }}</option>@endforeach</select></div><button class="records-button" type="submit">Filter</button></form>
         <h2 class="records-section-title">Submitted billing batches</h2>

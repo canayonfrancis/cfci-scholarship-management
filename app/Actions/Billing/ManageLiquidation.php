@@ -63,8 +63,9 @@ class ManageLiquidation
             if ($report->status !== 'draft') {
                 $this->fail('Only a draft liquidation may be submitted.');
             }
-            $this->requireComplete($report);
-            $report->update(['status' => 'submitted', 'submitted_at' => now(), 'submitted_by' => $actor->id]);
+            $checklist = $this->requireComplete($report);
+            $report->update(['status' => 'submitted', 'submitted_at' => now(), 'submitted_by' => $actor->id,
+                'compliance_snapshot' => $checklist + ['checked_by' => $actor->id, 'checked_at' => now()->toIso8601String()]]);
             $this->audit->record($actor, $report, 'liquidation_submitted');
         }, 3);
     }
@@ -79,11 +80,16 @@ class ManageLiquidation
             if ($report->status !== 'submitted' || $report->prepared_by === $actor->id || $report->submitted_by === $actor->id) {
                 $this->fail('A different Coordinator must review a submitted liquidation.');
             }
-            if ($decision === 'accepted') {
-                $this->requireComplete($report);
+            if (! in_array($decision, ['accepted', 'returned'], true)) {
+                $this->fail('Choose acceptance or return for a submitted liquidation.');
             }
+            $checklist = $decision === 'accepted' ? $this->requireComplete($report) : null;
             $before = $report->only($report->getFillable());
-            $report->update(['status' => $decision, 'reviewed_by' => $actor->id, 'reviewed_at' => now(), 'review_notes' => $notes]);
+            $changes = ['status' => $decision, 'reviewed_by' => $actor->id, 'reviewed_at' => now(), 'review_notes' => $notes];
+            if ($decision === 'accepted' && $report->compliance_snapshot === null) {
+                $changes['compliance_snapshot'] = $checklist + ['checked_by' => $actor->id, 'checked_at' => now()->toIso8601String()];
+            }
+            $report->update($changes);
             $this->audit->record($actor, $report, 'liquidation_'.$decision, $before);
         }, 3);
     }
@@ -97,12 +103,14 @@ class ManageLiquidation
         }
     }
 
-    private function requireComplete(Liquidation $report): void
+    private function requireComplete(Liquidation $report): array
     {
         $summary = $this->summary->forBatch($report->batch, $report);
         if (! $summary['complete']) {
             $this->fail(implode(' ', $summary['issues']));
         }
+
+        return $summary['compliance'];
     }
 
     private function fail(string $message): never

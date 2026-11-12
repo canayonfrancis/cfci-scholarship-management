@@ -77,4 +77,9 @@ class Payout extends Model
     {
         return $this->hasMany(Document::class, 'payout_id');
     }
+
+    public function acknowledgments(): HasMany
+    {
+        return $this->hasMany(PaymentAcknowledgment::class);
+    }
 }

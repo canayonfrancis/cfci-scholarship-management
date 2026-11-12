@@ -44,7 +44,7 @@ class AcademicPeriod extends Model
         return AcademicValidationContext::where('active_period_id', $this->id)->orWhere('source_period_id', $this->id)->exists()
             || $this->terms()->exists() || $this->academicRecords()->exists()
             || $this->applications()->exists() || $this->startingAssignments()->exists()
-            || $this->endingAssignments()->exists() || $this->students()->exists()
+            || $this->endingAssignments()->exists() || $this->students()->exists() || $this->scholarshipBatches()->exists()
             || AuditEvent::where('subject_type', Student::class)->where('after_state->academic_period_id', $this->id)->exists();
     }
 
@@ -66,6 +66,11 @@ class AcademicPeriod extends Model
     public function billingBatches(): HasMany
     {
         return $this->hasMany(BillingBatch::class, 'academic_period_id');
+    }
+
+    public function scholarshipBatches(): HasMany
+    {
+        return $this->hasMany(ScholarshipBatch::class, 'academic_period_id');
     }
 
     public function fundingReceipts(): HasMany

@@ -1,5 +1,5 @@
 <x-records-page title="Scholar records" description="Find scholars, maintain their details, and follow their scholarship history.">
-    <x-slot:actions>@can('create', \App\Models\Student::class)<a class="records-button is-primary" href="{{ route('scholars.create') }}">Add scholar <x-dashboard-icon name="arrow-right" :size="16" /></a>@endcan</x-slot:actions>
+    <x-slot:actions>@can('viewAny', \App\Models\ScholarshipBatch::class)<a class="records-button" href="{{ route('scholarship-batches.index') }}">Semester rosters</a>@endcan @can('create', \App\Models\Student::class)<a class="records-button is-primary" href="{{ route('scholars.create') }}">Add scholar <x-dashboard-icon name="arrow-right" :size="16" /></a>@endcan</x-slot:actions>
     <section class="dashboard-card records-card" aria-label="Scholar directory">
         <form class="records-filters" action="{{ route('scholars.index') }}" method="GET">
             <x-record-field name="q" label="Search scholars" :value="$filters['q'] ?? ''" placeholder="Student number, name, or email" maxlength="100" type="search" />
