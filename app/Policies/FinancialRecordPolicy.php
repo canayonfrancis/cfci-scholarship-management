@@ -8,12 +8,12 @@ class FinancialRecordPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['finance', 'administrator', 'coordinator', 'viewer']);
+        return $user->hasAnyRole(['registrar', 'finance', 'administrator', 'coordinator', 'viewer']);
     }
 
     public function prepare(User $user): bool
     {
-        return $user->hasAnyRole(['coordinator', 'finance']);
+        return $user->hasAnyRole(['registrar', 'coordinator', 'administrator', 'finance']);
     }
 
     public function verify(User $user): bool
@@ -23,6 +23,6 @@ class FinancialRecordPolicy
 
     public function evidence(User $user): bool
     {
-        return $user->hasAnyRole(['coordinator', 'finance', 'administrator']);
+        return $user->hasAnyRole(['registrar', 'coordinator', 'finance', 'administrator']);
     }
 }

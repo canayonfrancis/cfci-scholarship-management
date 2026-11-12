@@ -256,7 +256,7 @@ class ScholarshipFundsTest extends TestCase
         $csv = $this->get(route('billing-batches.report', ['academic_period_id' => $g['period']->id, 'export' => 'csv']))->assertOk()->streamedContent();
         $this->assertStringContainsString('SYNTHETIC-ADMIN-APPROVAL', $csv);
         $this->assertStringContainsString($g['student']->student_number, $csv);
-        $this->actingAs($this->staff('registrar'))->get(route('billing-batches.report'))->assertForbidden();
+        $this->actingAs($this->staff('registrar'))->get(route('billing-batches.report'))->assertOk();
     }
 
     public function test_program_changes_preserve_history_and_cannot_create_another_scholar_semester_allocation(): void

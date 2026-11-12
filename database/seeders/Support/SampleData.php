@@ -80,13 +80,13 @@ final class SampleData
         return AuditEvent::where('action', self::CREATED)->where('subject_type', $model::class)->where('subject_id', $model->id)->exists();
     }
 
-    public static function staff(string $role, bool $reviewer = false): User
+    public static function staff(string $role): User
     {
-        if (! in_array($role, User::OPERATIONAL_ROLES, true) || ($reviewer && $role !== 'coordinator')) {
-            throw new RuntimeException('Sample staff must use coordinator or registrar; independent reviewers are Coordinators.');
+        if (! in_array($role, User::OPERATIONAL_ROLES, true)) {
+            throw new RuntimeException('Sample staff must use coordinator or registrar.');
         }
         $labels = ['registrar' => 'Camille Santos', 'coordinator' => 'Rafael Mendoza'];
-        $email = 'sample.'.$role.($reviewer ? '.reviewer' : '').'@example.test';
+        $email = 'sample.'.$role.'@example.test';
         $user = User::where('email', $email)->first();
         if ($user) {
             if (! self::owned($user)) {
@@ -95,7 +95,7 @@ final class SampleData
 
             return $user;
         }
-        $user = User::create(['name' => '[SAMPLE] '.($reviewer ? 'Mara Dela Cruz (independent reviewer)' : $labels[$role]), 'email' => $email, 'password' => config('sample-data.password')]);
+        $user = User::create(['name' => '[SAMPLE] '.$labels[$role], 'email' => $email, 'password' => config('sample-data.password')]);
         $user->forceFill(['email_verified_at' => now()])->save();
         $user->roles()->create(['role' => $role]);
         self::mark($user);

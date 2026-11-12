@@ -24,11 +24,11 @@ class OperationalRoleSecurityTest extends TestCase
 
     public static function operationalRoles(): array
     {
-        return [['coordinator', 'School Scholarship Coordinator'], ['registrar', 'Registrar Staff']];
+        return [['coordinator', 'School Scholarship Coordinator'], ['registrar', 'Registrar Staff'], ['administrator', 'Test Administrator']];
     }
 
     #[DataProvider('operationalRoles')]
-    public function test_both_roles_can_login_follow_an_authorized_intended_url_and_logout(string $role, string $label): void
+    public function test_authorized_staff_can_login_follow_an_authorized_intended_url_and_logout(string $role, string $label): void
     {
         $user = $this->staff($role);
         $this->get(route('scholars.index'))->assertRedirect(route('login'));
@@ -40,19 +40,14 @@ class OperationalRoleSecurityTest extends TestCase
             $this->get(route($route))->assertOk();
         }
         $response = $this->get(route('dashboard'))->assertOk()->assertSeeText($label);
-        if ($role === 'registrar') {
-            $response->assertDontSee('href="'.route('financial.index').'"', false)
-                ->assertDontSee('href="'.route('billing-batches.index').'"', false);
-        } else {
-            $response->assertSee('href="'.route('financial.index').'"', false)
-                ->assertSee('href="'.route('billing-batches.index').'"', false);
-        }
+        $response->assertSee('href="'.route('financial.index').'"', false)
+            ->assertSee('href="'.route('billing-batches.index').'"', false);
         $this->withSession(['private_marker' => 'remove on logout'])->post(route('logout'))->assertRedirect('/')->assertSessionMissing('private_marker');
         $this->assertGuest();
         $this->get(route('dashboard'))->assertRedirect(route('login'));
     }
 
-    public function test_registrar_cannot_mutate_approvals_configuration_assignments_or_any_financial_endpoint(): void
+    public function test_registrar_cannot_approve_records_configure_policy_or_authorize_deductions(): void
     {
         $g = $this->financialContext();
         $course = AcademicProgram::create(['name' => 'Synthetic course']);
@@ -74,24 +69,17 @@ class OperationalRoleSecurityTest extends TestCase
             ['POST', 'evaluations.store', []], ['POST', 'evaluations.policy', [$g['application']]], ['POST', 'evaluations.run', [$g['application']]],
             ['POST', 'evaluations.evidence', [$g['application']]], ['PATCH', 'evaluations.evidence.review', [$g['application'], $document]],
             ['POST', 'evaluations.external', [$g['application']]], ['POST', 'evaluations.activate', [$g['application']]],
-            ['POST', 'billing-batches.terms', []], ['POST', 'billing-batches.store', []], ['PATCH', 'billing-batches.update', [$g['batch']]],
-            ['POST', 'billing-batches.items.store', [$g['batch']]], ['DELETE', 'billing-batches.items.destroy', [$g['batch'], $g['item']]],
-            ['POST', 'billing-batches.submit', [$g['batch']]], ['POST', 'billing-batches.approve', [$g['batch']]],
+            ['POST', 'billing-batches.terms', []], ['POST', 'billing-batches.approve', [$g['batch']]],
             ['POST', 'billing-batches.budget', []], ['POST', 'billing-batches.items.adjust', [$g['batch'], $g['item']]],
-            ['POST', 'financial.receipts.store', []], ['POST', 'financial.receipts.post', [$g['receipt']]], ['POST', 'financial.allocate', [$g['batch']]],
-            ['POST', 'financial.payouts.store', []], ['POST', 'financial.payouts.post', [$g['payout']]], ['POST', 'financial.deduct', [$g['payout']]],
-            ['POST', 'financial.settle', [$g['deduction']]], ['POST', 'financial.liquidations.store', [$g['batch']]],
-            ['POST', 'financial.liquidations.refresh', [$g['liquidation']]], ['POST', 'financial.liquidations.submit', [$g['liquidation']]],
-            ['POST', 'financial.liquidations.review', [$g['liquidation']]], ['POST', 'financial.evidence.store', ['receipt', $g['receipt']]],
+            ['POST', 'financial.receipts.post', [$g['receipt']]],
+            ['POST', 'financial.payouts.post', [$g['payout']]], ['POST', 'financial.deduct', [$g['payout']]],
+            ['POST', 'financial.settle', [$g['deduction']]],
+            ['POST', 'financial.liquidations.review', [$g['liquidation']]],
             ['POST', 'financial.evidence.review', ['receipt', $g['receipt'], $document]],
         ];
         foreach ($routes as [$method, $route, $parameters]) {
             $this->call($method, route($route, $parameters), ['role' => 'coordinator', 'roles' => ['coordinator']])->assertForbidden();
         }
-        foreach (['financial.index', 'billing-batches.index', 'billing-batches.report'] as $route) {
-            $this->get(route($route))->assertForbidden();
-        }
-        $this->get(route('financial.evidence.download', ['receipt', $g['receipt'], $document]))->assertForbidden();
         foreach ($before as $table => $snapshot) {
             $this->assertSame($snapshot, DB::table($table)->orderBy('id')->get()->toJson(), $table.' must be unchanged');
         }
@@ -126,6 +114,6 @@ class OperationalRoleSecurityTest extends TestCase
         $this->patch(route('profile.update'), ['name' => 'Registrar Name', 'email' => $user->email, 'id' => $other->id, 'role' => 'coordinator', 'roles' => ['coordinator'], 'user_id' => $other->id])->assertSessionHasNoErrors();
         $this->assertSame(['registrar'], $user->roles()->pluck('role')->all());
         $this->assertSame($before, $other->fresh()->getAttributes());
-        $this->post(route('financial.receipts.store'), [])->assertForbidden();
+        $this->post(route('billing-batches.budget'), [])->assertForbidden();
     }
 }

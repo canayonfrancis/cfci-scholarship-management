@@ -7,6 +7,10 @@ Status: baseline design with CFCI's subsequent direct-validation clarification a
 
 This plan is based on the repository and the school's requirements supplied in this conversation. It does not establish external scholarship policy. Confirmed requirements, implementation proposals, and unresolved decisions are identified separately. See [progress.md](progress.md) for verification results and the work tracker.
 
+## Latest role and recording clarification (2026-11-12)
+
+Task 15 in [progress.md](progress.md) and the current [access review](auth-access-review.md) supersede older financial-authority/account assumptions: Registrar may record billing and financial events, Coordinator approves/verifies them, and the user explicitly retains the existing Test Administrator with access to every feature under the same record-integrity rules. The system records events outside the application; it does not execute payments. One Registrar recorder and one Coordinator reviewer are sufficient; no second Coordinator or automatic Administrator conversion is required. Older references to Finance/Administrator operational separation below are historical. Existing accounts and relationships are preserved.
+
 ## Complete integration review (2026-11-12)
 
 Task 12 in [progress.md](progress.md) and [integration-review.md](integration-review.md) verify the three official modules against the requested ten-step process. Final suites pass on SQLite and isolated MariaDB, including real concurrency. A confirmed academic-document download checksum defect and a database-specific test assertion were fixed. The latest dashboard-only presentation is preserved. Production rollout remains blocked by unresolved academic policy/configuration, dependency advisories and outstanding deployment/recovery/school acceptance requirements; successful synthetic downstream fixtures are not approved school criteria.

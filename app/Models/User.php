@@ -14,8 +14,11 @@ class User extends Authenticatable
 {
     public const OPERATIONAL_ROLES = ['coordinator', 'registrar'];
 
-    // Existing legacy memberships retain access until the sole local Administrator
-    // account has been reviewed. Never use this list to provision new roles.
+    // The user explicitly retains the existing Administrator for full-system testing.
+    // This exception is not a newly provisionable operational role.
+    public const TECHNICAL_ROLES = ['administrator'];
+
+    // Finance/Viewer remain legacy compatibility memberships, not provisioning choices.
     public const STAFF_ROLES = ['administrator', 'registrar', 'coordinator', 'finance', 'viewer'];
 
     /** @use HasFactory<UserFactory> */

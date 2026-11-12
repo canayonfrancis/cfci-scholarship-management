@@ -21,7 +21,8 @@ class AuditStaffAccess extends Command
             $counts = array_replace(array_fill_keys(User::OPERATIONAL_ROLES, 0), $roles->all());
             $roleless = User::doesntHave('roles')->count();
             $multiple = User::has('roles', '>', 1)->count();
-            $legacy = $roles->except(User::OPERATIONAL_ROLES)->only(User::STAFF_ROLES)->all();
+            $technical = $roles->only(User::TECHNICAL_ROLES)->all();
+            $legacy = $roles->except([...User::OPERATIONAL_ROLES, ...User::TECHNICAL_ROLES])->only(User::STAFF_ROLES)->all();
             $unexpected = $roles->except(User::STAFF_ROLES)->all();
 
             return [
@@ -35,6 +36,7 @@ class AuditStaffAccess extends Command
                 'operational_roles' => User::OPERATIONAL_ROLES,
                 'accounts_by_role' => $counts,
                 'non_operational_roles' => (object) $roles->except(User::OPERATIONAL_ROLES)->all(),
+                'approved_technical_roles' => (object) $technical,
                 'legacy_roles_pending_review' => (object) $legacy,
                 'unexpected_roles' => (object) $unexpected,
                 'accounts_without_roles' => $roleless,

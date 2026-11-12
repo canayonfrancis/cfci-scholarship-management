@@ -136,6 +136,12 @@ class BillingBatchTest extends TestCase
         $this->assertSame('finalized', $item->status);
         $this->assertSame(auth()->id(), $item->finalized_by);
         $this->assertSame(BillingEligibility::POLICY, $item->basis_snapshot['policy']);
+        $before = $batch->getAttributes();
+        $itemBefore = $item->getAttributes();
+        $this->getJson(route('billing-batches.options', ['program_id' => $batch->program_id, 'academic_period_id' => $batch->academic_period_id, 'status' => 'submitted']))->assertOk()->assertJsonFragment(['id' => $batch->id]);
+        $this->get(route('billing-batches.index', ['billing_batch_id' => $batch->id]))->assertOk()->assertSee('value="'.$batch->id.'" selected', false);
+        $this->assertSame($before, $batch->fresh()->getAttributes());
+        $this->assertSame($itemBefore, $item->fresh()->getAttributes());
         $this->get(route('billing-batches.show', $batch))->assertOk()->assertSee('Submitted')->assertDontSee('Submit validated batch');
         $this->submit($batch)->assertForbidden();
         $this->patch(route('billing-batches.update', $batch), ['lock_version' => $batch->lock_version, 'batch_number' => 'Changed'])->assertForbidden();
@@ -208,7 +214,7 @@ class BillingBatchTest extends TestCase
 
     public static function roles(): array
     {
-        return [['finance', true, true, false], ['administrator', true, false, true], ['coordinator', true, true, true], ['viewer', true, false, false], ['registrar', false, false, false], ['none', false, false, false]];
+        return [['finance', true, true, false], ['administrator', true, true, true], ['coordinator', true, true, true], ['viewer', true, false, false], ['registrar', true, true, false], ['none', false, false, false]];
     }
 
     #[DataProvider('roles')]

@@ -12,10 +12,12 @@ use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipProgram;
 use App\Models\Student;
 use App\Models\User;
+use App\Rules\PositiveBatchNumber;
 use App\Services\Billing\BillingEligibility;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class ManageBillingBatch
@@ -58,24 +60,40 @@ class ManageBillingBatch
     {
         Gate::forUser($actor)->authorize('create', BillingBatch::class);
 
-        return DB::transaction(function () use ($actor, $data) {
-            $program = ScholarshipProgram::whereKey($data['program_id'])->lockForUpdate()->firstOrFail();
-            $period = AcademicPeriod::whereKey($data['academic_period_id'])->lockForUpdate()->firstOrFail();
-            $terms = ProgramPeriodTerm::where('program_id', $program->id)->where('academic_period_id', $period->id)->lockForUpdate()->first();
-            $rate = $terms?->rates()->orderByDesc('revision')->first();
-            if (! $program->is_active || ! $rate) {
-                $this->fail('Select an available program and explicitly approved semester billing terms.');
-            }
-            $numbers = $terms->billingBatches()->pluck('batch_number')->map(fn ($number) => preg_match('/^Batch (\d+)$/', $number, $matches) ? (int) $matches[1] : 0);
-            $batch = $terms->billingBatches()->create([
-                'program_id' => $program->id, 'academic_period_id' => $period->id, 'scholarship_rate_id' => $rate->id,
-                'batch_number' => 'Batch '.(($numbers->max() ?? 0) + 1),
-                'reference' => $data['reference'] ?? null, 'prepared_by' => $actor->id,
-            ]);
-            $this->audit->record($actor, $batch, 'billing_batch_created');
+        try {
+            return DB::transaction(function () use ($actor, $data) {
+                $program = ScholarshipProgram::whereKey($data['program_id'])->lockForUpdate()->firstOrFail();
+                $period = AcademicPeriod::whereKey($data['academic_period_id'])->lockForUpdate()->firstOrFail();
+                $terms = ProgramPeriodTerm::where('program_id', $program->id)->where('academic_period_id', $period->id)->lockForUpdate()->first();
+                $rate = $terms?->rates()->orderByDesc('revision')->lockForUpdate()->first();
+                if (! $program->is_active || ! $rate) {
+                    $this->fail('Select an available program and explicitly approved semester billing terms.');
+                }
+                $numbers = $terms->billingBatches()->lockForUpdate()->pluck('batch_number')->map(fn ($label) => $this->numberFromLabel($label))->filter(fn ($number) => $number !== null);
+                if (isset($data['batch_number'])) {
+                    Validator::make($data, ['batch_number' => ['required', new PositiveBatchNumber]])->validate();
+                    $number = (int) $data['batch_number'];
+                    if ($numbers->contains($number)) {
+                        throw ValidationException::withMessages(['batch_number' => 'This Batch Number already exists for the selected scholarship program, academic year and semester.']);
+                    }
+                } else {
+                    if (($numbers->max() ?? 0) >= PositiveBatchNumber::MAX) {
+                        throw ValidationException::withMessages(['batch_number' => 'Automatic numbering has reached its supported limit. Enter an unused positive Batch Number.']);
+                    }
+                    $number = ($numbers->max() ?? 0) + 1;
+                }
+                $batch = $terms->billingBatches()->create([
+                    'program_id' => $program->id, 'academic_period_id' => $period->id, 'scholarship_rate_id' => $rate->id,
+                    'batch_number' => 'Batch '.$number,
+                    'reference' => $data['reference'] ?? null, 'prepared_by' => $actor->id,
+                ]);
+                $this->audit->record($actor, $batch, 'billing_batch_created');
 
-            return $batch;
-        }, 3);
+                return $batch;
+            }, 3);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['batch_number' => 'This Batch Number already exists for the selected scholarship program, academic year and semester. Reload before retrying.']);
+        }
     }
 
     public function change(BillingBatch $batch, User $actor, int $version, string $operation, array $data = []): BillingBatch
@@ -99,6 +117,10 @@ class ManageBillingBatch
                 }
                 $before = $batch->only($batch->getFillable());
                 if ($operation === 'edit') {
+                    $number = $this->numberFromLabel(trim($data['batch_number']));
+                    if ($number !== null && $terms->billingBatches()->whereKeyNot($batch->id)->lockForUpdate()->pluck('batch_number')->contains(fn ($label) => $this->numberFromLabel($label) === $number)) {
+                        throw ValidationException::withMessages(['batch_number' => 'This Batch Number already exists for the selected scholarship program, academic year and semester.']);
+                    }
                     $batch->fill(['batch_number' => trim($data['batch_number']), 'reference' => $data['reference'] ?? null]);
                 } elseif ($operation === 'add') {
                     $application = ScholarshipApplication::whereKey($data['application_id'])->lockForUpdate()->firstOrFail();
@@ -149,6 +171,11 @@ class ManageBillingBatch
         } catch (UniqueConstraintViolationException) {
             $this->fail('The batch name or scholar semester bill already exists. Reload the batch before retrying.');
         }
+    }
+
+    private function numberFromLabel(string $label): ?int
+    {
+        return preg_match('/^Batch (\d+)$/i', trim($label), $matches) ? (int) $matches[1] : null;
     }
 
     private function fail(string $message): never

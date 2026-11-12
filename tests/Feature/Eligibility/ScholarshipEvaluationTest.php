@@ -350,7 +350,7 @@ class ScholarshipEvaluationTest extends TestCase
 
     public static function roles(): array
     {
-        return [['coordinator', true, true], ['registrar', true, false], ['administrator', true, false], ['finance', false, false], ['viewer', false, false], ['none', false, false]];
+        return [['coordinator', true, true], ['registrar', true, false], ['administrator', true, true], ['finance', false, false], ['viewer', false, false], ['none', false, false]];
     }
 
     #[DataProvider('roles')]

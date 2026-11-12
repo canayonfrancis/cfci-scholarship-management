@@ -193,6 +193,8 @@ class DevelopmentSampleSeederTest extends TestCase
         foreach (['students' => 80, 'scholarship_assignments' => 60, 'academic_records' => 140, 'academic_record_grades' => 700, 'scholarship_applications' => 60, 'evaluation_runs' => 120, 'external_approvals' => 102, 'scholarship_rates' => 18, 'scholarship_budgets' => 18, 'billing_batches' => 36, 'billing_items' => 36, 'billing_batch_approvals' => 18, 'billing_adjustments' => 16, 'funding_receipts' => 18, 'documents' => 310] as $table => $count) {
             $this->assertDatabaseCount($table, $count);
         }
+        $this->assertDatabaseCount('users', 2);
+        $this->assertSame(['coordinator', 'registrar'], DB::table('user_roles')->orderBy('role')->pluck('role')->all());
         $this->assertSame(36, ScholarshipAssignment::where('status', 'active')->count());
         $this->assertSame(36, EvaluationRun::where('run_number', 2)->where('automatic_outcome', 'passed')->count());
         $this->assertSame(6, EvaluationRun::where('run_number', 2)->where('automatic_outcome', 'failed')->count());

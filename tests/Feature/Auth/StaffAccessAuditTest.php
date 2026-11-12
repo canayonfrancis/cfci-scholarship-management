@@ -35,7 +35,8 @@ class StaffAccessAuditTest extends TestCase
         $this->assertNull($report['active_accounts']);
         $this->assertSame(1, $report['accounts_by_role']['coordinator']);
         $this->assertSame(1, $report['accounts_by_role']['registrar']);
-        $this->assertSame(['administrator' => 1], $report['legacy_roles_pending_review']);
+        $this->assertSame([], $report['legacy_roles_pending_review']);
+        $this->assertSame(['administrator' => 1], $report['approved_technical_roles']);
         $this->assertSame(['student' => 1], $report['unexpected_roles']);
         $this->assertSame(1, $report['accounts_without_roles']);
         $this->assertSame(1, $report['accounts_with_multiple_roles']);

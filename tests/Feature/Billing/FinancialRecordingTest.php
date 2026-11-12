@@ -227,7 +227,8 @@ class FinancialRecordingTest extends TestCase
         $this->get(route('financial.evidence.download', ['receipt', 99999, $document]))->assertNotFound();
         $this->get(route('financial.evidence.download', ['application', $g['application']->id, $document]))->assertNotFound();
         $this->actingAs($this->staff('coordinator'))->get(route('financial.evidence.download', ['payout', $payment->id, $document]))->assertOk();
-        foreach (['viewer', 'registrar'] as $role) {
+        $this->actingAs($this->staff('registrar'))->get(route('financial.evidence.download', ['payout', $payment->id, $document]))->assertOk();
+        foreach (['viewer'] as $role) {
             $this->actingAs($this->staff($role))->get(route('financial.evidence.download', ['payout', $payment->id, $document]))->assertForbidden();
         }
         Storage::disk('scholarship')->put($document->storage_path, 'tampered');
@@ -295,7 +296,7 @@ class FinancialRecordingTest extends TestCase
         $receipt = $this->funds($g);
         $this->actingAs($g['finance'])->post(route('financial.liquidations.store', $g['batch']), ['reference' => 'SAMPLE-PAGES'])->assertSessionHasNoErrors();
         $report = Liquidation::sole();
-        foreach (['finance', 'administrator', 'coordinator', 'viewer'] as $role) {
+        foreach (['finance', 'administrator', 'coordinator', 'registrar', 'viewer'] as $role) {
             $this->actingAs($this->staff($role));
             $this->get(route('financial.index'))->assertOk();
             $this->get(route('financial.batch', $g['batch']))->assertOk();
@@ -305,7 +306,6 @@ class FinancialRecordingTest extends TestCase
                 $this->post(route('financial.payouts.store'), [])->assertForbidden();
             }
         }
-        $this->actingAs($this->staff('registrar'))->get(route('financial.index'))->assertForbidden();
         $this->actingAs(User::factory()->create())->get(route('financial.index'))->assertForbidden();
     }
 

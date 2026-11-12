@@ -36,6 +36,7 @@
                 $roleLabels = auth()->user()->roles->pluck('role')->map(fn ($role) => match ($role) {
                     'coordinator' => 'School Scholarship Coordinator',
                     'registrar' => 'Registrar Staff',
+                    'administrator' => 'Test Administrator',
                     default => in_array($role, \App\Models\User::STAFF_ROLES, true) ? Str::headline($role).' (legacy; review required)' : 'Unrecognized role',
                 });
                 $initials = Str::of(auth()->user()->name)->trim()->explode(' ')->filter()->take(2)->map(fn ($part) => Str::upper(Str::substr($part, 0, 1)))->implode('');

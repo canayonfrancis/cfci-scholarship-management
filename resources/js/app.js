@@ -1,8 +1,10 @@
 import './bootstrap';
 
 import Alpine from 'alpinejs';
+import billingBatchFilter from './billing-batch-filter';
 
 window.Alpine = Alpine;
+Alpine.data('billingBatchFilter', billingBatchFilter);
 
 Alpine.data('scrollableNavigation', () => ({
     canScrollLeft: false,

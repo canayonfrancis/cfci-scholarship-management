@@ -22,8 +22,10 @@ use App\Services\Eligibility\SchoolGradingPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ScholarshipLifecycleTest extends TestCase
@@ -62,13 +64,14 @@ class ScholarshipLifecycleTest extends TestCase
     }
 
     /** All records originate through their normal HTTP workflow; reference/role setup is test-only. */
-    private function evaluatedScholar(): array
+    private function evaluatedScholar(string $recordingRole = 'registrar', string $reviewingRole = 'coordinator'): array
     {
-        // Two operational roles; separate Coordinator identities retain independent review.
-        $admin = $this->staff('coordinator');
-        $registrar = $this->staff('registrar');
-        $coordinator = $this->staff('coordinator');
-        $finance = $coordinator;
+        // One Registrar records; one Coordinator reviews. The approved test
+        // Administrator can exercise either responsibility without bypassing record rules.
+        $registrar = $this->staff($recordingRole);
+        $coordinator = $this->staff($reviewingRole);
+        $admin = $coordinator;
+        $finance = $registrar;
         $program = ScholarshipProgram::create(['code' => 'TES', 'name' => 'Synthetic TES reference']);
         $period = AcademicPeriod::create(['academic_year' => '2026-2027', 'semester_code' => '1']);
         $this->login($admin);
@@ -112,11 +115,18 @@ class ScholarshipLifecycleTest extends TestCase
         $this->get(route('dashboard'))->assertOk()->assertViewHas('metrics', fn ($m) => $m['total_scholars'] === 1 && $m['school_eligible'] === 0 && $m['pending_evaluations'] === 1 && $m['active_awards'] === 0);
     }
 
-    public function test_http_lifecycle_reconciles_all_modules_with_a_test_only_resolved_grading_prerequisite(): void
+    public static function recordingAndReviewRoles(): array
     {
+        return [['registrar', 'coordinator'], ['administrator', 'coordinator'], ['registrar', 'administrator']];
+    }
+
+    #[DataProvider('recordingAndReviewRoles')]
+    public function test_http_lifecycle_reconciles_all_modules_with_a_test_only_resolved_grading_prerequisite(string $recordingRole, string $reviewingRole): void
+    {
+        Http::preventStrayRequests();
         // Never enabled in production; this isolates downstream integration from an unconfirmed school rule.
         $this->mock(SchoolGradingPolicy::class)->shouldReceive('check')->andReturn(['status' => 'pass', 'reason' => 'SYNTHETIC resolved prerequisite for integration test only']);
-        $g = $this->evaluatedScholar();
+        $g = $this->evaluatedScholar($recordingRole, $reviewingRole);
         $this->assertSame('passed', $g['run']->automatic_outcome);
         $this->post(route('evaluations.activate', $g['application']), ['evaluation_id' => $g['run']->id, 'approval_id' => $g['approval']->id])->assertSessionHasNoErrors();
         $this->assertSame('active', $g['assignment']->fresh()->status);
@@ -180,11 +190,15 @@ class ScholarshipLifecycleTest extends TestCase
         }
         $this->get(route('dashboard'))->assertOk()->assertViewHas('metrics', $metrics);
         $this->login($g['registrar']);
-        $this->get(route('financial.evidence.download', ['payout', $payment, $proof]))->assertForbidden();
+        $this->get(route('financial.evidence.download', ['payout', $payment, $proof]))->assertOk();
+        if ($recordingRole === 'registrar') {
+            $this->post(route('financial.evidence.review', ['payout', $payment, $proof]), ['decision' => 'accepted', 'review_notes' => 'Unauthorized Registrar review'])->assertForbidden();
+        }
         $this->assertDatabaseCount('billing_items', 1);
         $this->assertDatabaseCount('payouts', 1);
         $this->assertSame($g['run']->id, $g['assignment']->fresh()->activation_evaluation_id);
         $this->assertDatabaseHas('audit_events', ['subject_id' => $g['assignment']->id, 'action' => 'scholarship_award_activated']);
+        Http::assertNothingSent();
     }
 
     private function financialProof(array $g, string $type, $owner, string $documentType): Document

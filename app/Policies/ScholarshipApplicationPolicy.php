@@ -19,7 +19,7 @@ class ScholarshipApplicationPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasAnyRole(['coordinator']);
+        return $user->hasAnyRole(['coordinator', 'administrator']);
     }
 
     public function evaluate(User $user, ScholarshipApplication $application): bool

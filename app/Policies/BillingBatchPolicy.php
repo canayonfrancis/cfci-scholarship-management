@@ -9,7 +9,7 @@ class BillingBatchPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['administrator', 'finance', 'coordinator', 'viewer']);
+        return $user->hasAnyRole(['administrator', 'registrar', 'finance', 'coordinator', 'viewer']);
     }
 
     public function view(User $user, BillingBatch $batch): bool
@@ -19,7 +19,7 @@ class BillingBatchPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasAnyRole(['coordinator', 'finance']);
+        return $user->hasAnyRole(['coordinator', 'registrar', 'administrator', 'finance']);
     }
 
     public function update(User $user, BillingBatch $batch): bool

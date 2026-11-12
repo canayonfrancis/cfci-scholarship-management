@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
     });
     Route::resource('academic-programs', AcademicProgramController::class)->only(['index', 'store', 'update']);
     Route::get('billing-batches', [BillingBatchController::class, 'index'])->name('billing-batches.index');
+    Route::get('billing-batches/options', [BillingBatchController::class, 'options'])->middleware('cache.headers:no_store;private')->name('billing-batches.options');
     Route::post('billing-batches/terms', [BillingBatchController::class, 'configure'])->name('billing-batches.terms');
     Route::post('billing-batches', [BillingBatchController::class, 'store'])->name('billing-batches.store');
     Route::get('billing-batches/report', [ScholarshipFundsController::class, 'report'])->name('billing-batches.report');

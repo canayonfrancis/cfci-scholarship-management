@@ -138,7 +138,7 @@ class DashboardAnalyticsTest extends TestCase
 
     public static function roles(): array
     {
-        return [['administrator', true, true], ['coordinator', true, true], ['registrar', true, false], ['finance', false, true], ['viewer', false, true]];
+        return [['administrator', true, true], ['coordinator', true, true], ['registrar', true, true], ['finance', false, true], ['viewer', false, true]];
     }
 
     #[DataProvider('roles')]

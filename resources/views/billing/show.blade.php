@@ -10,7 +10,7 @@
             <p class="records-notice">Approved by {{ $batch->approval->approvedBy->name }} on {{ $batch->approval->approved_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}. Reference: {{ $batch->approval->reference }}. Original approved total: ₱{{ number_format((float) $batch->approval->amount_snapshot, 2) }}.</p><p>This approval reserves scholarship budget. It does not confirm a receipt or payment.</p>
         @elseif($batch->status === 'submitted')
             <p>Awaiting independent Coordinator approval. Preparers and submitters cannot approve their own allocations.</p>
-        @else<p>A Coordinator must submit a validated allocation batch before another Coordinator can approve it.</p>@endif
+        @else<p>A Registrar or Coordinator must submit a validated allocation record before a different Coordinator can approve it.</p>@endif
         @can('approve', $batch)
             <form class="records-form" method="POST" action="{{ route('billing-batches.approve', $batch) }}">@csrf<div class="record-field"><label for="coordinator-approval-reference">Coordinator approval reference</label><input class="record-input" id="coordinator-approval-reference" name="reference" maxlength="255" required></div><button class="records-button is-primary" type="submit">Review eligibility, check budget and approve</button></form>
         @endcan

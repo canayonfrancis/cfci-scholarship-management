@@ -19,7 +19,7 @@ class AcademicRecordPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasAnyRole(['registrar']);
+        return $user->hasAnyRole(['registrar', 'administrator']);
     }
 
     public function update(User $user, AcademicRecord $record): bool

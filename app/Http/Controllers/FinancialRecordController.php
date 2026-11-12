@@ -88,7 +88,7 @@ class FinancialRecordController extends Controller
     {
         $action->postPayout($payout, $request->user());
 
-        return back()->with('status', 'Actual student payment verified and posted.');
+        return back()->with('status', 'External payment record verified. No money was sent by this system.');
     }
 
     public function deduct(FinancialRecordRequest $request, Payout $payout, RecordFinancialActivity $action)
