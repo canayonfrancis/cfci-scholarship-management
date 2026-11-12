@@ -159,17 +159,15 @@ class DirectValidationScopeTest extends TestCase
         $this->assertNull($g['application']->currentSchoolDecision());
     }
 
-    public function test_context_requires_admin_school_reference_confirmation_and_a_fresh_version(): void
+    public function test_context_requires_coordinator_school_reference_confirmation_and_a_fresh_version(): void
     {
         $g = $this->fixtures();
         $data = ['revision' => 1, 'active_period_id' => $g['target']->id, 'source_period_id' => $g['source']->id];
-        foreach ([$g['registrar'], $g['coordinator']] as $actor) {
-            $this->actingAs($actor)->post(route('academic-periods.context'), $data)->assertForbidden();
-        }
-        $this->actingAs($g['admin'])->post(route('academic-periods.context'), $data)->assertSessionHasErrors(['source_policy_reference', 'confirm_source']);
+        $this->actingAs($g['registrar'])->post(route('academic-periods.context'), $data)->assertForbidden();
+        $this->actingAs($g['coordinator'])->post(route('academic-periods.context'), $data)->assertSessionHasErrors(['source_policy_reference', 'confirm_source']);
         $data += ['source_policy_reference' => 'Approved source reference', 'confirm_source' => 1];
         $this->post(route('academic-periods.context'), $data + ['confirmed_by' => 9999])->assertSessionHasNoErrors();
-        $this->assertSame($g['admin']->id, AcademicValidationContext::current()->confirmed_by);
+        $this->assertSame($g['coordinator']->id, AcademicValidationContext::current()->confirmed_by);
         $this->post(route('academic-periods.context'), $data)->assertSessionHasErrors('revision');
         $this->assertSame(2, AcademicValidationContext::current()->revision);
         $this->assertDatabaseRejects(fn () => DB::table('academic_validation_context')->insert(['id' => 2]));

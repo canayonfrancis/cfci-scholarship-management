@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 abstract class RecordPolicy
 {
-    protected const WRITERS = ['administrator'];
+    protected const WRITERS = ['coordinator', 'administrator'];
 
     public function viewAny(User $user): bool
     {

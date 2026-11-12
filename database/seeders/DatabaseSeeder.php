@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed a repeatable administrator account for local testing.
+     * Seed a repeatable Coordinator account for local testing.
      */
     public function run(): void
     {
@@ -21,17 +21,17 @@ class DatabaseSeeder extends Seeder
         }
 
         DB::transaction(function () {
-            $admin = User::firstOrCreate(
+            $coordinator = User::firstOrCreate(
                 ['email' => 'test@example.com'],
                 [
-                    'name' => 'Test Admin',
+                    'name' => 'Test Coordinator',
                     'email_verified_at' => now(),
                     'password' => 'admin123',
                 ],
             );
 
-            if ($admin->wasRecentlyCreated) {
-                $admin->roles()->firstOrCreate(['role' => 'administrator']);
+            if ($coordinator->wasRecentlyCreated) {
+                $coordinator->roles()->firstOrCreate(['role' => 'coordinator']);
             }
         });
     }

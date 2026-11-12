@@ -208,7 +208,7 @@ class BillingBatchTest extends TestCase
 
     public static function roles(): array
     {
-        return [['finance', true, true, false], ['administrator', true, false, true], ['coordinator', true, false, false], ['viewer', true, false, false], ['registrar', false, false, false], ['none', false, false, false]];
+        return [['finance', true, true, false], ['administrator', true, false, true], ['coordinator', true, true, true], ['viewer', true, false, false], ['registrar', false, false, false], ['none', false, false, false]];
     }
 
     #[DataProvider('roles')]

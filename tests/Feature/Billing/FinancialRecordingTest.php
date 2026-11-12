@@ -226,7 +226,8 @@ class FinancialRecordingTest extends TestCase
         $this->get(route('financial.evidence.download', ['payout', $payment->id, $document]))->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
         $this->get(route('financial.evidence.download', ['receipt', 99999, $document]))->assertNotFound();
         $this->get(route('financial.evidence.download', ['application', $g['application']->id, $document]))->assertNotFound();
-        foreach (['viewer', 'coordinator', 'registrar'] as $role) {
+        $this->actingAs($this->staff('coordinator'))->get(route('financial.evidence.download', ['payout', $payment->id, $document]))->assertOk();
+        foreach (['viewer', 'registrar'] as $role) {
             $this->actingAs($this->staff($role))->get(route('financial.evidence.download', ['payout', $payment->id, $document]))->assertForbidden();
         }
         Storage::disk('scholarship')->put($document->storage_path, 'tampered');
@@ -300,7 +301,7 @@ class FinancialRecordingTest extends TestCase
             $this->get(route('financial.batch', $g['batch']))->assertOk();
             $this->get(route('financial.receipt', $receipt))->assertOk();
             $this->get(route('financial.liquidation', $report))->assertOk();
-            if (in_array($role, ['coordinator', 'viewer'], true)) {
+            if ($role === 'viewer') {
                 $this->post(route('financial.payouts.store'), [])->assertForbidden();
             }
         }

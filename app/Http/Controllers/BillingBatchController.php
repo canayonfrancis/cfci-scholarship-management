@@ -134,7 +134,7 @@ class BillingBatchController extends Controller
         $data = $request->validate(['lock_version' => ['required', 'integer', 'min:0'], 'reference' => ['required', 'string', 'max:255', 'regex:/\S/']]);
         $manage->change($batch, $request->user(), (int) $data['lock_version'], 'submit', $data);
 
-        return back()->with('status', 'Scholarship allocation batch submitted for Administrator approval. Submission does not approve or release funds.');
+        return back()->with('status', 'Scholarship allocation batch submitted for Coordinator approval. Submission does not approve or release funds.');
     }
 
     private function scopeRules(): array

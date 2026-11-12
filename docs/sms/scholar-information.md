@@ -63,6 +63,20 @@ Common mobile forms `09171234567`, `9171234567`, `+63 917 123 4567` and `0063917
 
 Create/Edit forms retain the dashboard palette, inputs, buttons and responsive grids. Eight sections cover identification, personal, academic, family, address, contact, additional and scholarship information. Labels distinguish basic requirements, complete-profile requirements and optional values. The detail screen shows a completeness badge, missing-field list for authorized profile staff, grouped details and retained history. The directory adds academic program/year/semester and completeness while keeping search, scholarship/status filters, pagination and View/Edit permissions.
 
+## Scholar Records academic-year filter (2026-11-12)
+
+The Scholar Records directory now includes an **Academic year** dropdown alongside search, active scholarship and record status. Choices come from distinct registered `academic_periods.academic_year` values, newest first; a year appears once even when both semesters are registered. No year is selected automatically.
+
+Filtering matches the Student's **current academic profile period**, the same year displayed in the directory's Academic year / semester column. Both semesters of the selected year are included. Registrar revisions, earlier profile snapshots, assignments and billing history do not make a scholar match a different current-profile year. The query uses the existing `academicPeriod` relationship without multiplying scholar rows.
+
+**All academic years** includes profiles whose year is not yet provided. A specific year excludes those unknown profiles; registered years with no matching scholars show the normal empty state. Archived scholars are included unless record status is also filtered. The filter does not establish certified enrollment, scholarship eligibility or historical as-of status.
+
+Academic year combines with the existing name/ID/email search, active scholarship and record-status filters. The GET parameter is `academic_year=2026-2027`; selected values remain visible and pagination retains every active filter. Submitting the form starts again at page 1. **Clear** removes all directory filters. Unregistered, malformed and array-valued year inputs are rejected server-side.
+
+This reuses the existing staff read permissions, period records, Blade fields and responsive design. No migration, new school-year data, financial mutation, profile rewrite or dashboard filter was introduced. Three feature cases cover both semesters, current-versus-historical membership, archived/unknown profiles, distinct year options, empty results, combined filters, pagination and invalid input; verification is recorded in [progress.md](progress.md).
+
+## Development fixtures and verification
+
 Fresh development fixtures use five `[SAMPLE]` academic programs and produce **45 complete / 35 incomplete profiles** among the original 80 students. Historical students retain an unspecified program instead of asserting old course offerings. LRN is `0` or null; generated PhilSys values stay null; 4Ps references use explicit `SAMPLE-*` strings. Non-dialable `00000000` landline-format placeholders are confined to fictional fixtures. Optional indicators include both answers and null. No production/manual student data is used.
 
 Existing completed datasets are not retroactively rewritten. A new separate **`cfci_sms_profiles_demo`** was created and verified. It has the usual 80 seed students plus two identifiable browser-created examples, totaling **82 students: 46 complete / 36 incomplete**. The earlier `cfci_sms_samples_demo` retains its original 80 students with new fields null. Source application `cfci_scholarship` retains its three manual students unchanged.

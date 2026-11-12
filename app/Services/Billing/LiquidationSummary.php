@@ -17,7 +17,7 @@ class LiquidationSummary
         $expected = [];
         $gross = $school = $direct = $withheld = $settled = $effective = 0;
         if (! RecordFinancialActivity::approved($batch)) {
-            $issues[] = 'The billing batch has not received Administrator approval.';
+            $issues[] = 'The billing batch has not received Coordinator approval.';
         }
         $items = $batch->items()->with(['student', 'payouts.deductions', 'payouts.documents'])->orderBy('id')->get();
         if ($items->isEmpty()) {

@@ -1,7 +1,7 @@
 <x-records-page :title="$assignment->exists ? 'Update scholarship assignment' : 'Assign scholarship'" :description="$scholar->full_name.' · '.$scholar->student_number">
     <x-slot:actions><a class="records-button" href="{{ route('scholars.show', $scholar) }}">Back to scholar</a></x-slot:actions>
     <section class="dashboard-card records-card records-form-card">
-        @if($programs->isEmpty() || $periods->isEmpty())<p class="records-alert">An administrator must add a scholarship program and academic semester before an assignment can be recorded.</p>@endif
+        @if($programs->isEmpty() || $periods->isEmpty())<p class="records-alert">A Coordinator must add a scholarship program and academic semester before an assignment can be recorded.</p>@endif
         <form method="POST" action="{{ $assignment->exists ? route('scholars.assignments.update', [$scholar, $assignment]) : route('scholars.assignments.store', $scholar) }}" x-data="{ assignmentStatus: @js(old('status', $assignment->status)) }" x-init="assignmentStatus = $el.querySelector('[name=status]').value">
             @csrf @if($assignment->exists) @method('PATCH') @endif
             <p class="record-help">Create pending assignments here. New awards must be activated through an eligible school evaluation and verified external approval. Only one scholarship can be active at a time.</p>

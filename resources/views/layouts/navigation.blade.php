@@ -1,4 +1,4 @@
-<header class="site-header" x-data="{ mobileOpen: false, profileOpen: false, notificationsOpen: false }" @keydown.escape.window="mobileOpen = profileOpen = notificationsOpen = false">
+<header class="site-header" x-data="{ mobileOpen: false, profileOpen: false }" @keydown.escape.window="mobileOpen = profileOpen = false">
     <a class="skip-link" href="#main-content">Skip to dashboard</a>
     <div class="topbar">
         <a href="{{ route('dashboard') }}" class="brand" aria-label="CFCI Scholarship Management dashboard">
@@ -6,7 +6,8 @@
         </a>
 
         <div class="desktop-nav-wrap" x-data="scrollableNavigation" :class="{ 'can-scroll-left': canScrollLeft, 'can-scroll-right': canScrollRight }">
-        <nav class="desktop-nav" x-ref="navigation" aria-label="Primary navigation" tabindex="0" @scroll.passive="updateScrollEdges()">
+        <button class="nav-scroll-button is-left" type="button" x-cloak x-show="canScrollLeft" x-transition.opacity.duration.150ms :disabled="!canScrollLeft" @click="scrollNavigation(-1)" aria-label="Scroll navigation left" aria-controls="primary-navigation"><x-dashboard-icon name="chevron-right" :size="20" /></button>
+        <nav id="primary-navigation" class="desktop-nav" x-ref="navigation" aria-label="Primary navigation" tabindex="0" @scroll.passive="updateScrollEdges()">
             @php
                 $navItems = [
                     ['Dashboard', 'home', route('dashboard'), request()->routeIs('dashboard')],
@@ -32,7 +33,11 @@
                 if (auth()->user()->can('financial-view')) {
                     $navItems[] = ['Payments & liquidation', 'clipboard', route('financial.index'), request()->routeIs('financial.*')];
                 }
-                $roleLabels = auth()->user()->roles->pluck('role')->map(fn ($role) => Str::headline($role));
+                $roleLabels = auth()->user()->roles->pluck('role')->map(fn ($role) => match ($role) {
+                    'coordinator' => 'School Scholarship Coordinator',
+                    'registrar' => 'Registrar Staff',
+                    default => in_array($role, \App\Models\User::STAFF_ROLES, true) ? Str::headline($role).' (legacy; review required)' : 'Unrecognized role',
+                });
                 $initials = Str::of(auth()->user()->name)->trim()->explode(' ')->filter()->take(2)->map(fn ($part) => Str::upper(Str::substr($part, 0, 1)))->implode('');
             @endphp
             @foreach ($navItems as [$label, $icon, $href, $active])
@@ -41,26 +46,12 @@
                 </a>
             @endforeach
         </nav>
+        <button class="nav-scroll-button is-right" type="button" x-cloak x-show="canScrollRight" x-transition.opacity.duration.150ms :disabled="!canScrollRight" @click="scrollNavigation(1)" aria-label="Scroll navigation right" aria-controls="primary-navigation"><x-dashboard-icon name="chevron-right" :size="20" /></button>
         </div>
 
         <div class="topbar-actions">
-            <div class="action-dropdown">
-                <button class="round-button notification-button" type="button" aria-label="Monitoring overview" @click="notificationsOpen = !notificationsOpen; profileOpen = false" :aria-expanded="notificationsOpen">
-                    <x-dashboard-icon name="bell" :size="21" />
-                </button>
-                <div class="popover notification-popover" x-cloak x-show="notificationsOpen" x-transition @click.outside="notificationsOpen = false">
-                    <strong>Monitoring</strong>
-                    @if(auth()->user()->hasAnyRole(\App\Models\User::STAFF_ROLES))
-                        <p>View current scholarship indicators and graphs.</p>
-                        <a href="{{ route('dashboard') }}#applications-trend">View dashboard graphs</a>
-                    @else
-                        <p>Your account does not have staff reporting access.</p>
-                    @endif
-                </div>
-            </div>
-
             <div class="profile-wrap">
-                <button class="profile-button" type="button" @click="profileOpen = !profileOpen; notificationsOpen = false" :aria-expanded="profileOpen" aria-label="Open user menu">
+                <button class="profile-button" type="button" @click="profileOpen = !profileOpen" :aria-expanded="profileOpen" aria-label="Open user menu">
                     <span class="avatar" aria-hidden="true">{{ $initials }}</span>
                     <span class="profile-copy"><strong>{{ Auth::user()->name }}</strong><small>{{ $roleLabels->isNotEmpty() ? $roleLabels->implode(', ') : 'No staff role assigned' }}</small></span>
                     <x-dashboard-icon name="chevron-down" :size="17" />

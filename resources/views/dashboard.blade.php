@@ -49,7 +49,7 @@
         </section>
 
         @if(!$canReport)
-            <section class="dashboard-card dashboard-access-notice"><p>Your account does not have staff reporting access. Contact an Administrator to assign the appropriate role.</p></section>
+            <section class="dashboard-card dashboard-access-notice"><p>Your account does not have staff reporting access. Contact a Coordinator to assign the appropriate role.</p></section>
         @else
         <section class="stats-grid" aria-label="Scholarship validation overview">
             @foreach ($stats as $stat)
@@ -167,7 +167,7 @@
                 <template x-if="tableState === 'loading'"><x-dashboard-skeleton type="table" /></template>
                 <div x-cloak x-show="tableState === 'error'" class="dashboard-error"><p>Unable to load recent validations.</p><button type="button" @click="tableState = 'ready'"><x-dashboard-icon name="reload" :size="15" /> Retry</button></div>
                 @if (!auth()->user()->can('viewAny', \App\Models\ScholarshipApplication::class))
-                    <p class="record-help">Detailed academic evaluations are restricted to authorized Registrar, Coordinator and Administrator accounts. Aggregate counts remain visible above.</p>
+                    <p class="record-help">Detailed academic evaluations are restricted to authorized Registrar and Coordinator accounts. Aggregate counts remain visible above.</p>
                 @elseif (count($recentApplications))
                     <div class="table-wrap" x-show="tableState === 'ready'" tabindex="0" role="region" aria-label="Recent validations table, scroll horizontally for more columns">
                         <table class="recent-validations-table">

@@ -45,6 +45,14 @@ Alpine.data('scrollableNavigation', () => ({
         this.canScrollRight = remaining > 1;
     },
 
+    scrollNavigation(direction) {
+        const navigation = this.$refs.navigation;
+        navigation.scrollBy({
+            left: direction * Math.max(120, navigation.clientWidth * 0.7),
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        });
+    },
+
     destroy() {
         this.resizeObserver?.disconnect();
     },

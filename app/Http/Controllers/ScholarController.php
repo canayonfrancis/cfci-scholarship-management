@@ -24,7 +24,12 @@ class ScholarController extends Controller
     public function index(Request $request): View
     {
         Gate::authorize('viewAny', Student::class);
-        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'record_status' => ['nullable', Rule::in(['active', 'archived'])], 'program_id' => ['nullable', 'integer', 'exists:scholarship_programs,id']]);
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'record_status' => ['nullable', Rule::in(['active', 'archived'])],
+            'program_id' => ['nullable', 'integer', 'exists:scholarship_programs,id'],
+            'academic_year' => ['nullable', 'string', 'regex:/^[0-9]{4}-[0-9]{4}$/D', 'exists:academic_periods,academic_year'],
+        ]);
         $query = Student::with(['activeAssignment.program', 'academicProgram', 'academicPeriod'])->withCount('assignments');
         foreach (preg_split('/\s+/u', trim($filters['q'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) as $word) {
             $query->where(function ($query) use ($word) {
@@ -35,8 +40,14 @@ class ScholarController extends Controller
         }
         $query->when($filters['record_status'] ?? null, fn ($query, $status) => $query->where('record_status', $status));
         $query->when($filters['program_id'] ?? null, fn ($query, $id) => $query->whereHas('activeAssignment', fn ($assignment) => $assignment->where('program_id', $id)));
+        $query->when($filters['academic_year'] ?? null, fn ($query, $year) => $query->whereHas('academicPeriod', fn ($period) => $period->where('academic_year', $year)));
 
-        return view('scholars.index', ['scholars' => $query->orderBy('last_name')->orderBy('first_name')->orderBy('id')->paginate(15)->withQueryString(), 'programs' => ScholarshipProgram::orderBy('code')->get(), 'filters' => $filters]);
+        return view('scholars.index', [
+            'scholars' => $query->orderBy('last_name')->orderBy('first_name')->orderBy('id')->paginate(15)->withQueryString(),
+            'programs' => ScholarshipProgram::orderBy('code')->get(),
+            'academicYears' => AcademicPeriod::distinct()->orderByDesc('academic_year')->pluck('academic_year'),
+            'filters' => $filters,
+        ]);
     }
 
     public function create(): View

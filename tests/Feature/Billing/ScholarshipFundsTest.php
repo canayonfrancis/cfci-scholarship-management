@@ -82,7 +82,7 @@ class ScholarshipFundsTest extends TestCase
         $this->assertSame('67500.00', $summary['remaining']);
         $this->assertSame('0.00', $summary['received']);
         $this->assertSame('0.00', $summary['released_net']);
-        $this->get(route('billing-batches.show', $g['batch']))->assertOk()->assertSee('Administrator allocation approval')->assertSee('Approved');
+        $this->get(route('billing-batches.show', $g['batch']))->assertOk()->assertSee('Coordinator allocation approval')->assertSee('Approved');
         $this->approve($g)->assertForbidden();
         foreach (['funding_receipts', 'funding_allocations', 'payouts', 'deductions', 'liquidations'] as $table) {
             $this->assertDatabaseCount($table, 0);

@@ -12,6 +12,7 @@ use App\Models\AcademicRecordGrade;
 use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipApplication;
 use App\Models\Student;
+use App\Models\User;
 use Database\Seeders\Support\SampleData;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -36,7 +37,7 @@ class DevelopmentSampleSeeder extends Seeder
                 $period = AcademicPeriod::where('academic_year', $year)->where('semester_code', '1')->firstOrFail();
                 $programs = SampleData::programs();
                 $staff = [];
-                foreach (['administrator', 'finance', 'registrar', 'coordinator', 'viewer'] as $role) {
+                foreach (User::OPERATIONAL_ROLES as $role) {
                     $staff[$role] = SampleData::staff($role);
                 }
                 for ($i = 0; $i < 60; $i++) {
@@ -44,10 +45,10 @@ class DevelopmentSampleSeeder extends Seeder
                     if (! $student->wasRecentlyCreated) {
                         continue;
                     }
-                    app(RecordAudit::class)->record($staff['administrator'], $student, 'sample_profile_created');
+                    app(RecordAudit::class)->record($staff['coordinator'], $student, 'sample_profile_created');
                     $this->academic($student, $period, $staff['registrar'], $i % 3 !== 2, $files);
                     $code = $i >= 48 && $i < 54 ? 'COSCHO' : ($i % 2 === 0 ? 'TES' : 'TDP');
-                    $assignment = app(SaveScholarshipAssignment::class)->save($student, $staff['administrator'], [
+                    $assignment = app(SaveScholarshipAssignment::class)->save($student, $staff['coordinator'], [
                         'program_id' => $programs[$code]->id, 'start_period_id' => $period->id, 'status' => 'pending',
                         'status_reason' => 'SAMPLE: development assignment awaiting the actual eligibility/approval workflow.',
                     ]);
@@ -76,7 +77,7 @@ class DevelopmentSampleSeeder extends Seeder
                     if (! $student->wasRecentlyCreated) {
                         continue;
                     }
-                    app(RecordAudit::class)->record($staff['administrator'], $student, 'sample_profile_created');
+                    app(RecordAudit::class)->record($staff['coordinator'], $student, 'sample_profile_created');
                     foreach (['1', '2'] as $semester) {
                         $historicalPeriod = AcademicPeriod::where('academic_year', $historicalYear)->where('semester_code', $semester)->firstOrFail();
                         $this->academic($student, $historicalPeriod, $staff['registrar'], false, $files, true);

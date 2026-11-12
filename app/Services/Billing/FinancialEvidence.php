@@ -60,7 +60,7 @@ class FinancialEvidence
         DB::transaction(function () use ($document, $actor, $decision, $notes) {
             $document = Document::whereKey($document->id)->lockForUpdate()->firstOrFail();
             if ($document->review_status === 'accepted' || $document->uploaded_by === $actor->id) {
-                throw ValidationException::withMessages(['evidence' => 'Accepted evidence is immutable; a different Administrator must review uploaded evidence.']);
+                throw ValidationException::withMessages(['evidence' => 'Accepted evidence is immutable; a different Coordinator must review uploaded evidence.']);
             }
             if (! $this->intact($document)) {
                 throw ValidationException::withMessages(['evidence' => 'Evidence is unavailable or its checksum changed. Upload a new, intact copy.']);

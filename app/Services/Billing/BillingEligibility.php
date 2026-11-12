@@ -20,7 +20,7 @@ class BillingEligibility
         $fail = fn (string $message) => throw ValidationException::withMessages(['billing' => $message]);
         $rate ??= $terms->rates()->orderByDesc('revision')->first();
         if (! $rate || $rate->program_period_term_id !== $terms->id || ! $rate->approved_by || ! $rate->approved_at || Money::cents($rate->amount) <= 0) {
-            $fail('An Administrator-approved scholarship amount for the exact semester is required.');
+            $fail('A Coordinator-approved scholarship amount for the exact semester is required.');
         }
         $amount = $rate->amount;
         if ($application->program_period_term_id !== $terms->id || $application->program_id !== $terms->program_id || $application->academic_period_id !== $terms->academic_period_id) {

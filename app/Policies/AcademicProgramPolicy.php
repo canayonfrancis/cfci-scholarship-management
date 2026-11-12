@@ -4,5 +4,5 @@ namespace App\Policies;
 
 class AcademicProgramPolicy extends RecordPolicy
 {
-    // Existing staff may read; only Administrators maintain reference configuration.
+    // Coordinators maintain configuration; legacy Administrator access awaits review.
 }

@@ -4,6 +4,7 @@ namespace Tests\Feature\Records;
 
 use App\Actions\Records\RecordAudit;
 use App\Models\AcademicPeriod;
+use App\Models\AcademicRecord;
 use App\Models\AuditEvent;
 use App\Models\BillingItem;
 use App\Models\EvaluationRun;
@@ -77,7 +78,7 @@ class ScholarRecordsTest extends TestCase
 
     public static function roles(): array
     {
-        return [['administrator', true, true, true], ['coordinator', true, false, false], ['registrar', true, false, false], ['finance', false, false, false], ['viewer', false, false, false]];
+        return [['administrator', true, true, true], ['coordinator', true, true, true], ['registrar', true, false, false], ['finance', false, false, false], ['viewer', false, false, false]];
     }
 
     #[DataProvider('roles')]
@@ -166,6 +167,68 @@ class ScholarRecordsTest extends TestCase
         $this->get(route('scholars.index', ['q' => 'Group', 'record_status' => 'active']))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->count() === 15 && $rows->total() === 17)->assertSee('q=Group', false);
         $this->get(route('scholars.index', ['q' => 'Group', 'record_status' => 'active', 'page' => 2]))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->count() === 2);
         $this->get(route('scholars.index', ['record_status' => 'archived']))->assertOk()->assertSeeText('Ana Dela Cruz')->assertDontSeeText('Group Dela');
+    }
+
+    public function test_academic_year_filter_matches_current_profiles_in_both_semesters_without_historical_duplicates(): void
+    {
+        $g = $this->fixtures();
+        $second = AcademicPeriod::create(['academic_year' => '2026-2027', 'semester_code' => '2']);
+        $previous = AcademicPeriod::create(['academic_year' => '2025-2026', 'semester_code' => '1']);
+        AcademicPeriod::create(['academic_year' => '2027-2028', 'semester_code' => '1']);
+        $g['scholar']->update(['academic_period_id' => $g['period']->id]);
+        $secondScholar = Student::create($this->scholarData(['student_number' => 'YEAR-SECOND', 'first_name' => 'Second', 'academic_period_id' => $second->id]));
+        $older = Student::create($this->scholarData(['student_number' => 'YEAR-OLDER', 'first_name' => 'Older', 'record_status' => 'archived', 'academic_period_id' => $previous->id]));
+        $unknown = Student::create($this->scholarData(['student_number' => 'YEAR-UNKNOWN', 'first_name' => 'Unknown']));
+        foreach ([$g['scholar'], $older, $unknown] as $student) {
+            AcademicRecord::create(['student_id' => $student->id, 'academic_period_id' => $g['period']->id, 'revision' => 1]);
+            AcademicRecord::create(['student_id' => $student->id, 'academic_period_id' => $second->id, 'revision' => 1]);
+        }
+        $this->actingAs($this->staff('viewer'));
+        $this->get(route('scholars.index', ['academic_year' => '2026-2027']))->assertOk()
+            ->assertViewHas('scholars', fn ($rows) => $rows->total() === 2 && $rows->modelKeys() === [$g['scholar']->id, $secondScholar->id])
+            ->assertViewHas('academicYears', fn ($years) => $years->all() === ['2027-2028', '2026-2027', '2025-2026'])
+            ->assertSee('value="2026-2027" selected', false)->assertDontSeeText('YEAR-OLDER')->assertDontSeeText('YEAR-UNKNOWN');
+        $this->get(route('scholars.index', ['academic_year' => '2025-2026']))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->total() === 1 && $rows->first()->is($older));
+        $this->get(route('scholars.index', ['academic_year' => '2027-2028']))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->total() === 0)->assertSeeText('No scholars found');
+        $this->get(route('scholars.index', ['academic_year' => '']))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->total() === 4);
+    }
+
+    public function test_academic_year_combines_with_search_scholarship_status_and_pagination(): void
+    {
+        $g = $this->fixtures();
+        $second = AcademicPeriod::create(['academic_year' => '2026-2027', 'semester_code' => '2']);
+        $previous = AcademicPeriod::create(['academic_year' => '2025-2026', 'semester_code' => '1']);
+        $otherProgram = ScholarshipProgram::create(['code' => 'TES', 'name' => 'TES']);
+        $matching = [];
+        foreach (range(1, 17) as $index) {
+            $student = Student::create($this->scholarData(['student_number' => 'YEAR-GROUP-'.$index, 'first_name' => 'Group', 'last_name' => sprintf('Scholar%02d', $index), 'academic_period_id' => $index % 2 ? $g['period']->id : $second->id]));
+            ScholarshipAssignment::create(['student_id' => $student->id, 'program_id' => $g['program']->id, 'start_period_id' => $student->academic_period_id, 'status' => 'active']);
+            $matching[] = $student->id;
+        }
+        foreach ([['OLD', $previous->id, 'active', $g['program']->id], ['OTHER', $g['period']->id, 'active', $otherProgram->id], ['ARCHIVED', $g['period']->id, 'archived', null]] as [$suffix, $periodId, $status, $programId]) {
+            $student = Student::create($this->scholarData(['student_number' => 'YEAR-GROUP-'.$suffix, 'first_name' => 'Group', 'academic_period_id' => $periodId, 'record_status' => $status]));
+            if ($programId) {
+                ScholarshipAssignment::create(['student_id' => $student->id, 'program_id' => $programId, 'start_period_id' => $periodId, 'status' => 'active']);
+            }
+        }
+        $filters = ['academic_year' => '2026-2027', 'q' => 'Group', 'record_status' => 'active', 'program_id' => $g['program']->id];
+        $this->actingAs($this->staff('administrator'));
+        $this->get(route('scholars.index', $filters))->assertOk()
+            ->assertViewHas('scholars', fn ($rows) => $rows->total() === 17 && $rows->modelKeys() === array_slice($matching, 0, 15))
+            ->assertViewHas('filters', $filters)->assertSee('academic_year=2026-2027', false);
+        $this->get(route('scholars.index', $filters + ['page' => 2]))->assertOk()
+            ->assertViewHas('scholars', fn ($rows) => $rows->total() === 17 && $rows->modelKeys() === array_slice($matching, 15));
+        $this->get(route('scholars.index', ['academic_year' => '2026-2027', 'record_status' => 'archived']))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->total() === 1 && $rows->first()->student_number === 'YEAR-GROUP-ARCHIVED');
+    }
+
+    public function test_academic_year_rejects_unregistered_malformed_and_array_values(): void
+    {
+        $this->fixtures();
+        $this->actingAs($this->staff('viewer'));
+        foreach (['2026', '2025-2026', '<script>alert(1)</script>', ['2026-2027']] as $year) {
+            $this->get(route('scholars.index', ['academic_year' => $year]))->assertSessionHasErrors('academic_year');
+        }
+        $this->assertDatabaseCount('students', 1);
     }
 
     public function test_program_codes_are_configurable_and_unknown_edukar_amount_stays_null(): void
@@ -381,10 +444,10 @@ class ScholarRecordsTest extends TestCase
     {
         $user = User::factory()->create();
         $hash = $user->password;
-        $this->artisan('sms:grant-role', ['email' => $user->email, 'role' => 'administrator'])->assertSuccessful();
-        $this->artisan('sms:grant-role', ['email' => $user->email, 'role' => 'administrator'])->assertSuccessful();
+        $this->artisan('sms:grant-role', ['email' => $user->email, 'role' => 'coordinator'])->assertSuccessful();
+        $this->artisan('sms:grant-role', ['email' => $user->email, 'role' => 'coordinator'])->assertSuccessful();
         $this->artisan('sms:grant-role', ['email' => $user->email, 'role' => 'invalid'])->assertFailed();
-        $this->artisan('sms:grant-role', ['email' => 'missing@example.test', 'role' => 'administrator'])->assertFailed();
+        $this->artisan('sms:grant-role', ['email' => 'missing@example.test', 'role' => 'coordinator'])->assertFailed();
         $this->assertSame($hash, $user->fresh()->password);
         $this->assertSame(1, $user->roles()->count());
         $this->assertSame(1, AuditEvent::where('action', 'staff_role_granted')->count());

@@ -123,13 +123,13 @@ php artisan serve --host=127.0.0.1 --port=8001
 
 Open `http://127.0.0.1:8001/login`. These are process-scoped environment overrides; closing that terminal leaves `.env` and the ordinary server unchanged. Do not use cached production configuration for this local command.
 
+Fresh datasets use the two operational roles below. Normal samples create one account per role; synthetic financial demos add a second Coordinator identity for independent review. Existing completed datasets and legacy accounts are preserved, so their historical account counts may differ. See [auth-access-review.md](auth-access-review.md).
+
 | Demo role | Login email |
 | --- | --- |
-| Administrator | `sample.administrator@example.test` |
-| Finance | `sample.finance@example.test` |
-| Registrar | `sample.registrar@example.test` |
-| Coordinator | `sample.coordinator@example.test` |
-| Viewer | `sample.viewer@example.test` |
+| School Scholarship Coordinator | `sample.coordinator@example.test` |
+| Registrar Staff | `sample.registrar@example.test` |
+| School Scholarship Coordinator, separate financial reviewer (synthetic demo only) | `sample.coordinator.reviewer@example.test` |
 
 Initial password: **`CfciSample2026!`**, configurable through `SMS_SAMPLE_PASSWORD` before initial creation. Reruns do not reset passwords or removed roles. Accounts and evidence are development fixtures only; they are absent from the original application database.
 

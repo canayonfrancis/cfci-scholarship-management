@@ -64,10 +64,11 @@ class ScholarshipLifecycleTest extends TestCase
     /** All records originate through their normal HTTP workflow; reference/role setup is test-only. */
     private function evaluatedScholar(): array
     {
-        $admin = $this->staff('administrator');
+        // Two operational roles; separate Coordinator identities retain independent review.
+        $admin = $this->staff('coordinator');
         $registrar = $this->staff('registrar');
         $coordinator = $this->staff('coordinator');
-        $finance = $this->staff('finance');
+        $finance = $coordinator;
         $program = ScholarshipProgram::create(['code' => 'TES', 'name' => 'Synthetic TES reference']);
         $period = AcademicPeriod::create(['academic_year' => '2026-2027', 'semester_code' => '1']);
         $this->login($admin);

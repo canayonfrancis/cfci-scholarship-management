@@ -13,16 +13,16 @@ class FinancialRecordPolicy
 
     public function prepare(User $user): bool
     {
-        return $user->hasAnyRole(['finance']);
+        return $user->hasAnyRole(['coordinator', 'finance']);
     }
 
     public function verify(User $user): bool
     {
-        return $user->hasAnyRole(['administrator']);
+        return $user->hasAnyRole(['coordinator', 'administrator']);
     }
 
     public function evidence(User $user): bool
     {
-        return $user->hasAnyRole(['finance', 'administrator']);
+        return $user->hasAnyRole(['coordinator', 'finance', 'administrator']);
     }
 }

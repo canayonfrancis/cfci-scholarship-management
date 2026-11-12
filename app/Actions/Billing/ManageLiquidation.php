@@ -77,7 +77,7 @@ class ManageLiquidation
             ProgramPeriodTerm::whereKey($scopeId)->lockForUpdate()->firstOrFail();
             $report = Liquidation::whereKey($report->id)->lockForUpdate()->firstOrFail();
             if ($report->status !== 'submitted' || $report->prepared_by === $actor->id || $report->submitted_by === $actor->id) {
-                $this->fail('A different Administrator must review a submitted liquidation.');
+                $this->fail('A different Coordinator must review a submitted liquidation.');
             }
             if ($decision === 'accepted') {
                 $this->requireComplete($report);

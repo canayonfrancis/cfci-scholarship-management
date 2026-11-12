@@ -28,7 +28,7 @@
                     </form>
                 @endcan
             </div>
-        @empty<p class="record-help">No academic programs are registered. An Administrator can add the school’s confirmed program names above.</p>@endforelse
+        @empty<p class="record-help">No academic programs are registered. A Coordinator can add the school’s confirmed program names above.</p>@endforelse
         <div class="records-pagination">{{ $programs->links() }}</div>
     </section>
 </x-records-page>

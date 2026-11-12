@@ -65,7 +65,7 @@ class ScholarshipEvaluationController extends Controller
             Student::whereKey($assignment->student_id)->lockForUpdate()->firstOrFail();
             $context = AcademicValidationContext::whereKey(1)->lockForUpdate()->firstOrFail();
             if (! $context->active_period_id || $context->active_period_id !== (int) $data['academic_period_id']) {
-                throw ValidationException::withMessages(['academic_period_id' => 'Use the currently configured active period. An administrator must configure it before validation.']);
+                throw ValidationException::withMessages(['academic_period_id' => 'Use the currently configured active period. A Coordinator must configure it before validation.']);
             }
             $assignment = $assignment->fresh();
             if ($assignment->program_id !== (int) $data['program_id'] || ! in_array($assignment->status, ['pending', 'active'], true)) {

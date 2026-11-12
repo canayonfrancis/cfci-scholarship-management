@@ -12,6 +12,10 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
+    public const OPERATIONAL_ROLES = ['coordinator', 'registrar'];
+
+    // Existing legacy memberships retain access until the sole local Administrator
+    // account has been reviewed. Never use this list to provision new roles.
     public const STAFF_ROLES = ['administrator', 'registrar', 'coordinator', 'finance', 'viewer'];
 
     /** @use HasFactory<UserFactory> */

@@ -67,7 +67,7 @@ class RecordFinancialActivity
                 return;
             }
             if (! $receipt->recorded_by || $receipt->recorded_by === $actor->id || ! $receipt->received_on || $receipt->received_on->toDateString() > now('Asia/Manila')->toDateString() || Money::cents($receipt->amount) <= 0 || ! filled($receipt->reference) || ! filled($receipt->source)) {
-                $this->fail('A different Administrator must verify a dated, identified actual receipt. Legacy placeholders are not actual receipt records.');
+                $this->fail('A different Coordinator must verify a dated, identified actual receipt. Legacy placeholders are not actual receipt records.');
             }
             if (! $this->evidence->approved($receipt, 'receipt_evidence')) {
                 $this->fail('Accepted intact receipt evidence is required before funds are counted as received.');
@@ -156,7 +156,7 @@ class RecordFinancialActivity
                 ProgramPeriodTerm::whereKey($scopeId)->lockForUpdate()->firstOrFail();
                 $payout = Payout::whereKey($payout->id)->lockForUpdate()->firstOrFail();
                 if ($payout->status !== 'draft' || $payout->payment_mode !== 'school' || $payout->recorded_by === $actor->id || empty($data['permitted_by_program'])) {
-                    $this->fail('A separate Administrator may authorize a documented deduction only on a school-payment draft.');
+                    $this->fail('A separate Coordinator may authorize a documented deduction only on a school-payment draft.');
                 }
                 $amount = Money::cents($data['amount']);
                 if ($amount <= 0 || $amount + Money::signedTotal($payout->deductions()->lockForUpdate()->get()) > Money::cents($payout->gross_amount) - Money::cents($payout->net_amount)) {
@@ -169,7 +169,7 @@ class RecordFinancialActivity
                 }
                 $deduction = $payout->deductions()->create(['billing_batch_id' => $payout->billing_batch_id, 'type' => $data['type'], 'amount' => Money::decimal($amount), 'basis' => $data['basis'], 'destination' => $data['destination'], 'authority_reference' => $data['authority_reference'], 'consent_reference' => $data['consent_reference'], 'authorized_by' => $actor->id, 'authorized_at' => now()]);
                 $document = $this->evidence->upload($deduction, $actor, $file, 'deduction_authority');
-                $document->update(['review_status' => 'accepted', 'reviewed_by' => $actor->id, 'reviewed_at' => now(), 'review_notes' => 'Administrator verified the cited program-specific authority and beneficiary basis for this exact deduction.']);
+                $document->update(['review_status' => 'accepted', 'reviewed_by' => $actor->id, 'reviewed_at' => now(), 'review_notes' => 'Coordinator verified the cited program-specific authority and beneficiary basis for this exact deduction.']);
                 $this->audit->record($actor, $deduction, 'specific_benefit_deduction_authorized');
 
                 return $deduction;
@@ -200,7 +200,7 @@ class RecordFinancialActivity
             AcademicValidationContext::whereKey(1)->lockForUpdate()->firstOrFail();
             ScholarshipProgram::whereKey($item->program_id)->lockForUpdate()->firstOrFail();
             if (! self::approved($batch) || ! $payout->recorded_by || $payout->recorded_by === $actor->id || ! $payout->institutional_student_id || ! $payout->paid_on || $payout->paid_on->toDateString() > now('Asia/Manila')->toDateString()) {
-                $this->fail('A separate Administrator must verify an identified, dated payment against an approved batch.');
+                $this->fail('A separate Coordinator must verify an identified, dated payment against an approved batch.');
             }
             $basis = $this->eligibility->basis($item->application, $terms, $batch->appliedRate());
             if (! $this->evidence->approved($payout, 'payment_evidence')) {
@@ -248,7 +248,7 @@ class RecordFinancialActivity
                 return;
             }
             if ($deduction->payout->status !== 'posted' || $deduction->payout->payment_mode !== 'school' || $deduction->payout->recorded_by === $actor->id || ! $deduction->authorized_by || $data['settled_on'] < $deduction->payout->paid_on->toDateString()) {
-                $this->fail('Verify settlement only after the authorized school payment, with a separate Administrator.');
+                $this->fail('Verify settlement only after the authorized school payment, with a separate Coordinator.');
             }
             if (! $this->evidence->approved($deduction, 'deduction_settlement')) {
                 $this->fail('Accepted proof of actual full deduction settlement is required; withholding alone is not settlement.');

@@ -14,8 +14,8 @@ Artisan::command('inspire', function () {
 
 Artisan::command('sms:grant-role {email} {role}', function () {
     $role = $this->argument('role');
-    if (! in_array($role, User::STAFF_ROLES, true)) {
-        $this->error('Supported roles: '.implode(', ', User::STAFF_ROLES));
+    if (! in_array($role, User::OPERATIONAL_ROLES, true)) {
+        $this->error('Supported roles: '.implode(', ', User::OPERATIONAL_ROLES));
 
         return 1;
     }

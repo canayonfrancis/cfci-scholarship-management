@@ -19,7 +19,7 @@ class BillingBatchPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasAnyRole(['finance']);
+        return $user->hasAnyRole(['coordinator', 'finance']);
     }
 
     public function update(User $user, BillingBatch $batch): bool
@@ -34,7 +34,7 @@ class BillingBatchPolicy
 
     public function configure(User $user): bool
     {
-        return $user->hasAnyRole(['administrator']);
+        return $user->hasAnyRole(['coordinator', 'administrator']);
     }
 
     public function approve(User $user, BillingBatch $batch): bool

@@ -104,7 +104,8 @@ class DevelopmentSampleSeederTest extends TestCase
         }
         $this->assertDatabaseCount('academic_periods', 40);
         $this->assertDatabaseCount('scholarship_programs', 3);
-        $this->assertDatabaseCount('users', 5);
+        $this->assertDatabaseCount('users', 2);
+        $this->assertSame(['coordinator', 'registrar'], DB::table('user_roles')->distinct()->orderBy('role')->pluck('role')->all());
         $this->assertSame(54, Student::where('record_status', 'active')->count());
         $this->assertSame(26, Student::where('record_status', 'archived')->count());
         $this->assertSame(60, EvaluationRun::where('automatic_outcome', 'needs_review')->count());
@@ -126,7 +127,7 @@ class DevelopmentSampleSeederTest extends TestCase
         $this->seed(DevelopmentSampleSeeder::class);
         $sample = Student::where('student_number', 'SAMPLE-C-2026-001')->firstOrFail();
         $sample->update(['first_name' => 'Manually edited']);
-        $finance = User::where('email', 'sample.finance@example.test')->firstOrFail();
+        $finance = User::where('email', 'sample.coordinator@example.test')->firstOrFail();
         $finance->update(['name' => 'Manually renamed', 'password' => 'manually-selected-secret']);
         $finance->roles()->delete();
         $before = $this->fingerprint();
@@ -256,7 +257,7 @@ class DevelopmentSampleSeederTest extends TestCase
         }
         $this->assertDatabaseCount('academic_periods', 0);
         config(['sample-data.academic_year' => '2026-2027']);
-        $manual = User::factory()->create(['email' => 'sample.finance@example.test']);
+        $manual = User::factory()->create(['email' => 'sample.coordinator@example.test']);
         $before = $manual->fresh()->getAttributes();
         try {
             app(DevelopmentSampleSeeder::class)->run();

@@ -51,10 +51,10 @@ class SyntheticDemoSeeder extends Seeder
                 }
                 $year = SampleData::academicYear();
                 $period = AcademicPeriod::where('academic_year', $year)->where('semester_code', '1')->firstOrFail();
-                $admin = SampleData::staff('administrator');
+                $admin = SampleData::staff('coordinator', reviewer: true);
                 $registrar = SampleData::staff('registrar');
                 $coordinator = SampleData::staff('coordinator');
-                $finance = SampleData::staff('finance');
+                $finance = $coordinator;
                 $programs = SampleData::programs();
                 $context = AcademicValidationContext::current();
                 if ($context->active_period_id !== null && ! str_starts_with($context->source_policy_reference ?? '', 'SAMPLE:')) {
