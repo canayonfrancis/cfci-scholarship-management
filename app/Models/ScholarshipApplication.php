@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ScholarshipApplication extends Model
 {
@@ -66,6 +67,11 @@ class ScholarshipApplication extends Model
     public function evaluationRuns(): HasMany
     {
         return $this->hasMany(EvaluationRun::class, 'application_id');
+    }
+
+    public function latestEvaluation(): HasOne
+    {
+        return $this->hasOne(EvaluationRun::class, 'application_id')->ofMany('run_number', 'max');
     }
 
     public function currentSchoolDecision(): ?EvaluationRun

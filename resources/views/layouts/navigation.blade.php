@@ -1,4 +1,4 @@
-<header class="site-header" x-data="{ mobileOpen: false, profileOpen: false, notificationsOpen: false, searching: false }" @keydown.escape.window="mobileOpen = profileOpen = notificationsOpen = searching = false">
+<header class="site-header" x-data="{ mobileOpen: false, profileOpen: false, notificationsOpen: false }" @keydown.escape.window="mobileOpen = profileOpen = notificationsOpen = false">
     <a class="skip-link" href="#main-content">Skip to dashboard</a>
     <div class="topbar">
         <a href="{{ route('dashboard') }}" class="brand" aria-label="CFCI Scholarship Management dashboard">
@@ -44,22 +44,18 @@
         </div>
 
         <div class="topbar-actions">
-            <div class="search-wrap" :class="{ 'is-open': searching }">
-                <label class="sr-only" for="dashboard-search">Search dashboard</label>
-                <input id="dashboard-search" x-ref="searchInput" x-cloak x-show="searching" x-transition type="search" placeholder="Search" @click.outside="searching = false">
-                <button class="round-button" type="button" aria-label="Search" @click="searching = !searching; $nextTick(() => searching && $refs.searchInput.focus())" :aria-expanded="searching">
-                    <x-dashboard-icon name="search" :size="21" />
-                </button>
-            </div>
-
             <div class="action-dropdown">
-                <button class="round-button notification-button" type="button" aria-label="Notifications, 1 unread" @click="notificationsOpen = !notificationsOpen; profileOpen = false" :aria-expanded="notificationsOpen">
-                    <x-dashboard-icon name="bell" :size="21" /><span class="notification-dot"></span>
+                <button class="round-button notification-button" type="button" aria-label="Monitoring overview" @click="notificationsOpen = !notificationsOpen; profileOpen = false" :aria-expanded="notificationsOpen">
+                    <x-dashboard-icon name="bell" :size="21" />
                 </button>
                 <div class="popover notification-popover" x-cloak x-show="notificationsOpen" x-transition @click.outside="notificationsOpen = false">
-                    <strong>Notifications</strong>
-                    <p>Dashboard notifications are demonstration data.</p>
-                    <a href="#recent-applications" @click="notificationsOpen = false">View validation overview</a>
+                    <strong>Monitoring</strong>
+                    @if(auth()->user()->hasAnyRole(\App\Models\User::STAFF_ROLES))
+                        <p>View current scholarship indicators and graphs.</p>
+                        <a href="{{ route('dashboard') }}#applications-trend">View dashboard graphs</a>
+                    @else
+                        <p>Your account does not have staff reporting access.</p>
+                    @endif
                 </div>
             </div>
 

@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Route;
 Route::redirect('/', '/login');
 
 Route::get('/dashboard', DashboardController::class)
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'verified', 'cache.headers:no_store;private'])
     ->name('dashboard');
 
 Route::middleware('auth')->group(function () {

@@ -1,19 +1,20 @@
 <x-app-layout>
+    @if($canReport)
     @php
-        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         $chartLeft = 36;
         $chartWidth = 714;
         $chartBottom = 174;
         $chartHeight = 140;
-        $pointString = fn ($values) => collect($values)->map(fn ($value, $index) => round($chartLeft + ($index * $chartWidth / 11), 1).','.round($chartBottom - ($value * $chartHeight / 100), 1))->implode(' ');
+        $pointString = fn ($values) => collect($values)->map(fn ($value, $index) => round($chartLeft + ($index * $chartWidth / 11), 1).','.round($chartBottom - ($value * $chartHeight / $chartMax), 1))->implode(' ');
         $applicationPoints = $pointString($applications);
         $qualifiedPoints = $pointString($qualified);
         $statusClass = fn ($status) => match ($status) {
-            'For Evaluation' => 'status-blue',
-            'Incomplete' => 'status-red',
-            default => 'status-green',
+            'School eligible' => 'status-green',
+            'School ineligible' => 'status-red',
+            default => 'status-blue',
         };
     @endphp
+    @endif
 
     <div class="dashboard-page" x-data="{ periodOpen: false, yearOpen: false }">
         <section
@@ -47,6 +48,10 @@
             </div>
         </section>
 
+        @if(!$canReport)
+            <section class="dashboard-card dashboard-filters"><p>Your account does not have staff reporting access. Contact an Administrator to assign the appropriate role.</p></section>
+        @else
+        <section class="dashboard-card records-page dashboard-filters" aria-label="Dashboard filters">@include('dashboard.filters', ['filterAction' => route('dashboard')])<p class="record-help">Current recorded state for the selected program/year/semester. Historical records are retained; older decisions do not automatically remain eligible.</p></section>
         <section class="stats-grid" aria-label="Scholarship validation overview">
             @foreach ($stats as $stat)
                 <article class="stat-card stat-{{ $stat['tone'] }}">
@@ -55,9 +60,7 @@
                         <p>{{ $stat['label'] }}</p>
                         <div class="stat-value-row">
                             <strong>{{ number_format($stat['value']) }}</strong>
-                            <span class="trend-badge {{ $stat['direction'] === 'down' ? 'trend-down' : '' }}">
-                                <span aria-hidden="true">{{ $stat['direction'] === 'down' ? '↓' : '↑' }}</span> {{ $stat['trend'] }}
-                            </span>
+                            <span class="trend-badge">Live</span>
                         </div>
                         <small>{{ $stat['comparison'] }}</small>
                     </div>
@@ -75,44 +78,34 @@
             </article>
         </section>
 
+        <section class="stats-grid dashboard-secondary-stats" aria-label="Funding and approval overview">
+            @foreach($additionalStats as $stat)
+                <article class="stat-card stat-{{ $stat['tone'] }}"><span class="stat-icon"><x-dashboard-icon :name="$stat['icon']" :size="30" /></span><div class="stat-content"><p>{{ $stat['label'] }}</p><div class="stat-value-row"><strong>{{ $stat['value'] === null ? 'Unconfirmed' : ($stat['money'] ? '₱'.number_format((float) $stat['value'], 2) : number_format($stat['value'])) }}</strong></div><small>{{ $stat['comparison'] }}</small></div></article>
+            @endforeach
+        </section>
+
         <section class="analytics-grid" aria-label="Validation analytics">
-            <article id="applications-trend" class="dashboard-card trend-card" x-data="{ chartState: 'ready', activePoint: 8 }">
+            <article id="applications-trend" class="dashboard-card trend-card" x-data="{ chartState: 'ready', activePoint: 11 }">
                 <header class="card-header trend-header">
                     <div>
                         <h2><span class="title-icon"><x-dashboard-icon name="trend" :size="20" /></span>Validations Trend</h2>
-                        <p>Monthly validation and qualification overview (demonstration data)</p>
+                        <p>Latest semester evaluations · last 12 calendar months (Manila)</p>
                     </div>
-                    <div class="chart-controls">
-                        <div class="select-control">
-                            <button type="button" @click="yearOpen = !yearOpen; periodOpen = false" :aria-expanded="yearOpen"><x-dashboard-icon name="calendar" :size="16" /> Academic Year 2025 – 2026 <x-dashboard-icon name="chevron-down" :size="15" /></button>
-                            <div class="select-menu" x-cloak x-show="yearOpen" @click.outside="yearOpen = false" x-transition>
-                                <button type="button" @click="yearOpen = false">Academic Year 2025 – 2026</button>
-                                <button type="button" @click="yearOpen = false">Academic Year 2024 – 2025</button>
-                            </div>
-                        </div>
-                        <div class="select-control short-control">
-                            <button type="button" @click="periodOpen = !periodOpen; yearOpen = false" :aria-expanded="periodOpen">Monthly <x-dashboard-icon name="chevron-down" :size="15" /></button>
-                            <div class="select-menu" x-cloak x-show="periodOpen" @click.outside="periodOpen = false" x-transition>
-                                <button type="button" @click="periodOpen = false">Monthly</button>
-                                <button type="button" @click="periodOpen = false">Quarterly</button>
-                            </div>
-                        </div>
-                    </div>
-                </header>
+                    <div class="chart-controls"><span class="record-help">Filters applied above</span></div></header>
 
                 <template x-if="chartState === 'loading'"><x-dashboard-skeleton type="chart" /></template>
-                <div x-show="chartState === 'error'" class="dashboard-error"><p>Unable to load validation statistics.</p><button type="button" @click="chartState = 'ready'"><x-dashboard-icon name="reload" :size="15" /> Retry</button></div>
+                <div x-cloak x-show="chartState === 'error'" class="dashboard-error"><p>Unable to load validation statistics.</p><button type="button" @click="chartState = 'ready'"><x-dashboard-icon name="reload" :size="15" /> Retry</button></div>
                 <div class="trend-chart" x-show="chartState === 'ready'">
                     <div class="chart-legend" aria-hidden="true"><span><i class="application-dot"></i>Validations</span><span><i class="blue-dot"></i>Qualified</span></div>
                     <svg viewBox="0 0 790 210" role="img" aria-labelledby="trend-chart-title trend-chart-desc" preserveAspectRatio="none">
-                        <title id="trend-chart-title">Demonstration validations and qualification by month</title>
-                        <desc id="trend-chart-desc">Demonstration validations rise from 18 in January to a peak of 76 in September. Qualified examples rise from 10 to a peak of 52 in September.</desc>
+                        <title id="trend-chart-title">Latest evaluations and current school eligibility by month</title>
+                        <desc id="trend-chart-desc">{{ array_sum($applications) }} latest semester evaluation runs in this period; {{ array_sum($qualified) }} currently school-eligible contexts. Historical reruns are not counted again.</desc>
                         <defs>
                             <linearGradient id="applications-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A80E0E" stop-opacity=".18"/><stop offset="1" stop-color="#A80E0E" stop-opacity="0"/></linearGradient>
                             <linearGradient id="qualified-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4A9DDB" stop-opacity=".13"/><stop offset="1" stop-color="#4A9DDB" stop-opacity="0"/></linearGradient>
                         </defs>
-                        @foreach ([0, 25, 50, 75, 100] as $tick)
-                            @php $y = $chartBottom - ($tick * $chartHeight / 100); @endphp
+                        @foreach ([0, $chartMax / 4, $chartMax / 2, $chartMax * 3 / 4, $chartMax] as $tick)
+                            @php $y = $chartBottom - ($tick * $chartHeight / $chartMax); @endphp
                             <line class="chart-grid-line" x1="{{ $chartLeft }}" y1="{{ $y }}" x2="{{ $chartLeft + $chartWidth }}" y2="{{ $y }}" />
                             <text class="chart-axis" x="3" y="{{ $y + 4 }}">{{ $tick }}</text>
                         @endforeach
@@ -128,8 +121,8 @@
                         @foreach ($months as $index => $month)
                             @php
                                 $x = round($chartLeft + ($index * $chartWidth / 11), 1);
-                                $appY = round($chartBottom - ($applications[$index] * $chartHeight / 100), 1);
-                                $qualifiedY = round($chartBottom - ($qualified[$index] * $chartHeight / 100), 1);
+                                $appY = round($chartBottom - ($applications[$index] * $chartHeight / $chartMax), 1);
+                                $qualifiedY = round($chartBottom - ($qualified[$index] * $chartHeight / $chartMax), 1);
                             @endphp
                             <g class="chart-points" tabindex="0" role="button" aria-label="{{ $month }}: {{ $applications[$index] }} validations, {{ $qualified[$index] }} qualified" @mouseenter="activePoint = {{ $index }}" @focus="activePoint = {{ $index }}">
                                 <circle cx="{{ $x }}" cy="{{ $appY }}" r="4.5" class="application-point" />
@@ -140,7 +133,7 @@
                     </svg>
                     @foreach ($months as $index => $month)
                         <div class="chart-tooltip" x-cloak x-show="activePoint === {{ $index }}" :style="`left: clamp(76px, ${5 + ({{ $index }} * 8.1)}%, calc(100% - 144px))`">
-                            <strong>{{ $month === 'Sep' ? 'September' : $month }} 2025</strong>
+                            <strong>{{ $month }}</strong>
                             <span><i class="application-dot"></i>Validations <b>{{ $applications[$index] }}</b></span>
                             <span><i class="blue-dot"></i>Qualified <b>{{ $qualified[$index] }}</b></span>
                         </div>
@@ -151,10 +144,10 @@
             <article class="dashboard-card status-card" x-data="{ statusState: 'ready' }">
                 <header class="card-header"><h2><span class="title-icon"><x-dashboard-icon name="sparkle" :size="20" /></span>Validation Status</h2></header>
                 <template x-if="statusState === 'loading'"><x-dashboard-skeleton type="status" /></template>
-                <div x-show="statusState === 'error'" class="dashboard-error"><p>Unable to load validation status.</p><button type="button" @click="statusState = 'ready'"><x-dashboard-icon name="reload" :size="15" /> Retry</button></div>
+                <div x-cloak x-show="statusState === 'error'" class="dashboard-error"><p>Unable to load validation status.</p><button type="button" @click="statusState = 'ready'"><x-dashboard-icon name="reload" :size="15" /> Retry</button></div>
                 <div x-show="statusState === 'ready'">
-                    <div class="donut" role="img" aria-label="286 total demonstration validations: 192 qualified, 48 under review, 32 not qualified, and 14 incomplete">
-                        <div><strong>286</strong><span>Total</span></div>
+                    <div class="donut" style="background: {{ $donutStyle }}" role="img" aria-label="{{ array_sum(array_column($statuses, 'count')) }} semester validations: {{ collect($statuses)->map(fn ($s) => $s['count'].' '.$s['label'])->implode(', ') }}">
+                        <div><strong>{{ array_sum(array_column($statuses, 'count')) }}</strong><span>Semester checks</span></div>
                     </div>
                     <ul class="status-list">
                         @foreach ($statuses as $status)
@@ -167,29 +160,30 @@
         </section>
 
         <section class="lower-grid" aria-label="Validation and scholar details">
-            <article id="recent-applications" class="dashboard-card recent-card" x-data="{ tableState: 'ready', openAction: null }">
+            <article id="recent-applications" class="dashboard-card recent-card" x-data="{ tableState: 'ready' }">
                 <header class="card-header card-header-inline">
                     <h2><span class="title-icon"><x-dashboard-icon name="document" :size="20" /></span>Recent Validations</h2>
-                    <a href="#recent-applications" class="text-link">View All <x-dashboard-icon name="arrow-right" :size="15" /></a>
+                    @can('viewAny', \App\Models\ScholarshipApplication::class)<a href="{{ route('evaluations.index', $evaluationFilters) }}" class="text-link">View All <x-dashboard-icon name="arrow-right" :size="15" /></a>@endcan
                 </header>
                 <template x-if="tableState === 'loading'"><x-dashboard-skeleton type="table" /></template>
-                <div x-show="tableState === 'error'" class="dashboard-error"><p>Unable to load recent validations.</p><button type="button" @click="tableState = 'ready'"><x-dashboard-icon name="reload" :size="15" /> Retry</button></div>
-                @if (count($recentApplications))
-                    <div class="table-wrap" x-show="tableState === 'ready'">
-                        <table>
-                            <caption class="sr-only">Five demonstration scholarship validations</caption>
-                            <thead><tr><th scope="col">#</th><th scope="col">Name</th><th scope="col">Program</th><th scope="col">Status</th><th scope="col">Date Recorded</th><th scope="col">Actions</th></tr></thead>
+                <div x-cloak x-show="tableState === 'error'" class="dashboard-error"><p>Unable to load recent validations.</p><button type="button" @click="tableState = 'ready'"><x-dashboard-icon name="reload" :size="15" /> Retry</button></div>
+                @if (!auth()->user()->can('viewAny', \App\Models\ScholarshipApplication::class))
+                    <p class="record-help">Detailed academic evaluations are restricted to authorized Registrar, Coordinator and Administrator accounts. Aggregate counts remain visible above.</p>
+                @elseif (count($recentApplications))
+                    <div class="table-wrap" x-show="tableState === 'ready'" tabindex="0" role="region" aria-label="Recent validations table, scroll horizontally for more columns">
+                        <table class="recent-validations-table">
+                            <caption class="sr-only">Five most recently recorded semester checks in the selected scope</caption>
+                            <thead><tr><th scope="col">Student ID</th><th scope="col">Name</th><th scope="col">Program</th><th scope="col">Status</th><th scope="col">Date Recorded</th><th scope="col">View</th></tr></thead>
                             <tbody>
                                 @foreach ($recentApplications as $application)
                                     <tr tabindex="0">
                                         <td data-label="#">{{ $application['id'] }}</td>
-                                        <td data-label="Name"><span class="applicant"><i>{{ $application['initials'] }}</i>{{ $application['name'] }}</span></td>
+                                        <td data-label="Name"><span class="applicant"><i>{{ $application['initials'] }}</i><span class="scholar-name">{{ $application['name'] }}</span></span></td>
                                         <td data-label="Program">{{ $application['program'] }}</td>
                                         <td data-label="Status"><span class="status-pill {{ $statusClass($application['status']) }}">{{ $application['status'] }}</span></td>
                                         <td data-label="Date Recorded">{{ $application['submitted'] }}</td>
                                         <td data-label="Actions" class="actions-cell">
-                                            <button type="button" class="ellipsis-button" aria-label="Actions for {{ $application['name'] }}" @click.stop="openAction = openAction === {{ $loop->index }} ? null : {{ $loop->index }}"><x-dashboard-icon name="ellipsis" :size="19" /></button>
-                                            <div class="table-action-menu" x-cloak x-show="openAction === {{ $loop->index }}" @click.outside="openAction = null"><a href="#recent-applications">View validation</a><a href="#recent-applications">Start evaluation</a></div>
+                                            <a class="ellipsis-button" href="{{ $application['url'] }}" aria-label="View validation for {{ $application['name'] }}" title="View validation"><x-dashboard-icon name="eye" :size="19" /></a>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -204,13 +198,13 @@
             <article id="scholars-by-program" class="dashboard-card programs-card">
                 <header class="card-header card-header-inline">
                     <h2><span class="title-icon"><x-dashboard-icon name="graduation-cap" :size="20" /></span>Scholars by Program</h2>
-                    <a href="#scholars-by-program" class="text-link">View All <x-dashboard-icon name="arrow-right" :size="15" /></a>
+                    <a href="{{ route('scholars.index') }}" class="text-link">View All <x-dashboard-icon name="arrow-right" :size="15" /></a>
                 </header>
                 <div class="program-list">
                     @foreach ($programs as $program)
                         <div class="program-row">
                             <span>{{ $program['name'] }}</span>
-                            <div class="progress-track" role="progressbar" aria-label="{{ $program['name'] }} scholars" aria-valuenow="{{ $program['percent'] }}" aria-valuemin="0" aria-valuemax="100"><i class="shade-{{ $program['shade'] }}" style="width: {{ $program['percent'] / 42 * 65 }}%"></i></div>
+                            <div class="progress-track" role="progressbar" aria-label="{{ $program['name'] }} active scholars" aria-valuenow="{{ $program['percent'] }}" aria-valuemin="0" aria-valuemax="100"><i class="shade-{{ $program['shade'] }}" style="width: {{ $program['percent'] }}%"></i></div>
                             <strong>{{ $program['count'] }}</strong><small>{{ $program['percent'] }}%</small>
                         </div>
                     @endforeach
@@ -231,6 +225,6 @@
             </article>
         </section>
 
-        <section id="announcements" class="sr-only" aria-label="Announcements"><h2>Announcements</h2></section>
+        @endif
     </div>
 </x-app-layout>

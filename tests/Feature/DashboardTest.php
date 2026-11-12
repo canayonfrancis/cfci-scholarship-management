@@ -19,6 +19,7 @@ class DashboardTest extends TestCase
             'name' => 'Francis C. Canayon',
             'email_verified_at' => now(),
         ]);
+        $user->roles()->create(['role' => 'viewer']);
 
         $response = $this->actingAs($user)->get(route('dashboard'));
 
@@ -27,7 +28,9 @@ class DashboardTest extends TestCase
             ->assertSeeText('Good morning, Francis!')
             ->assertSeeText('Thu, Sep 10, 2026')
             ->assertSee('Validations Trend')
-            ->assertSee('Anne Dela Cruz')
+            ->assertDontSee('Anne Dela Cruz')
+            ->assertSee('Total scholars')
+            ->assertViewHas('metrics', fn ($m) => $m['total_scholars'] === 0)
             ->assertSee('Direct Scholarship Validation')
             ->assertDontSee('Create a New Application');
     }

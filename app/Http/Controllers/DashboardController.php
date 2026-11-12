@@ -2,67 +2,81 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DashboardRequest;
+use App\Models\AcademicPeriod;
+use App\Models\ScholarshipApplication;
+use App\Models\ScholarshipProgram;
+use App\Models\User;
+use App\Services\DashboardAnalytics;
 use Illuminate\Support\Str;
-use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(DashboardRequest $request, DashboardAnalytics $analytics)
     {
-        $localNow = now('Asia/Manila');
-        $firstName = Str::of(request()->user()?->name ?? 'Francis')
-            ->trim()
-            ->before(' ')
-            ->value();
+        $now = now('Asia/Manila');
+        $hero = ['greeting' => $now->hour < 12 ? 'Good morning' : ($now->hour < 18 ? 'Good afternoon' : 'Good evening'), 'firstName' => Str::of($request->user()->name)->trim()->before(' ')->value(), 'date' => $now->format('D, M j, Y'), 'dateTime' => $now->toDateString()];
+        $canReport = $request->user()->hasAnyRole(User::STAFF_ROLES);
+        if (! $canReport) {
+            return view('dashboard', compact('hero', 'canReport'));
+        }
+        $filters = $request->validated();
+        $canFinancial = $request->user()->can('financial-view');
+        $data = $analytics->build($filters, $canFinancial);
+        $metrics = $data['metrics'];
+        $stats = [];
+        foreach ([['total_scholars', 'Total scholars', 'green', 'users', 'Distinct registered identities, including archived'], ['active_awards', 'Active scholarship awards', 'purple', 'user-group', 'Currently active awards covering the selected period'], ['pending_evaluations', 'Pending evaluations', 'blue', 'document', 'Latest semester checks needing evaluation or reassessment'], ['school_eligible', 'School-eligible scholars', 'amber', 'graduation-cap', 'Distinct active students with a current qualified decision']] as [$key, $label, $tone, $icon, $comparison]) {
+            $stats[] = compact('key', 'label', 'tone', 'icon', 'comparison') + ['value' => $metrics[$key], 'money' => false];
+        }
+        $additionalStats = [['label' => 'Pending external approvals', 'value' => $metrics['pending_external'], 'tone' => 'blue', 'icon' => 'clipboard', 'comparison' => 'Semester decisions awaiting verification', 'money' => false]];
+        if ($canFinancial) {
+            foreach ([['billing_total', 'Billing totals', 'Submitted original amounts; not receipts'], ['school_funding', 'Recorded school funding', 'Verified posted receipts, less reversals'], ['student_payouts', 'Documented student payouts', 'Posted student net: school + direct, less reversals'], ['incomplete_liquidations', 'Incomplete liquidation records', 'Approved batches not fully reconciled and accepted']] as [$key, $label, $comparison]) {
+                $additionalStats[] = ['label' => $label, 'value' => $metrics[$key], 'comparison' => $comparison, 'tone' => 'green', 'icon' => 'document', 'money' => $key !== 'incomplete_liquidations'];
+            }
+        }
+        $counts = $data['evaluations']->countBy('state');
+        $statuses = [];
+        $segments = [];
+        $position = 0;
+        foreach ([['School eligible', 'green', '#278263'], ['Pending review', 'blue', '#4a9ddb'], ['School ineligible', 'amber', '#a80e0e'], ['Not evaluated', 'gray', '#a7b0be']] as [$label, $tone, $color]) {
+            $count = $counts[$label] ?? 0;
+            $percent = $data['evaluations']->count() ? $count * 100 / $data['evaluations']->count() : 0;
+            $statuses[] = compact('label', 'tone', 'count') + ['percent' => round($percent, 1)];
+            $segments[] = $color.' '.round($position, 3).'% '.round($position + $percent, 3).'%';
+            $position += $percent;
+        }
+        $donutStyle = $position ? 'conic-gradient('.implode(', ', $segments).')' : '#e6e8ec';
+        $months = [];
+        $applications = [];
+        $qualified = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $month = $now->copy()->startOfMonth()->subMonths($i);
+            $key = $month->format('Y-m');
+            $months[] = $month->format('M Y');
+            $cohort = $data['evaluations']->filter(fn ($r) => $r['application']->latestEvaluation?->completed_at?->timezone('Asia/Manila')->format('Y-m') === $key);
+            $applications[] = $cohort->count();
+            $qualified[] = $cohort->where('state', 'School eligible')->count();
+        }
+        $chartMax = max(4, (int) (ceil(max([...$applications, ...$qualified, 1]) / 4) * 4));
+        $recentApplications = $data['evaluations']->sortByDesc('recorded_at')->take(5)->map(fn ($r) => ['id' => $r['student_number'], 'initials' => Str::of($r['name'])->explode(' ')->filter()->take(2)->map(fn ($p) => Str::substr($p, 0, 1))->implode(''), 'name' => $r['name'], 'program' => $r['program'], 'status' => $r['state'], 'submitted' => $r['recorded_at']?->timezone('Asia/Manila')->format('M j, Y') ?? 'Not recorded', 'url' => route('evaluations.show', $r['id'])]);
+        $programs = $data['programs'];
+        $quickLinks = [['label' => 'Manage Scholars', 'icon' => 'user-group', 'href' => route('scholars.index')], ['label' => 'Scholarship Programs', 'icon' => 'graduation-cap', 'href' => route('scholarship-programs.index')], ['label' => 'Settings', 'icon' => 'settings', 'href' => route('profile.edit')]];
+        if ($request->user()->can('viewAny', ScholarshipApplication::class)) {
+            $quickLinks[] = ['label' => 'Evaluation Queue', 'icon' => 'clipboard', 'href' => route('evaluations.index')];
+        }
+        if ($canFinancial) {
+            $quickLinks[] = ['label' => 'Payments & liquidation', 'icon' => 'document', 'href' => route('financial.index')];
+        }
 
-        $greeting = match (true) {
-            $localNow->hour < 12 => 'Good morning',
-            $localNow->hour < 18 => 'Good afternoon',
-            default => 'Good evening',
-        };
+        $evaluationFilters = array_filter(['program_id' => $filters['program_id'] ?? null]);
+        if (filled($filters['academic_year'] ?? null) && filled($filters['semester_code'] ?? null)) {
+            $evaluationFilters['academic_period_id'] = AcademicPeriod::where('academic_year', $filters['academic_year'])->where('semester_code', $filters['semester_code'])->value('id');
+        }
 
-        return view('dashboard', [
-            'hero' => [
-                'greeting' => $greeting,
-                'firstName' => $firstName ?: 'Francis',
-                'date' => $localNow->format('D, M j, Y'),
-                'dateTime' => $localNow->toDateString(),
-            ],
-            'stats' => [
-                ['label' => 'Total Validations', 'value' => 286, 'trend' => '12%', 'direction' => 'up', 'comparison' => '+31 from last month', 'tone' => 'green', 'icon' => 'document'],
-                ['label' => 'For Evaluation', 'value' => 48, 'trend' => '18%', 'direction' => 'down', 'comparison' => '-11 from last month', 'tone' => 'blue', 'icon' => 'users'],
-                ['label' => 'Qualified Scholars', 'value' => 192, 'trend' => '15%', 'direction' => 'up', 'comparison' => '+25 from last month', 'tone' => 'amber', 'icon' => 'graduation-cap'],
-                ['label' => 'Active Scholars', 'value' => 120, 'trend' => '6%', 'direction' => 'up', 'comparison' => '+7 from last year', 'tone' => 'purple', 'icon' => 'user-group'],
-            ],
-            'applications' => [18, 31, 29, 36, 44, 57, 50, 70, 76, 60, 51, 45],
-            'qualified' => [10, 15, 17, 21, 28, 23, 25, 44, 52, 39, 33, 24],
-            'statuses' => [
-                ['label' => 'Qualified', 'count' => 192, 'percent' => 67, 'tone' => 'green'],
-                ['label' => 'Under Review', 'count' => 48, 'percent' => 17, 'tone' => 'blue'],
-                ['label' => 'Not Qualified', 'count' => 32, 'percent' => 11, 'tone' => 'amber'],
-                ['label' => 'Incomplete', 'count' => 14, 'percent' => 5, 'tone' => 'gray'],
-            ],
-            'recentApplications' => [
-                ['id' => '001', 'initials' => 'AD', 'name' => 'Anne Dela Cruz', 'program' => 'College', 'status' => 'For Evaluation', 'submitted' => 'Sep 15, 2025'],
-                ['id' => '002', 'initials' => 'MS', 'name' => 'Mark Santos', 'program' => 'Senior High', 'status' => 'Complete', 'submitted' => 'Sep 14, 2025'],
-                ['id' => '003', 'initials' => 'BR', 'name' => 'Bea Reyes', 'program' => 'College', 'status' => 'For Evaluation', 'submitted' => 'Sep 14, 2025'],
-                ['id' => '004', 'initials' => 'JT', 'name' => 'Jiro Tan', 'program' => 'Technical-Vocational', 'status' => 'Incomplete', 'submitted' => 'Sep 13, 2025'],
-                ['id' => '005', 'initials' => 'LM', 'name' => 'Liza Mendoza', 'program' => 'College', 'status' => 'Qualified', 'submitted' => 'Sep 12, 2025'],
-            ],
-            'programs' => [
-                ['name' => 'College', 'count' => 68, 'percent' => 42, 'shade' => '100'],
-                ['name' => 'Senior High School', 'count' => 32, 'percent' => 20, 'shade' => '80'],
-                ['name' => 'Technical-Vocational', 'count' => 14, 'percent' => 9, 'shade' => '60'],
-                ['name' => 'Graduate Studies', 'count' => 6, 'percent' => 4, 'shade' => '40'],
-            ],
-            'quickLinks' => [
-                ['label' => 'Manage Scholars', 'icon' => 'user-group', 'href' => '#scholars-by-program'],
-                ['label' => 'Evaluation Queue', 'icon' => 'clipboard', 'href' => '#recent-applications'],
-                ['label' => 'Scholarship Programs', 'icon' => 'graduation-cap', 'href' => '#scholars-by-program'],
-                ['label' => 'Reports', 'icon' => 'chart', 'href' => '#applications-trend'],
-                ['label' => 'Announcements', 'icon' => 'megaphone', 'href' => '#announcements'],
-                ['label' => 'Settings', 'icon' => 'settings', 'href' => route('profile.edit')],
-            ],
+        return view('dashboard', [...compact('hero', 'canReport', 'filters', 'metrics', 'stats', 'additionalStats', 'statuses', 'donutStyle', 'months', 'applications', 'qualified', 'chartMax', 'recentApplications', 'programs', 'quickLinks', 'evaluationFilters'),
+            'scholarshipPrograms' => ScholarshipProgram::orderBy('code')->get(),
+            'academicYears' => AcademicPeriod::distinct()->orderByDesc('academic_year')->pluck('academic_year'),
+            'semesters' => AcademicPeriod::distinct()->orderBy('semester_code')->pluck('semester_code'),
         ]);
     }
 }

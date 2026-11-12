@@ -86,7 +86,7 @@ class AcademicVerificationTest extends TestCase
     {
         $record = $this->verifiedRecord();
         Storage::disk('academic')->put('certificates/'.$record->id.'/test.pdf', 'private evidence');
-        $document = $record->documents()->create(['disk' => 'academic', 'storage_path' => 'certificates/'.$record->id.'/test.pdf', 'original_name' => 'test.pdf', 'document_type' => 'grade_certificate']);
+        $document = $record->documents()->create(['disk' => 'academic', 'storage_path' => 'certificates/'.$record->id.'/test.pdf', 'original_name' => 'test.pdf', 'document_type' => 'grade_certificate', 'checksum' => hash('sha256', 'private evidence')]);
         $actor = $role === 'none' ? User::factory()->create() : $this->staff($role);
         $this->actingAs($actor);
         $this->get(route('academic-verifications.index'))->assertStatus($read ? 200 : 403);
@@ -142,6 +142,20 @@ class AcademicVerificationTest extends TestCase
         $this->assertDatabaseRejects(fn () => DB::table('documents')->where('id', $document->id)->update(['storage_path' => 'other.pdf']));
     }
 
+    public function test_changed_academic_certificate_is_not_served_as_verified_evidence(): void
+    {
+        [$student, $period] = $this->fixture();
+        $this->actingAs($this->staff())->post(route('academic-verifications.store'), $this->data($student, $period, ['certificates' => [$this->pdf()]]))->assertSessionHasNoErrors();
+        $record = AcademicRecord::sole();
+        $document = $record->documents()->sole();
+        $url = route('academic-verifications.certificate', [$record, $document]);
+        $this->get($url)->assertOk();
+        Storage::disk('academic')->put($document->storage_path, "%PDF-1.4\nChanged bytes after verification\n%%EOF");
+        $this->get($url)->assertNotFound();
+        $this->assertSame('verified', $record->fresh()->verification_status);
+        $this->assertSame('accepted', $document->fresh()->review_status);
+    }
+
     public function test_invalid_fields_missing_sources_and_duplicate_contexts_are_rejected(): void
     {
         [$student, $period] = $this->fixture();
@@ -154,6 +168,7 @@ class AcademicVerificationTest extends TestCase
         $this->assertDatabaseCount('audit_events', 1);
         $this->assertDatabaseRejects(fn () => AcademicRecord::create(['student_id' => $student->id, 'academic_period_id' => $period->id, 'revision' => 1]));
         $this->assertDatabaseRejects(fn () => AcademicRecord::create(['student_id' => $student->id, 'academic_period_id' => $period->id, 'revision' => 2, 'academic_standing' => 'eligible']));
+        $this->assertDatabaseCount('academic_records', 1);
     }
 
     public function test_drafts_can_be_saved_verified_and_protected_from_stale_edits_and_role_bypasses(): void
