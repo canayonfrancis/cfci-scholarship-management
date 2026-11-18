@@ -17,7 +17,7 @@ Identify the student once, record their scholarship program assignment and place
 ## Step-by-step procedure
 
 1. Search **Scholars** by Student ID/name before adding a person. Select the existing profile when found.
-2. For a new student, save the basic identity and known profile details. Leave unknown optional information unset.
+2. For new students, choose **Bulk Upload**, download the template and complete its required identity/course/contact columns. Preview and correct all errors, then explicitly confirm the import. Follow [the bulk-upload instructions](../16-bulk-scholar-upload-implementation.md). Complete other known profile details through Edit record; leave unknown optional information unset.
 3. Coordinator opens **Assign scholarship** on the scholar detail page, chooses the scholarship program and starting academic semester, and saves a **Pending** assignment.
 4. On the scholar detail page, open **Semester batch memberships**, select the pending/active assignment and matching program/semester roster, then **Assign to roster without billing**. The membership is displayed on the scholar record and roster.
 5. Hand the batch roster to Registrar for [enrollment validation](03-enrollment-validation.md). Membership must survive a not-enrolled result.
@@ -29,8 +29,8 @@ Identify the student once, record their scholarship program assignment and place
 
 | Record | Data |
 | --- | --- |
-| Minimum profile save | Unique `student_number`, `first_name`, `last_name`, `record_status` |
-| Optional known profile data | Middle/suffix names, contact, academic course/year/period, family/address and supported indicators/identifiers |
+| Bulk profile registration | Unique `student_number`, first/last names, sex, existing active academic course, configured year level, contact email and phone; middle name may be blank and suffix is optional. `record_status` is active administrative profile status. |
+| Other profile details | Middle/suffix names remain optional in the upload. Known academic period, family/address, birthdate and supported indicators/identifiers can be maintained through Edit record. |
 | Assignment | `student_id` from scoped scholar route, `program_id`, `start_period_id`, `status = pending`; known start date/reference only |
 | Proposed membership | Batch ID, student ID, assignment ID, matching program/benefit-period scope, assigning actor/time; retained reason/provenance for a later correction |
 

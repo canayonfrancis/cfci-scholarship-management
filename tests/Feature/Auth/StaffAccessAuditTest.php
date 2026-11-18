@@ -23,7 +23,7 @@ class StaffAccessAuditTest extends TestCase
         $legacy = User::factory()->create();
         $legacy->roles()->create(['role' => 'administrator']);
         $unexpected = User::factory()->create();
-        $unexpected->roles()->create(['role' => 'student']);
+        $unexpected->roles()->create(['role' => 'applicant']);
         User::factory()->create();
         $users = DB::table('users')->orderBy('id')->get()->toJson();
         $memberships = DB::table('user_roles')->orderBy('id')->get()->toJson();
@@ -37,7 +37,7 @@ class StaffAccessAuditTest extends TestCase
         $this->assertSame(1, $report['accounts_by_role']['registrar']);
         $this->assertSame([], $report['legacy_roles_pending_review']);
         $this->assertSame(['administrator' => 1], $report['approved_technical_roles']);
-        $this->assertSame(['student' => 1], $report['unexpected_roles']);
+        $this->assertSame(['applicant' => 1], $report['unexpected_roles']);
         $this->assertSame(1, $report['accounts_without_roles']);
         $this->assertSame(1, $report['accounts_with_multiple_roles']);
         $this->assertFalse($report['exactly_one_coordinator_and_one_registrar']);

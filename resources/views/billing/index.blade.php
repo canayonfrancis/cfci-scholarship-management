@@ -14,9 +14,9 @@
             <button class="records-button is-primary" type="submit" x-bind:disabled="loading || !!loadError">Filter</button><a class="records-button" href="{{ route('billing-batches.index') }}">Clear</a>
         </form>
     </section>
-    <section class="dashboard-card records-card"><h2>Scholarship budget overview</h2><p>Available budget is an approved planning limit. Remaining budget deducts approved allocations and authorized adjustments; it is not a cash balance.</p><x-allocation-summary :summaries="$summaries" /><div class="records-pagination">{{ $scopes->links() }}</div></section>
+    <section class="dashboard-card records-card"><h2>Scholarship budget overview</h2><p>Available budget is an approved planning limit. Remaining budget deducts approved allocations and authorized adjustments; it is not a cash balance.</p><x-allocation-summary :summaries="$summaries" :paginator="$scopes" /><div class="records-pagination">{{ $scopes->links() }}</div></section>
     <section class="dashboard-card records-card"><h2>Allocation batches</h2>
-        <div class="records-table-wrap"><table class="records-table"><thead><tr><th>Batch</th><th>Program</th><th>Year / semester</th><th>Status</th><th>Scholars</th><th>Prepared total</th></tr></thead><tbody>
+        <div class="records-table-wrap"><x-table-state :paginator="$batches" /><table class="records-table"><thead><tr><th>Batch</th><th>Program</th><th>Year / semester</th><th>Status</th><th>Scholars</th><th>Prepared total</th></tr></thead><tbody>
             @forelse($batches as $batch)<tr><td><a class="records-link" href="{{ route('billing-batches.show', $batch) }}">{{ $batch->batch_number }}</a></td><td>{{ $batch->program->code }}</td><td>{{ $batch->academicPeriod->academic_year }} / {{ $batch->academicPeriod->semester_code }}</td><td>{{ $batch->allocationStatus() === 'submitted' ? 'Awaiting Coordinator approval' : ucfirst($batch->allocationStatus()) }}</td><td>{{ $batch->items_count }}</td><td>{{ $batch->totalAmount() === null ? 'Unconfirmed total' : '₱'.number_format((float) $batch->totalAmount(), 2) }}</td></tr>
             @empty<tr><td colspan="6">No allocation batches match these filters.</td></tr>@endforelse
         </tbody></table></div><div class="records-pagination">{{ $batches->links() }}</div>

@@ -86,7 +86,7 @@ class ScholarshipFundsController extends Controller
         }
 
         return view('billing.report', [
-            'filters' => $filters, 'summaries' => $terms->map(fn ($term) => $summary->forTerms($term)), 'items' => $items->paginate(25)->withQueryString(),
+            'filters' => $filters, 'summaries' => $terms->map(fn ($term) => $summary->forTerms($term)), 'items' => $items->tablePaginate('allocations')->withQueryString(),
             'programs' => ScholarshipProgram::orderBy('code')->get(), 'periods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),
         ]);
     }

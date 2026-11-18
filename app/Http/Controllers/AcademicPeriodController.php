@@ -23,7 +23,7 @@ class AcademicPeriodController extends Controller
         $filters = $request->validate(['academic_year' => ['nullable', 'string', 'max:30']]);
 
         return view('periods.index', [
-            'periods' => AcademicPeriod::when($filters['academic_year'] ?? null, fn ($query, $year) => $query->where('academic_year', $year))->orderByDesc('academic_year')->orderBy('semester_code')->paginate(15)->withQueryString(),
+            'periods' => AcademicPeriod::when($filters['academic_year'] ?? null, fn ($query, $year) => $query->where('academic_year', $year))->orderByDesc('academic_year')->orderBy('semester_code')->tablePaginate('periods')->withQueryString(),
             'years' => AcademicPeriod::distinct()->orderByDesc('academic_year')->pluck('academic_year'), 'filters' => $filters,
             'context' => AcademicValidationContext::current()->load(['activePeriod', 'sourcePeriod']),
             'allPeriods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),
@@ -78,7 +78,7 @@ class AcademicPeriodController extends Controller
     {
         Gate::authorize('view', $period);
 
-        return view('periods.show', ['period' => $period, 'assignments' => $period->startingAssignments()->with(['student', 'program'])->latest('id')->paginate(15)]);
+        return view('periods.show', ['period' => $period, 'assignments' => $period->startingAssignments()->with(['student', 'program'])->latest('id')->tablePaginate('period_assignments')]);
     }
 
     public function edit(AcademicPeriod $period): View

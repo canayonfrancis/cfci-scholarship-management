@@ -32,7 +32,7 @@ class AcademicVerificationController extends Controller
                 ->when($filters['student_id'] ?? null, fn ($q, $value) => $q->where('student_id', $value))
                 ->when($filters['academic_period_id'] ?? null, fn ($q, $value) => $q->where('academic_period_id', $value))
                 ->when($filters['verification_status'] ?? null, fn ($q, $value) => $q->where('verification_status', $value))
-                ->orderByDesc('id')->paginate(15)->withQueryString(),
+                ->orderByDesc('id')->tablePaginate('academic_records')->withQueryString(),
             ...$this->choices(),
         ]);
     }

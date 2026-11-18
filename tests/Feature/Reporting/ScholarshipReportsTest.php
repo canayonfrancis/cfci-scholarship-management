@@ -316,8 +316,8 @@ class ScholarshipReportsTest extends TestCase
     {
         $g = $this->submission(26);
         $g['student']->update(['first_name' => '=REPORT-FORMULA']);
-        $this->actingAs($g['recorder'])->get($this->url('billed', ['page' => 2]))->assertOk()
-            ->assertViewHas('rows', fn ($rows) => $rows->count() === 1)
+        $this->actingAs($g['recorder'])->get($this->url('billed', ['page' => 3]))->assertOk()
+            ->assertViewHas('rows', fn ($rows) => $rows->count() === 6)
             ->assertViewHas('result', fn ($r) => $r['counts']['rows'] === 26 && $r['totals']['Total billing amount (original PHP)'] === '195006.50');
         $this->get($this->url('billed', ['format' => 'print']))->assertOk()->assertSee('195006.50')->assertSee('=REPORT-FORMULA');
         $csv = $this->get($this->url('billed', ['format' => 'csv']))->assertOk()->assertHeader('Cache-Control', 'no-store, private')->streamedContent();

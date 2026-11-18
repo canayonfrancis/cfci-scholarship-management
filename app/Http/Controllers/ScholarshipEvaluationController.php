@@ -39,7 +39,7 @@ class ScholarshipEvaluationController extends Controller
         return view('evaluations.index', [
             'applications' => ScholarshipApplication::with(['student', 'program', 'academicPeriod', 'evaluationRuns' => fn ($q) => $q->orderByDesc('run_number')])
                 ->when($filters['program_id'] ?? null, fn ($q, $id) => $q->where('program_id', $id))
-                ->when($filters['academic_period_id'] ?? null, fn ($q, $id) => $q->where('academic_period_id', $id))->latest('id')->paginate(15)->withQueryString(),
+                ->when($filters['academic_period_id'] ?? null, fn ($q, $id) => $q->where('academic_period_id', $id))->latest('id')->tablePaginate('evaluations')->withQueryString(),
             ...$this->choices(),
         ]);
     }

@@ -168,13 +168,14 @@
                 <div x-cloak x-show="tableState === 'error'" class="dashboard-error"><p>Unable to load recent validations.</p><button type="button" @click="tableState = 'ready'"><x-dashboard-icon name="reload" :size="15" /> Retry</button></div>
                 @if (!auth()->user()->can('viewAny', \App\Models\ScholarshipApplication::class))
                     <p class="record-help">Detailed academic evaluations are restricted to authorized Registrar and Coordinator accounts. Aggregate counts remain visible above.</p>
-                @elseif (count($recentApplications))
+                @elseif (count($recentApplications) || request()->has('tables.dashboard_validations'))
                     <div class="table-wrap" x-show="tableState === 'ready'" tabindex="0" role="region" aria-label="Recent validations table, scroll horizontally for more columns">
+                        <x-table-state :paginator="$recentApplications" />
                         <table class="recent-validations-table">
-                            <caption class="sr-only">Five most recently recorded semester checks</caption>
+                            <caption class="sr-only">Semester checks, newest first</caption>
                             <thead><tr><th scope="col">Student ID</th><th scope="col">Name</th><th scope="col">Program</th><th scope="col">Status</th><th scope="col">Date Recorded</th><th scope="col">View</th></tr></thead>
                             <tbody>
-                                @foreach ($recentApplications as $application)
+                                @forelse ($recentApplications as $application)
                                     <tr tabindex="0">
                                         <td data-label="#">{{ $application['id'] }}</td>
                                         <td data-label="Name"><span class="applicant"><i>{{ $application['initials'] }}</i><span class="scholar-name">{{ $application['name'] }}</span></span></td>
@@ -185,10 +186,13 @@
                                             <a class="ellipsis-button" href="{{ $application['url'] }}" aria-label="View validation for {{ $application['name'] }}" title="View validation"><x-dashboard-icon name="eye" :size="19" /></a>
                                         </td>
                                     </tr>
-                                @endforeach
+                                @empty
+                                    <tr><td colspan="6">No validations match these column filters.</td></tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
+                    <div class="records-pagination">{{ $recentApplications->links() }}</div>
                 @else
                     <x-dashboard-empty />
                 @endif

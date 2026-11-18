@@ -30,6 +30,15 @@ return [
 
     'disks' => [
 
+        'scholar-imports' => [
+            'driver' => 'local',
+            'root' => storage_path('app/scholar-imports-private'),
+            'visibility' => 'private',
+            'directory_visibility' => 'private',
+            'serve' => false,
+            'throw' => true,
+        ],
+
         'scholarship' => [
             'driver' => 'local',
             'root' => storage_path('app/scholarship-private'),

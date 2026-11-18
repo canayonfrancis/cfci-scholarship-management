@@ -1,9 +1,9 @@
-@props(['title', 'description' => ''])
+@props(['title', 'description' => '', 'eyebrow' => 'Scholarship administration'])
 
 <x-app-layout>
     <div class="dashboard-page records-page">
         <div class="records-heading">
-            <div><p class="records-eyebrow">Scholarship administration</p><h1>{{ $title }}</h1>@if($description)<p>{{ $description }}</p>@endif</div>
+            <div><p class="records-eyebrow">{{ $eyebrow }}</p><h1>{{ $title }}</h1>@if($description)<p>{{ $description }}</p>@endif</div>
             <div class="records-actions">{{ $actions ?? '' }}</div>
         </div>
         @if(session('status'))<div class="records-notice" role="status">{{ session('status') }}</div>@endif

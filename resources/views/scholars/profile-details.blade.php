@@ -34,7 +34,7 @@
         <section class="dashboard-card records-card">
             <h2 class="records-section-title">{{ $section }}</h2>
             <dl class="records-details">@foreach($sections[$section] as $label => $value)<div><dt>{{ $label }}</dt><dd>{{ $value === null || $value === '' ? 'Not provided' : $value }}</dd></div>@endforeach</dl>
-            @if($section === 'Academic Information')<p class="record-help">Current administrative profile. Registrar-certified semester records are maintained in academic history below.</p>@endif
+            @if($section === 'Academic Information' && ($showAcademicHistoryHelp ?? true))<p class="record-help">Current administrative profile. Registrar-certified semester records are maintained in academic history below.</p>@endif
         </section>
     @endif
 @endforeach

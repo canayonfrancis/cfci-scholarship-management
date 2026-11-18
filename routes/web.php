@@ -10,12 +10,16 @@ use App\Http\Controllers\PaymentAcknowledgmentController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScholarController;
+use App\Http\Controllers\ScholarImportController;
 use App\Http\Controllers\ScholarshipAssignmentController;
 use App\Http\Controllers\ScholarshipBatchController;
 use App\Http\Controllers\ScholarshipEvaluationController;
 use App\Http\Controllers\ScholarshipFundsController;
 use App\Http\Controllers\ScholarshipProgramController;
 use App\Http\Controllers\ScholarshipReportController;
+use App\Http\Controllers\StudentAccountController;
+use App\Http\Controllers\StudentProfileController;
+use App\Http\Middleware\ConfirmStudentAccountPassword;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -25,6 +29,33 @@ Route::get('/dashboard', DashboardController::class)
     ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::prefix('student-accounts')->name('student-accounts.')
+        ->middleware(['can:student-accounts.provision', 'cache.headers:no_store;private'])->group(function () {
+            Route::get('/', [StudentAccountController::class, 'index'])->name('index');
+            Route::get('{student}/confirm', [StudentAccountController::class, 'confirm'])
+                ->middleware(ConfirmStudentAccountPassword::class)->name('confirm');
+            Route::get('{student}', [StudentAccountController::class, 'show'])->name('show');
+            Route::post('{student}/create', [StudentAccountController::class, 'createAccount'])
+                ->middleware([ConfirmStudentAccountPassword::class, 'throttle:student-account-links'])->name('create');
+            Route::post('{student}/initial-password', [StudentAccountController::class, 'setInitialPassword'])
+                ->middleware([ConfirmStudentAccountPassword::class, 'throttle:student-account-links'])->name('initial-password');
+            foreach (['deactivate', 'reactivate'] as $action) {
+                Route::patch('{student}/'.$action, [StudentAccountController::class, $action])
+                    ->middleware([ConfirmStudentAccountPassword::class, 'throttle:student-account-links'])->name($action);
+            }
+            foreach (['setup-link', 'password-reset'] as $action) {
+                Route::post('{student}/'.$action, [StudentAccountController::class, 'credentialLink'])
+                    ->middleware([ConfirmStudentAccountPassword::class, 'throttle:student-account-links'])->name($action);
+            }
+        });
+
+    Route::get('student/profile', [StudentProfileController::class, 'show'])
+        ->middleware('cache.headers:no_store;private')->name('student.profile');
+    Route::get('student/profile/edit', [StudentProfileController::class, 'edit'])
+        ->middleware('cache.headers:no_store;private')->name('student.profile.edit');
+    Route::patch('student/profile', [StudentProfileController::class, 'update'])
+        ->middleware(['cache.headers:no_store;private', 'throttle:20,1'])->name('student.profile.update');
+
     Route::get('scholarship-reports/{report?}', [ScholarshipReportController::class, 'index'])->middleware('cache.headers:no_store;private')->name('scholarship-reports.index');
     Route::resource('scholarship-batches', ScholarshipBatchController::class)->parameters(['scholarship-batches' => 'batch'])->only(['index', 'store', 'show'])->middleware('cache.headers:no_store;private');
     Route::post('scholars/{scholar}/batch-memberships', [ScholarshipBatchController::class, 'join'])->name('scholars.batch-memberships.store');
@@ -85,7 +116,17 @@ Route::middleware('auth')->group(function () {
     Route::post('academic-verifications/{verification}/correction', [AcademicVerificationController::class, 'correct'])->name('academic-verifications.correct');
     Route::get('academic-verifications/{verification}/certificates/{document}', [AcademicVerificationController::class, 'certificate'])->name('academic-verifications.certificate');
     Route::resource('academic-verifications', AcademicVerificationController::class)->parameters(['academic-verifications' => 'verification'])->except('destroy');
-    Route::resource('scholars', ScholarController::class)->except('destroy')->middleware('cache.headers:no_store;private');
+    Route::prefix('scholars/bulk-upload')->name('scholars.imports.')
+        ->middleware(['can:create,App\Models\Student', 'cache.headers:no_store;private'])
+        ->controller(ScholarImportController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('template', 'template')->middleware('throttle:20,1')->name('template');
+            Route::post('preview', 'preview')->middleware('throttle:6,1')->name('preview');
+            Route::get('{import}', 'show')->whereUuid('import')->name('show');
+            Route::post('{import}/confirm', 'confirm')->whereUuid('import')->middleware('throttle:10,1')->name('confirm');
+            Route::delete('{import}', 'cancel')->whereUuid('import')->name('cancel');
+        });
+    Route::resource('scholars', ScholarController::class)->only(['index', 'show', 'edit', 'update'])->middleware('cache.headers:no_store;private');
     Route::resource('scholarship-programs', ScholarshipProgramController::class)->parameters(['scholarship-programs' => 'program'])->except('destroy');
     Route::resource('academic-periods', AcademicPeriodController::class)->parameters(['academic-periods' => 'period'])->except('destroy');
     Route::scopeBindings()->group(function () {
@@ -94,9 +135,11 @@ Route::middleware('auth')->group(function () {
         Route::get('scholars/{scholar}/assignments/{assignment}/edit', [ScholarshipAssignmentController::class, 'edit'])->name('scholars.assignments.edit');
         Route::patch('scholars/{scholar}/assignments/{assignment}', [ScholarshipAssignmentController::class, 'update'])->name('scholars.assignments.update');
     });
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::middleware('can:account-settings')->group(function () {
+        Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+        Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    });
 });
 
 require __DIR__.'/auth.php';

@@ -23,7 +23,7 @@ class AuditStaffAccess extends Command
             $multiple = User::has('roles', '>', 1)->count();
             $technical = $roles->only(User::TECHNICAL_ROLES)->all();
             $legacy = $roles->except([...User::OPERATIONAL_ROLES, ...User::TECHNICAL_ROLES])->only(User::STAFF_ROLES)->all();
-            $unexpected = $roles->except(User::STAFF_ROLES)->all();
+            $unexpected = $roles->except([...User::STAFF_ROLES, User::STUDENT_ROLE])->all();
 
             return [
                 'connection' => DB::getDriverName(),
@@ -35,6 +35,8 @@ class AuditStaffAccess extends Command
                 'active_account_status' => 'Not modeled: users has no activation or deactivation field',
                 'operational_roles' => User::OPERATIONAL_ROLES,
                 'accounts_by_role' => $counts,
+                'student_accounts' => $roles->get(User::STUDENT_ROLE, 0),
+                'student_accounts_without_profile' => User::whereHas('roles', fn ($query) => $query->where('role', User::STUDENT_ROLE))->doesntHave('student')->count(),
                 'non_operational_roles' => (object) $roles->except(User::OPERATIONAL_ROLES)->all(),
                 'approved_technical_roles' => (object) $technical,
                 'legacy_roles_pending_review' => (object) $legacy,

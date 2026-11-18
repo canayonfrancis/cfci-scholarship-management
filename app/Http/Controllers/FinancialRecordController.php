@@ -16,9 +16,9 @@ use App\Services\Billing\BatchFundingStatus;
 use App\Services\Billing\FinancialEvidence;
 use App\Services\Billing\LiquidationSummary;
 use App\Services\Billing\Money;
+use App\Support\TablePagination;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -36,13 +36,11 @@ class FinancialRecordController extends Controller
         if (filled($filters['stage'] ?? null)) {
             $rows = $rows->where('state', $filters['stage'])->values();
         }
-        $page = LengthAwarePaginator::resolveCurrentPage();
-        $total = $rows->count();
         $shortfall = $rows->where('state', 'awaiting_funds')->sum(fn ($row) => Money::cents($row['shortfall']));
 
         return view('financial.funding-status', [
             'filters' => $filters, 'stages' => BatchFundingStatus::LABELS,
-            'rows' => (new LengthAwarePaginator($rows->forPage($page, 25)->values(), $total, 25, $page, ['path' => $request->url()]))->withQueryString(),
+            'rows' => TablePagination::collection($rows, 'funding_status'),
             'shortfall' => Money::decimal($shortfall),
             'terms' => ProgramPeriodTerm::with(['program', 'academicPeriod'])->orderByDesc('academic_period_id')->get(),
         ]);
@@ -57,8 +55,8 @@ class FinancialRecordController extends Controller
         return view('financial.index', [
             'filters' => $filters,
             'terms' => ProgramPeriodTerm::with(['program', 'academicPeriod'])->orderByDesc('academic_period_id')->get(),
-            'batches' => BillingBatch::with(['program', 'academicPeriod', 'approval'])->whereIn('status', ['submitted', 'finalized'])->when($scope, fn ($q) => $q->where('program_period_term_id', $scope))->orderByDesc('id')->paginate(15, ['*'], 'batch_page')->withQueryString(),
-            'receipts' => FundingReceipt::with(['program', 'academicPeriod'])->when($scope, fn ($q) => $q->where('program_period_term_id', $scope))->orderByDesc('id')->paginate(15, ['*'], 'receipt_page')->withQueryString(),
+            'batches' => BillingBatch::with(['program', 'academicPeriod', 'approval'])->whereIn('status', ['submitted', 'finalized'])->when($scope, fn ($q) => $q->where('program_period_term_id', $scope))->orderByDesc('id')->tablePaginate('financial_batches', 'batch_page')->withQueryString(),
+            'receipts' => FundingReceipt::with(['program', 'academicPeriod'])->when($scope, fn ($q) => $q->where('program_period_term_id', $scope))->orderByDesc('id')->tablePaginate('receipts', 'receipt_page')->withQueryString(),
         ]);
     }
 

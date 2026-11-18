@@ -9,9 +9,12 @@
         <button class="nav-scroll-button is-left" type="button" x-cloak x-show="canScrollLeft" x-transition.opacity.duration.150ms :disabled="!canScrollLeft" @click="scrollNavigation(-1)" aria-label="Scroll navigation left" aria-controls="primary-navigation"><x-dashboard-icon name="chevron-right" :size="20" /></button>
         <nav id="primary-navigation" class="desktop-nav" x-ref="navigation" aria-label="Primary navigation" tabindex="0" @scroll.passive="updateScrollEdges()">
             @php
-                $navItems = [
+                $navItems = auth()->user()->isStudentOnly() ? [] : [
                     ['Dashboard', 'home', route('dashboard'), request()->routeIs('dashboard')],
                 ];
+                if (auth()->user()->can('viewSelf', \App\Models\Student::class)) {
+                    $navItems[] = ['My profile', 'user', route('student.profile'), request()->routeIs('student.profile')];
+                }
                 if (auth()->user()->can('viewAny', \App\Models\ScholarshipApplication::class)) {
                     $navItems[] = ['Evaluations', 'clipboard', route('evaluations.index'), request()->routeIs('evaluations.*')];
                 }
@@ -20,6 +23,9 @@
                 }
                 if (auth()->user()->can('viewAny', \App\Models\Student::class)) {
                     $navItems[] = ['Scholars', 'users', route('scholars.index'), request()->routeIs('scholars.*')];
+                }
+                if (auth()->user()->can('student-accounts.provision')) {
+                    $navItems[] = ['Student accounts', 'user', route('student-accounts.index'), request()->routeIs('student-accounts.*')];
                 }
                 if (auth()->user()->can('viewAny', \App\Models\ScholarshipProgram::class)) {
                     $navItems[] = ['Scholarship programs', 'graduation-cap', route('scholarship-programs.index'), request()->routeIs('scholarship-programs.*')];
@@ -38,6 +44,7 @@
                     'coordinator' => 'School Scholarship Coordinator',
                     'registrar' => 'Registrar Staff',
                     'administrator' => 'Test Administrator',
+                    'student' => 'Student',
                     default => in_array($role, \App\Models\User::STAFF_ROLES, true) ? Str::headline($role).' (legacy; review required)' : 'Unrecognized role',
                 });
                 $initials = Str::of(auth()->user()->name)->trim()->explode(' ')->filter()->take(2)->map(fn ($part) => Str::upper(Str::substr($part, 0, 1)))->implode('');
@@ -55,11 +62,12 @@
             <div class="profile-wrap">
                 <button class="profile-button" type="button" @click="profileOpen = !profileOpen" :aria-expanded="profileOpen" aria-label="Open user menu">
                     <span class="avatar" aria-hidden="true">{{ $initials }}</span>
-                    <span class="profile-copy"><strong>{{ Auth::user()->name }}</strong><small>{{ $roleLabels->isNotEmpty() ? $roleLabels->implode(', ') : 'No staff role assigned' }}</small></span>
+                    <span class="profile-copy"><strong>{{ Auth::user()->name }}</strong><small>{{ $roleLabels->isNotEmpty() ? $roleLabels->implode(', ') : 'No role assigned' }}</small></span>
                     <x-dashboard-icon name="chevron-down" :size="17" />
                 </button>
                 <div class="popover profile-popover" x-cloak x-show="profileOpen" x-transition @click.outside="profileOpen = false">
-                    <a href="{{ route('profile.edit') }}">Profile &amp; settings</a>
+                    @can('viewSelf', \App\Models\Student::class)<a href="{{ route('student.profile') }}">My student profile</a>@endcan
+                    @can('account-settings')<a href="{{ route('profile.edit') }}">Profile &amp; settings</a>@endcan
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit">Log out</button>
@@ -80,6 +88,6 @@
                 <x-dashboard-icon :name="$icon" :size="19" /><span>{{ $label }}</span>
             </a>
         @endforeach
-        <a href="{{ route('profile.edit') }}" class="nav-item"><x-dashboard-icon name="settings" :size="19" /><span>Settings</span></a>
+        @can('account-settings')<a href="{{ route('profile.edit') }}" class="nav-item"><x-dashboard-icon name="settings" :size="19" /><span>Settings</span></a>@endcan
     </nav>
 </header>

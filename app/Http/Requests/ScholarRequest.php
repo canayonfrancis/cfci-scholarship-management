@@ -15,7 +15,7 @@ class ScholarRequest extends FormRequest
     {
         $scholar = $this->route('scholar');
 
-        return $scholar instanceof Student ? Gate::allows('update', $scholar) : Gate::allows('create', Student::class);
+        return $scholar instanceof Student && Gate::allows('update', $scholar);
     }
 
     protected function prepareForValidation(): void

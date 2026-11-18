@@ -37,6 +37,21 @@ return [
 
     'mailers' => [
 
+        'student_accounts' => [
+            'transport' => 'smtp',
+            'scheme' => env('STUDENT_MAIL_SCHEME', 'smtp'),
+            'host' => env('STUDENT_MAIL_HOST'),
+            'port' => env('STUDENT_MAIL_PORT', 587),
+            'username' => env('STUDENT_MAIL_USERNAME'),
+            'password' => env('STUDENT_MAIL_PASSWORD'),
+            'require_tls' => true,
+            'timeout' => 15,
+            'from' => [
+                'address' => env('STUDENT_MAIL_FROM_ADDRESS'),
+                'name' => env('STUDENT_MAIL_FROM_NAME', env('APP_NAME', 'Scholarship Management')),
+            ],
+        ],
+
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),

@@ -1,5 +1,5 @@
-@props(['summaries'])
-<div class="records-table-wrap"><table class="records-table"><caption class="sr-only">Scholarship fund and budget summary in Philippine pesos</caption><thead><tr><th>Program / semester</th><th>Approved budget</th><th>Approved allocations</th><th>Remaining budget</th><th>Awaiting approval</th><th>Actually received</th><th>Net cash released</th></tr></thead><tbody>
+@props(['summaries', 'paginator' => null])
+<div class="records-table-wrap"><x-table-state :paginator="$paginator" /><table class="records-table"><caption class="sr-only">Scholarship fund and budget summary in Philippine pesos</caption><thead><tr><th>Program / semester</th><th>Approved budget</th><th>Approved allocations</th><th>Remaining budget</th><th>Awaiting approval</th><th>Actually received</th><th>Net cash released</th></tr></thead><tbody>
 @forelse($summaries as $summary)
     <tr><td>{{ $summary['terms']->program->code }}<small class="records-muted">{{ $summary['terms']->academicPeriod->academic_year }} / Semester {{ $summary['terms']->academicPeriod->semester_code }}</small></td>
         <td>{{ $summary['budget'] ? '₱'.number_format((float) $summary['budget']->amount, 2) : 'Unconfigured' }}</td>

@@ -41,9 +41,9 @@ class BillingBatchController extends Controller
             ->when($filters['program_id'] ?? null, fn ($q, $value) => $q->where('program_id', $value))
             ->when($filters['academic_period_id'] ?? null, fn ($q, $value) => $q->where('academic_period_id', $value))
             ->when($filters['academic_year'] ?? null, fn ($q, $year) => $q->whereHas('academicPeriod', fn ($q) => $q->where('academic_year', $year)))
-            ->orderByDesc('academic_period_id')->orderBy('program_id')->paginate(10, ['*'], 'scopes')->withQueryString();
+            ->orderByDesc('academic_period_id')->orderBy('program_id')->tablePaginate('budget_scopes', 'scopes')->withQueryString();
 
-        return view('billing.index', ['batches' => $query->latest('id')->paginate(15)->withQueryString(), 'batchOptions' => $options->forScope($filters), 'filters' => $filters, 'scopes' => $scopes, 'summaries' => $scopes->map(fn ($terms) => $summary->forTerms($terms)), ...$this->choices()]);
+        return view('billing.index', ['batches' => $query->latest('id')->tablePaginate('billing_batches')->withQueryString(), 'batchOptions' => $options->forScope($filters), 'filters' => $filters, 'scopes' => $scopes, 'summaries' => $scopes->map(fn ($terms) => $summary->forTerms($terms)), ...$this->choices()]);
     }
 
     public function options(Request $request, BillingBatchOptions $options): JsonResponse
@@ -93,8 +93,7 @@ class BillingBatchController extends Controller
                 $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], trim($search['q'])).'%';
                 $query->whereHas('student', fn ($query) => $query->whereRaw("student_number LIKE ? ESCAPE '!'", [$term])->orWhereRaw("first_name LIKE ? ESCAPE '!'", [$term])->orWhereRaw("last_name LIKE ? ESCAPE '!'", [$term]));
             }
-            $candidates = $query->orderBy('student_id')->paginate(15, ['*'], 'candidates')->withQueryString();
-            $candidates->getCollection()->transform(function ($application) use ($eligibility, $batch) {
+            $candidates = $query->orderBy('student_id')->tablePaginate('candidates', 'candidates', function ($application) use ($eligibility, $batch) {
                 try {
                     $eligibility->basis($application, $batch->terms, $batch->appliedRate());
                     $reason = null;
@@ -106,7 +105,7 @@ class BillingBatchController extends Controller
             });
         }
 
-        return view('billing.show', ['batch' => $batch, 'items' => $batch->items()->with(['student', 'adjustments.authorizedBy'])->orderBy('id')->paginate(25), 'candidates' => $candidates, 'search' => $search]);
+        return view('billing.show', ['batch' => $batch, 'items' => $batch->items()->with(['student', 'adjustments.authorizedBy'])->orderBy('id')->tablePaginate('billing_items'), 'candidates' => $candidates, 'search' => $search]);
     }
 
     public function update(Request $request, BillingBatch $batch, ManageBillingBatch $manage): RedirectResponse

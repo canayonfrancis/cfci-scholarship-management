@@ -7,8 +7,8 @@ use App\Models\BillingBatch;
 use App\Models\ScholarshipBatch;
 use App\Models\ScholarshipProgram;
 use App\Services\Reporting\ScholarshipReports;
+use App\Support\TablePagination;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -42,11 +42,10 @@ class ScholarshipReportController extends Controller
         if (($filters['format'] ?? null) === 'print') {
             return view('scholarship-reports.print', ['result' => $result]);
         }
-        $page = (int) ($filters['page'] ?? 1);
 
         return view('scholarship-reports.index', [
             'result' => $result, 'titles' => ScholarshipReports::TITLES,
-            'rows' => (new LengthAwarePaginator($result['rows']->forPage($page, 25)->values(), $result['counts']['rows'], 25, $page, ['path' => $request->url()]))->withQueryString(),
+            'rows' => TablePagination::collection($result['rows'], 'report_rows', columns: fn ($row) => array_map(fn ($key) => $row[$key] ?? 'Unconfirmed', array_keys($result['columns']))),
             'programs' => ScholarshipProgram::orderBy('code')->get(), 'rosters' => ScholarshipBatch::with(['program', 'academicPeriod'])->orderBy('program_id')->orderBy('batch_number')->get(),
             'billings' => $roster ? collect() : BillingBatch::with(['program', 'academicPeriod'])->orderByDesc('id')->get(),
             'periods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),

@@ -164,8 +164,8 @@ class ScholarRecordsTest extends TestCase
             Student::create($this->scholarData(['student_number' => 'CFC-'.$i, 'first_name' => 'Group', 'last_name' => sprintf('Scholar%02d', $i)]));
         }
         $this->actingAs($this->staff('viewer'));
-        $this->get(route('scholars.index', ['q' => 'Group', 'record_status' => 'active']))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->count() === 15 && $rows->total() === 17)->assertSee('q=Group', false);
-        $this->get(route('scholars.index', ['q' => 'Group', 'record_status' => 'active', 'page' => 2]))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->count() === 2);
+        $this->get(route('scholars.index', ['q' => 'Group', 'record_status' => 'active']))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->count() === 10 && $rows->total() === 17)->assertSee('q=Group', false);
+        $this->get(route('scholars.index', ['q' => 'Group', 'record_status' => 'active', 'page' => 2]))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->count() === 7);
         $this->get(route('scholars.index', ['record_status' => 'archived']))->assertOk()->assertSeeText('Ana Dela Cruz')->assertDontSeeText('Group Dela');
     }
 
@@ -214,10 +214,10 @@ class ScholarRecordsTest extends TestCase
         $filters = ['academic_year' => '2026-2027', 'q' => 'Group', 'record_status' => 'active', 'program_id' => $g['program']->id];
         $this->actingAs($this->staff('administrator'));
         $this->get(route('scholars.index', $filters))->assertOk()
-            ->assertViewHas('scholars', fn ($rows) => $rows->total() === 17 && $rows->modelKeys() === array_slice($matching, 0, 15))
+            ->assertViewHas('scholars', fn ($rows) => $rows->total() === 17 && $rows->modelKeys() === array_slice($matching, 0, 10))
             ->assertViewHas('filters', $filters)->assertSee('academic_year=2026-2027', false);
         $this->get(route('scholars.index', $filters + ['page' => 2]))->assertOk()
-            ->assertViewHas('scholars', fn ($rows) => $rows->total() === 17 && $rows->modelKeys() === array_slice($matching, 15));
+            ->assertViewHas('scholars', fn ($rows) => $rows->total() === 17 && $rows->modelKeys() === array_slice($matching, 10));
         $this->get(route('scholars.index', ['academic_year' => '2026-2027', 'record_status' => 'archived']))->assertOk()->assertViewHas('scholars', fn ($rows) => $rows->total() === 1 && $rows->first()->student_number === 'YEAR-GROUP-ARCHIVED');
     }
 

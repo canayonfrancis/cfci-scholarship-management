@@ -28,7 +28,7 @@ class ScholarshipProgramController extends Controller
             $query->where(fn ($query) => $query->whereRaw("code LIKE ? ESCAPE '!'", [$term])->orWhereRaw("name LIKE ? ESCAPE '!'", [$term]));
         }
 
-        return view('programs.index', ['programs' => $query->orderBy('code')->paginate(15)->withQueryString(), 'filters' => $filters]);
+        return view('programs.index', ['programs' => $query->orderBy('code')->tablePaginate('programs')->withQueryString(), 'filters' => $filters]);
     }
 
     public function create(Request $request, BillingBatchOptions $options): View
@@ -60,7 +60,7 @@ class ScholarshipProgramController extends Controller
     {
         Gate::authorize('view', $program);
 
-        return view('programs.show', ['program' => $program, 'assignments' => $program->assignments()->with(['student', 'startPeriod'])->latest('id')->paginate(15)]);
+        return view('programs.show', ['program' => $program, 'assignments' => $program->assignments()->with(['student', 'startPeriod'])->latest('id')->tablePaginate('program_assignments')]);
     }
 
     public function edit(Request $request, ScholarshipProgram $program, BillingBatchOptions $options): View

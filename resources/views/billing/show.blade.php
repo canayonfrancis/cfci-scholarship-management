@@ -27,7 +27,7 @@
         </form></section>
     @endcan
     <section class="dashboard-card records-card"><h2>Scholar allocation items</h2>
-        <div class="records-table-wrap"><table class="records-table"><thead><tr><th>Student number</th><th>Scholar</th><th>Semester amount</th><th>Validation / approval</th><th>Item status</th><th>Actions</th></tr></thead><tbody>
+        <div class="records-table-wrap"><x-table-state :paginator="$items" /><table class="records-table"><thead><tr><th>Student number</th><th>Scholar</th><th>Semester amount</th><th>Validation / approval</th><th>Item status</th><th>Actions</th></tr></thead><tbody>
             @forelse($items as $item)<tr><td>{{ $item->student->student_number }}</td><td>{{ $item->student->full_name }}</td><td>{{ $item->gross_amount === null ? 'Unconfirmed' : '₱'.number_format((float) $item->gross_amount, 2) }}</td><td>Validation #{{ $item->evaluation_run_id }} / Approval #{{ $item->external_approval_id }}</td><td>{{ ucfirst($item->status) }}</td><td>@can('update', $batch)<form method="POST" action="{{ route('billing-batches.items.destroy', [$batch, $item]) }}">@csrf @method('DELETE')<input type="hidden" name="lock_version" value="{{ $batch->lock_version }}"><button class="records-button" type="submit">Remove draft item</button></form>@endcan</td></tr>
             @empty<tr><td colspan="6">No scholars added to this allocation batch.</td></tr>@endforelse
         </tbody></table></div><div class="records-pagination">{{ $items->links() }}</div>
@@ -35,7 +35,7 @@
     @can('update', $batch)
         <section class="dashboard-card records-card"><h2>Add an individual scholar</h2><p>Only active, validated and verified scholars with a semester rate can be added. A reservation in any program prevents another allocation for this scholar and semester.</p>
             <form class="records-filters" method="GET" action="{{ route('billing-batches.show', $batch) }}"><x-record-field name="q" label="Find scholar by name or student number" :value="$search['q'] ?? ''" maxlength="100" /><button class="records-button" type="submit">Search</button></form>
-            <div class="records-table-wrap"><table class="records-table"><thead><tr><th>Student number</th><th>Scholar</th><th>Allocation eligibility</th><th>Action</th></tr></thead><tbody>
+            <div class="records-table-wrap"><x-table-state :paginator="$candidates" /><table class="records-table"><thead><tr><th>Student number</th><th>Scholar</th><th>Allocation eligibility</th><th>Action</th></tr></thead><tbody>
                 @forelse($candidates as $candidate)@php($application = $candidate['application'])<tr><td>{{ $application->student->student_number }}</td><td>{{ $application->student->full_name }}</td><td>{{ $candidate['reason'] ?? 'Permitted under the confirmed billing policy' }}</td><td>@if(!$candidate['reason'])<form method="POST" action="{{ route('billing-batches.items.store', $batch) }}">@csrf<input type="hidden" name="lock_version" value="{{ $batch->lock_version }}"><input type="hidden" name="application_id" value="{{ $application->id }}"><button class="records-button is-primary" type="submit">Add scholar</button></form>@endif</td></tr>
                 @empty<tr><td colspan="4">No unbilled semester validations match this search.</td></tr>@endforelse
             </tbody></table></div>@if($candidates instanceof \Illuminate\Contracts\Pagination\Paginator)<div class="records-pagination">{{ $candidates->links() }}</div>@endif

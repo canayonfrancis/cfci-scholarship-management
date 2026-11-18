@@ -8,11 +8,11 @@
 
 1. Open **Scholars** and search by Student ID, name or email before adding a record.
 2. If the person already exists, open **View** and use **Edit record** as needed. Reuse the same profile for later semesters and scholarship changes.
-3. If the person is new, select **Add scholar**.
-4. Enter the minimum required fields: **Student ID**, **Given name**, **Last name**, and **Record status**. Use the real institutional Student ID; duplicate IDs are rejected. Choose **Active** for a current profile. This is an administrative profile status, not an active scholarship.
-5. Complete the available personal, academic, contact, family, address and other requested profile information using actual records. Unknown optional values may remain blank; do not invent values to complete the form.
-6. Select the registered **academic program/course**, year level and actual academic year/semester when known. The academic course is separate from the scholarship program selected later. A Coordinator can use **Manage registered academic programs** if a course is missing. Load new courses before entering unsaved details, or save the basic profile first and complete its course through Edit record afterward.
-7. Select **Add scholar**. On the scholar detail page, review the profile and its completeness status. The app can save a basic profile that is not yet officially complete; completeness itself does not grant eligibility.
+3. If the person is new, select **Bulk Upload**, then **Download Template**. Follow [the bulk-upload guide](../16-bulk-scholar-upload-implementation.md).
+4. Fill the exact template columns: Student ID, Last Name, First Name, Middle Name, EXT, Sex, Course, Year Level, Email, Contact. Middle Name may be blank; EXT is optional. Use existing active course names and preserve IDs/contact numbers as Text.
+5. Upload the .xlsx or UTF-8 .csv file and select **Preview**. Correct every invalid or duplicate row, then upload the corrected file. Preview saves no scholar records.
+6. Review the valid preview, check the confirmation box and select **Confirm Import**. All new profiles are saved together with active administrative record status. No academic semester, scholarship assignment, enrollment verification or login account is created.
+7. Open the imported scholar through **View** and use **Edit record** to complete other known personal, family, address and academic-period fields. Unknown optional information remains blank. Profile completeness itself does not grant eligibility.
 
 The directory's **Academic year** filter matches the scholar's current profile period, not every year in scholarship history. **Active scholarship** filters active assignments only. When searching for a newly added or pending scholar, clear those filters if necessary before assuming the person is missing.
 

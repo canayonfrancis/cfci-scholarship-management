@@ -6,7 +6,7 @@
             <x-record-field name="academic_period_id" label="Academic year / semester" type="select"><option value="">All periods</option>@foreach($periods as $period)<option value="{{ $period->id }}" @selected(($filters['academic_period_id'] ?? '') == $period->id)>{{ $period->academic_year }} / {{ $period->semester_code }}</option>@endforeach</x-record-field>
             <button class="records-button" type="submit">Filter</button>
         </form>
-        <div class="records-table-wrap"><table class="records-table"><thead><tr><th>Roster batch</th><th>Program</th><th>Academic year / semester</th><th>Members</th></tr></thead><tbody>
+        <div class="records-table-wrap"><x-table-state :paginator="$batches" /><table class="records-table"><thead><tr><th>Roster batch</th><th>Program</th><th>Academic year / semester</th><th>Members</th></tr></thead><tbody>
             @forelse($batches as $batch)<tr><td><a class="records-link" href="{{ route('scholarship-batches.show', $batch) }}">{{ $batch->batch_number }}</a></td><td>{{ $batch->program->code }}</td><td>{{ $batch->academicPeriod->academic_year }} / {{ $batch->academicPeriod->semester_code }}</td><td>{{ $batch->memberships_count }}</td></tr>@empty<tr><td colspan="4">No semester rosters match this scope.</td></tr>@endforelse
         </tbody></table></div><div class="records-pagination">{{ $batches->links() }}</div>
     </section>

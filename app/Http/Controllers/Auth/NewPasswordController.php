@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Accounts\StudentCredentials;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Accounts\StudentAccess;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,10 +34,24 @@ class NewPasswordController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'token' => ['required'],
+            'token' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
+
+        $target = User::where('email', $request->email)->first();
+        if ($target && app(StudentAccess::class)->usesStudentCredentials($target)) {
+            try {
+                $status = app(StudentCredentials::class)->reset($request->only('email', 'password', 'password_confirmation', 'token'));
+            } catch (\Throwable) {
+                report(new \RuntimeException('Student credential reset failed; no credential details were recorded.'));
+                $status = Password::INVALID_TOKEN;
+            }
+
+            return $status === Password::PASSWORD_RESET
+                ? redirect()->route('login')->with('status', __($status))
+                : back()->withInput($request->only('email'))->withErrors(['email' => __(Password::INVALID_TOKEN)]);
+        }
 
         // Here we will attempt to reset the user's password. If it is successful we
         // will update the password on an actual user model and persist it to the

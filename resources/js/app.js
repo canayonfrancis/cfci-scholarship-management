@@ -2,6 +2,7 @@ import './bootstrap';
 
 import Alpine from 'alpinejs';
 import billingBatchFilter from './billing-batch-filter';
+import initializeDataTables from './data-tables';
 
 window.Alpine = Alpine;
 Alpine.data('billingBatchFilter', billingBatchFilter);
@@ -60,4 +61,5 @@ Alpine.data('scrollableNavigation', () => ({
     },
 }));
 
+initializeDataTables();
 Alpine.start();

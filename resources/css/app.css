@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+.data-table-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.data-table-size { display: inline-flex; align-items: center; flex-shrink: 0; gap: 10px; white-space: nowrap; color: var(--text-secondary); font-size: 13px; }
+.data-table-toolbar .data-table-size select.record-input { flex: none; width: 80px; min-height: 36px; padding: 6px 28px 6px 10px; border: 1px solid #d9dde4; border-radius: 7px; background-color: var(--surface); font-size: 13px; }
+.data-table-status { color: var(--text-secondary); font-size: 12px; }
+.data-table-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.data-table-sort-button { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 30px; padding: 4px; border: 1px solid transparent; border-radius: 6px; color: var(--text-secondary); background: transparent; cursor: pointer; }
+.data-table-sort-button svg { width: 18px; height: 22px; }
+.data-table-sort-button path { opacity: .35; }
+.data-table-sort-button:hover, .data-table-sort-button.is-active { color: var(--brand-primary); background: var(--brand-soft); border-color: var(--brand-border); }
+.data-table-sort-button[data-direction="asc"] .data-table-chevron-asc, .data-table-sort-button[data-direction="desc"] .data-table-chevron-desc { opacity: 1; }
+.data-table-sort-button:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
+.data-table-pagination { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.data-table-footer > .data-table-pagination { margin-top: 0; margin-left: auto; }
+.data-table-footer > .records-pagination { flex: 1; margin: 0; }
+.data-table-pagination button:disabled { opacity: .45; cursor: default; }
+table tr[hidden] { display: none !important; }
+@media (max-width: 640px) {
+    .data-table-pagination { justify-content: space-between; }
+    .data-table-footer > .data-table-pagination { width: 100%; }
+}
+@media print {
+    .data-table-toolbar, .data-table-sort-button, .data-table-pagination, .records-pagination { display: none !important; }
+}
+
 :root {
     --brand-primary: #a80e0e;
     --brand-primary-hover: #880b0b;
@@ -335,6 +359,41 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 355px) {
     .login-content { padding-inline: 18px; }
     .login-options { align-items: flex-start; flex-direction: column; gap: 0; padding: 8px 0 10px; }
+}
+
+/* Password confirmation uses the existing college authentication design. */
+.password-confirm-panel { height: auto; min-height: 740px; padding-block: 40px; }
+.password-confirm-content .login-brand { width: min(100%, 320px); min-height: 56px; }
+.password-confirm-content .login-intro { margin-top: 26px; }
+.password-confirm-content .login-intro h1 { font-size: clamp(34px, 3.5vw, 48px); letter-spacing: -1.4px; }
+.password-confirm-content .login-intro p { font-size: 15px; line-height: 1.6; }
+.password-confirm-account { margin-top: 20px; }
+.password-confirm-account span { display: block; margin-bottom: 3px; color: rgba(255,255,255,.76); font-size: 12px; }
+.password-confirm-account strong { display: block; color: #fff; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.password-confirm-note { display: flex; align-items: flex-start; gap: 11px; margin-top: 18px; padding: 14px 16px; border: 1px solid rgba(241,196,78,.28); border-left: 3px solid #f1c44e; border-radius: 10px; background: rgba(67,0,5,.24); }
+.password-confirm-note > .dashboard-icon { margin-top: 1px; color: #f1c44e; }
+.password-confirm-note h2 { margin: 0 0 5px; color: #fff4ce; font-size: 13px; line-height: 1.5; font-weight: 700; }
+.password-confirm-note p { margin: 0; color: rgba(255,255,255,.92); font-size: 13px; line-height: 1.6; }
+.password-confirm-form { margin-top: 22px; }
+.password-confirm-label { display: block; margin-bottom: 8px; color: #fff; font-size: 14px; font-weight: 600; }
+.password-confirm-help, .password-confirm-next { margin: 8px 0 0; color: rgba(255,255,255,.82); font-size: 12px; line-height: 1.6; }
+.password-confirm-submit { margin-top: 18px; height: 54px; font-size: 16px; }
+.password-confirm-submit:disabled { opacity: .65; cursor: wait; }
+.password-confirm-next { text-align: center; }
+.password-confirm-back { display: inline-block; margin-top: 20px; color: #fff; font-size: 13px; text-underline-offset: 4px; }
+.password-confirm-back:hover { text-decoration: underline; }
+.password-confirm-back:focus-visible, .password-confirm-form .password-toggle:focus-visible { outline: 2px solid #f1c44e; outline-offset: 4px; border-radius: 5px; }
+@media (max-width: 900px) {
+    .password-confirm-panel { min-height: 0; padding-block: 0; }
+    .password-confirm-content { padding-block: 36px; }
+    .password-confirm-content .login-intro h1 { font-size: clamp(34px, 7vw, 44px); }
+}
+@media (max-width: 540px) {
+    .password-confirm-content { padding: 30px 24px; }
+    .password-confirm-content .login-brand { min-height: 48px; }
+    .password-confirm-content .login-intro { margin-top: 22px; }
+    .password-confirm-content .login-intro h1 { font-size: 36px; }
+    .password-confirm-note { padding: 12px; gap: 9px; }
 }
 
 /* Floating application navigation */
@@ -765,6 +824,24 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
 .records-details dt { margin-bottom: 7px; font-size: 12px; color: var(--text-secondary); }
 .records-details dd { margin: 0; color: var(--text-primary); font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
 .records-preserve-lines { white-space: pre-line; }
+.scholar-import-instructions { margin: 16px 0 20px; color: var(--text-secondary); font-size: 14px; line-height: 1.7; }
+.scholar-import-instructions summary { color: var(--text-primary); font-weight: 600; cursor: pointer; }
+.scholar-import-instructions ul, .scholar-import-validation ul { margin: 10px 0 0; padding-left: 20px; list-style: disc; }
+.scholar-import-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.scholar-import-counts > div { padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.scholar-import-counts dt { color: var(--text-secondary); font-size: 12px; }
+.scholar-import-counts dd { margin: 8px 0 0; font-size: 25px; font-weight: 700; color: var(--text-primary); }
+.scholar-import-table { min-width: 1550px; }
+.scholar-import-table .scholar-import-validation { min-width: 280px; white-space: normal; }
+.scholar-import-validation ul { color: var(--danger); font-size: 12px; line-height: 1.6; }
+.scholar-import-confirmation { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-top: 24px; }
+.scholar-import-consent { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; font-size: 14px; line-height: 1.6; }
+.scholar-import-consent input { flex: none; margin-top: 4px; color: var(--brand-primary); border-radius: 4px; }
+.scholar-import-file::file-selector-button { margin-right: 12px; border: 0; border-radius: 6px; padding: 6px 10px; background: var(--border); color: var(--text-primary); cursor: pointer; }
+@media (max-width: 760px) {
+    .scholar-import-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .scholar-import-confirmation { flex-direction: column; align-items: stretch; }
+}
 .records-timeline { margin: 0; padding: 0; list-style: none; }
 .records-timeline li { margin-left: 7px; padding: 0 0 20px 22px; border-left: 2px solid var(--brand-border); }
 .records-timeline strong { display: block; font-size: 13px; }

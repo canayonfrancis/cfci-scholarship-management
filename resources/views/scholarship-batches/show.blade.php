@@ -3,8 +3,7 @@
     <section class="dashboard-card records-card">
         <p class="records-notice">Enrollment findings do not grant scholarship eligibility or external approval. Official Form 2/Form 3 classification awaits the approved school templates. Non-enrolled scholars remain in this roster.</p>
         <form class="records-filters" method="GET"><x-record-field name="view" label="Roster view" type="select">@foreach(['all' => 'All members', 'awaiting_verification' => 'Awaiting Registrar enrollment verification', 'unbilled' => 'Unbilled members (no submitted billing)'] as $value => $label)<option value="{{ $value }}" @selected(($filters['view'] ?? 'all') === $value)>{{ $label }}</option>@endforeach</x-record-field><button class="records-button" type="submit">Show members</button></form>
-        <p class="record-help">Billed means submitted billing; drafts are not billed. Existing billing in the same program and semester is shown even when it predates this roster.</p>
-        <div class="records-table-wrap"><table class="records-table"><thead><tr><th>Scholar</th><th>Assignment</th><th>Latest enrollment source</th><th>Registrar finding</th><th>Billing</th><th>Action</th></tr></thead><tbody>
+        <div class="records-table-wrap"><x-table-state :paginator="$members" /><table class="records-table"><thead><tr><th>Scholar</th><th>Assignment</th><th>Latest enrollment source</th><th>Registrar finding</th><th>Billing</th><th>Action</th></tr></thead><tbody>
             @forelse($members as $member)
                 @php
                     $record = $member->enrollmentRecord;

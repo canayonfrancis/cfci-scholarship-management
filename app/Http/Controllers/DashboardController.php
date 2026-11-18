@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ScholarshipApplication;
 use App\Models\User;
 use App\Services\DashboardAnalytics;
+use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -12,6 +13,10 @@ class DashboardController extends Controller
 {
     public function __invoke(Request $request, DashboardAnalytics $analytics)
     {
+        if ($request->user()->isStudentOnly()) {
+            return to_route('student.profile');
+        }
+
         $now = now('Asia/Manila');
         $hero = ['greeting' => $now->hour < 12 ? 'Good morning' : ($now->hour < 18 ? 'Good afternoon' : 'Good evening'), 'firstName' => Str::of($request->user()->name)->trim()->before(' ')->value(), 'date' => $now->format('D, M j, Y'), 'dateTime' => $now->toDateString()];
         $canReport = $request->user()->hasAnyRole(User::STAFF_ROLES);
@@ -55,7 +60,8 @@ class DashboardController extends Controller
             $qualified[] = $cohort->where('state', 'School eligible')->count();
         }
         $chartMax = max(4, (int) (ceil(max([...$applications, ...$qualified, 1]) / 4) * 4));
-        $recentApplications = $data['evaluations']->sortByDesc('recorded_at')->take(5)->map(fn ($r) => ['id' => $r['student_number'], 'initials' => Str::of($r['name'])->explode(' ')->filter()->take(2)->map(fn ($p) => Str::substr($p, 0, 1))->implode(''), 'name' => $r['name'], 'program' => $r['program'], 'status' => $r['state'], 'submitted' => $r['recorded_at']?->timezone('Asia/Manila')->format('M j, Y') ?? 'Not recorded', 'url' => route('evaluations.show', $r['id'])]);
+        $recentApplications = $data['evaluations']->sortByDesc('recorded_at')->map(fn ($r) => ['id' => $r['student_number'], 'initials' => Str::of($r['name'])->explode(' ')->filter()->take(2)->map(fn ($p) => Str::substr($p, 0, 1))->implode(''), 'name' => $r['name'], 'program' => $r['program'], 'status' => $r['state'], 'submitted' => $r['recorded_at']?->timezone('Asia/Manila')->format('M j, Y') ?? 'Not recorded', 'url' => route('evaluations.show', $r['id'])]);
+        $recentApplications = TablePagination::collection($recentApplications, 'dashboard_validations', columns: fn ($row) => [$row['id'], $row['name'], $row['program'], $row['status'], $row['submitted']]);
         $programs = $data['programs'];
         $quickLinks = [['label' => 'Manage Scholars', 'icon' => 'user-group', 'href' => route('scholars.index')], ['label' => 'Scholarship Programs', 'icon' => 'graduation-cap', 'href' => route('scholarship-programs.index')], ['label' => 'Settings', 'icon' => 'settings', 'href' => route('profile.edit')]];
         if ($request->user()->can('viewAny', ScholarshipApplication::class)) {

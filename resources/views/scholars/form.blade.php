@@ -5,13 +5,13 @@
         return is_bool($value) ? (string) (int) $value : (is_scalar($value) ? (string) $value : '');
     };
 @endphp
-<x-records-page :title="$scholar->exists ? 'Edit scholar' : 'Add scholar'" description="Maintain the student profile while retaining academic and scholarship history.">
-    <x-slot:actions><a class="records-button" href="{{ $scholar->exists ? route('scholars.show', $scholar) : route('scholars.index') }}">Back to {{ $scholar->exists ? 'scholar' : 'scholars' }}</a></x-slot:actions>
+<x-records-page title="Edit scholar" description="Maintain the student profile while retaining academic and scholarship history.">
+    <x-slot:actions><a class="records-button" href="{{ route('scholars.show', $scholar) }}">Back to scholar</a></x-slot:actions>
     <section class="dashboard-card records-card records-form-card">
-        <p class="record-help scholar-form-intro">Student ID, given name, last name and record status are required to register. Fields marked * are needed for a complete official profile; you may save while they are missing. Unmarked fields are optional. Profile completeness does not determine scholarship eligibility.</p>
+        <p class="record-help scholar-form-intro">Student ID, given name, last name and record status are required when saving changes. Fields marked * are needed for a complete official profile; you may save while they are missing. Unmarked fields are optional. Profile completeness does not determine scholarship eligibility.</p>
         @if($scholar->exists)<p class="record-help"><span class="records-badge {{ $scholar->hasCompleteProfile() ? 'is-green' : 'is-amber' }}">{{ $scholar->hasCompleteProfile() ? 'Complete' : 'Incomplete' }}</span> Current saved profile</p>@endif
-        <form action="{{ $scholar->exists ? route('scholars.update', $scholar) : route('scholars.store') }}" method="POST">
-            @csrf @if($scholar->exists) @method('PATCH') @endif
+        <form action="{{ route('scholars.update', $scholar) }}" method="POST">
+            @csrf @method('PATCH')
             <h2 class="records-section-title scholar-section-title">Student Identification</h2>
             <div class="records-form-grid">
                 <x-record-field name="student_number" label="Student ID (required)" :value="old('student_number', $scholar->student_number)" required maxlength="50" autocomplete="off" />
@@ -52,7 +52,7 @@
             <h2 class="records-section-title">Contact Information</h2>
             <div class="records-form-grid">
                 <x-record-field name="phone" label="Contact number *" type="tel" :value="old('phone', $scholar->phone)" maxlength="40" autocomplete="tel" help="Mobile: 9171234567, 09171234567 or +639171234567; landline: 8 digits. Recognized formats are normalized. Unchanged legacy numbers are retained for review." />
-                <x-record-field name="email" label="Email address *" type="email" :value="old('email', $scholar->email)" maxlength="255" autocomplete="email" help="Contact email only. Adding a scholar does not create a login account." />
+                <x-record-field name="email" label="Email address *" type="email" :value="old('email', $scholar->email)" maxlength="255" autocomplete="email" help="Contact email only. Editing this field does not change the linked login account." />
             </div>
             <h2 class="records-section-title">Additional Student Information</h2>
             <div class="records-form-grid">
@@ -65,7 +65,7 @@
             <h2 class="records-section-title">Scholarship Information</h2>
             <p class="record-help">Use the existing scholarship workflow for assignments, semester validations and verified approvals. Saving this profile grants no scholarship eligibility or financial approval.</p>
             @if($scholar->exists)<p class="record-help"><a class="records-link" href="{{ route('scholars.show', $scholar) }}">Review scholarship and academic history</a></p>@endif
-            <div class="records-form-footer"><p class="record-help">Close any active scholarship before archiving a scholar. Existing history is retained.</p><x-primary-button class="records-submit">{{ $scholar->exists ? 'Save changes' : 'Add scholar' }}</x-primary-button></div>
+            <div class="records-form-footer"><p class="record-help">Close any active scholarship before archiving a scholar. Existing history is retained.</p><x-primary-button class="records-submit">Save changes</x-primary-button></div>
         </form>
     </section>
 </x-records-page>

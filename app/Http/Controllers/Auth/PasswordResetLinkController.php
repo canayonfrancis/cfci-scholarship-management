@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Accounts\StudentCredentials;
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Services\Accounts\StudentAccess;
+use App\Services\Accounts\StudentCredentialDelivery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -33,13 +37,17 @@ class PasswordResetLinkController extends Controller
         // We will send the password reset link to this user. Once we have attempted
         // to send the link, we will examine the response then see the message we
         // need to show to the user. Finally, we'll send out a proper response.
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
+        $target = User::where('email', $request->email)->first();
+        try {
+            if ($target && app(StudentAccess::class)->usesStudentCredentials($target)) {
+                app(StudentCredentials::class)->issue($target);
+            } elseif (app(StudentCredentialDelivery::class)->available()) {
+                Password::sendResetLink($request->only('email'));
+            }
+        } catch (\Throwable) {
+            report(new \RuntimeException('Credential delivery request failed; no credential details were recorded.'));
+        }
 
-        return $status == Password::RESET_LINK_SENT
-                    ? back()->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+        return back()->with('status', 'If this account is eligible and credential delivery is available, password instructions will be sent.');
     }
 }

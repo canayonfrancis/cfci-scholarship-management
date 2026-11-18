@@ -90,7 +90,7 @@ class OperationalRoleSecurityTest extends TestCase
     public static function unexpectedRoles(): array
     {
         // Known legacy roles are explicitly retained pending the account review.
-        return [['admin'], ['student'], ['applicant'], ['super_admin'], ['COORDINATOR'], ['unknown'], [null]];
+        return [['admin'], ['applicant'], ['super_admin'], ['COORDINATOR'], ['unknown'], [null]];
     }
 
     #[DataProvider('unexpectedRoles')]

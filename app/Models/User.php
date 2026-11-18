@@ -3,7 +3,10 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Services\Accounts\StudentAccess;
+use App\Services\Accounts\StudentCredentialDelivery;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -12,6 +15,8 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
+    public const STUDENT_ROLE = 'student';
+
     public const OPERATIONAL_ROLES = ['coordinator', 'registrar'];
 
     // The user explicitly retains the existing Administrator for full-system testing.
@@ -55,12 +60,27 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'student_setup_required' => 'boolean',
+            'student_access_disabled_at' => 'immutable_datetime',
         ];
     }
 
     public function student(): HasOne
     {
         return $this->hasOne(Student::class);
+    }
+
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        if (app(StudentAccess::class)->usesStudentCredentials($this)) {
+            app(StudentCredentialDelivery::class)->send($this, $token);
+
+            return;
+        }
+        if (! app(StudentCredentialDelivery::class)->available()) {
+            throw new \RuntimeException('Credential delivery is unavailable.');
+        }
+        $this->notify(new ResetPassword($token));
     }
 
     public function roles(): HasMany
@@ -73,6 +93,11 @@ class User extends Authenticatable
         $this->loadMissing('roles');
 
         return $this->roles->contains(fn (UserRole $membership) => in_array($membership->role, $roles, true));
+    }
+
+    public function isStudentOnly(): bool
+    {
+        return $this->hasAnyRole([self::STUDENT_ROLE]) && ! $this->hasAnyRole(self::STAFF_ROLES);
     }
 
     public function academicVerifications(): HasMany

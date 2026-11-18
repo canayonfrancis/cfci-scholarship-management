@@ -25,7 +25,7 @@ class ScholarshipBatchController extends Controller
             'batches' => ScholarshipBatch::with(['program', 'academicPeriod'])->withCount('memberships')
                 ->when($filters['program_id'] ?? null, fn ($q, $id) => $q->where('program_id', $id))
                 ->when($filters['academic_period_id'] ?? null, fn ($q, $id) => $q->where('academic_period_id', $id))
-                ->latest('id')->paginate(15)->withQueryString(),
+                ->latest('id')->tablePaginate('rosters')->withQueryString(),
             'programs' => ScholarshipProgram::orderBy('code')->get(),
             'periods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),
         ]);
@@ -91,6 +91,6 @@ class ScholarshipBatchController extends Controller
             $query->whereNotExists((clone $submitted)->selectRaw('1'));
         }
 
-        return view('scholarship-batches.show', ['batch' => $batch, 'members' => $query->orderBy('student_id')->paginate(25)->withQueryString(), 'filters' => $filters]);
+        return view('scholarship-batches.show', ['batch' => $batch, 'members' => $query->orderBy('student_id')->tablePaginate('members')->withQueryString(), 'filters' => $filters]);
     }
 }

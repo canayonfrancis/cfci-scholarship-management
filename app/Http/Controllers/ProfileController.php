@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Accounts\StudentCredentials;
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Services\Accounts\StudentAccess;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,6 +30,11 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
+        if (app(StudentAccess::class)->usesStudentCredentials($request->user())) {
+            app(StudentCredentials::class)->updateProfile($request->user(), $request->validated());
+
+            return Redirect::route('profile.edit')->with('status', 'profile-updated');
+        }
         $request->user()->fill($request->validated());
 
         if ($request->user()->isDirty('email')) {

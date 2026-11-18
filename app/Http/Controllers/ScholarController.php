@@ -44,36 +44,11 @@ class ScholarController extends Controller
         $query->when($filters['academic_year'] ?? null, fn ($query, $year) => $query->whereHas('academicPeriod', fn ($period) => $period->where('academic_year', $year)));
 
         return view('scholars.index', [
-            'scholars' => $query->orderBy('last_name')->orderBy('first_name')->orderBy('id')->paginate(15)->withQueryString(),
+            'scholars' => $query->orderBy('last_name')->orderBy('first_name')->orderBy('id')->tablePaginate('scholars')->withQueryString(),
             'programs' => ScholarshipProgram::orderBy('code')->get(),
             'academicYears' => AcademicPeriod::distinct()->orderByDesc('academic_year')->pluck('academic_year'),
             'filters' => $filters,
         ]);
-    }
-
-    public function create(): View
-    {
-        Gate::authorize('create', Student::class);
-
-        $scholar = new Student(['record_status' => 'active']);
-
-        return view('scholars.form', ['scholar' => $scholar, ...$this->choices($scholar)]);
-    }
-
-    public function store(ScholarRequest $request, RecordAudit $audit): RedirectResponse
-    {
-        try {
-            $scholar = DB::transaction(function () use ($request, $audit) {
-                $scholar = Student::create($request->validated());
-                $audit->record($request->user(), $scholar, 'scholar_created');
-
-                return $scholar;
-            });
-        } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['student_number' => 'This student number is already registered.']);
-        }
-
-        return to_route('scholars.show', $scholar)->with('status', 'Scholar record added.');
     }
 
     public function show(Student $scholar): View
