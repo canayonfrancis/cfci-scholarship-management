@@ -8,7 +8,6 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinancialRecordController;
 use App\Http\Controllers\PaymentAcknowledgmentController;
 use App\Http\Controllers\PayrollController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScholarController;
 use App\Http\Controllers\ScholarImportController;
 use App\Http\Controllers\ScholarshipAssignmentController;
@@ -134,11 +133,6 @@ Route::middleware('auth')->group(function () {
         Route::post('scholars/{scholar}/assignments', [ScholarshipAssignmentController::class, 'store'])->name('scholars.assignments.store');
         Route::get('scholars/{scholar}/assignments/{assignment}/edit', [ScholarshipAssignmentController::class, 'edit'])->name('scholars.assignments.edit');
         Route::patch('scholars/{scholar}/assignments/{assignment}', [ScholarshipAssignmentController::class, 'update'])->name('scholars.assignments.update');
-    });
-    Route::middleware('can:account-settings')->group(function () {
-        Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-        Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-        Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     });
 });
 

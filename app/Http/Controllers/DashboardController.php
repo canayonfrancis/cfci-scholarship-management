@@ -63,7 +63,7 @@ class DashboardController extends Controller
         $recentApplications = $data['evaluations']->sortByDesc('recorded_at')->map(fn ($r) => ['id' => $r['student_number'], 'initials' => Str::of($r['name'])->explode(' ')->filter()->take(2)->map(fn ($p) => Str::substr($p, 0, 1))->implode(''), 'name' => $r['name'], 'program' => $r['program'], 'status' => $r['state'], 'submitted' => $r['recorded_at']?->timezone('Asia/Manila')->format('M j, Y') ?? 'Not recorded', 'url' => route('evaluations.show', $r['id'])]);
         $recentApplications = TablePagination::collection($recentApplications, 'dashboard_validations', columns: fn ($row) => [$row['id'], $row['name'], $row['program'], $row['status'], $row['submitted']]);
         $programs = $data['programs'];
-        $quickLinks = [['label' => 'Manage Scholars', 'icon' => 'user-group', 'href' => route('scholars.index')], ['label' => 'Scholarship Programs', 'icon' => 'graduation-cap', 'href' => route('scholarship-programs.index')], ['label' => 'Settings', 'icon' => 'settings', 'href' => route('profile.edit')]];
+        $quickLinks = [['label' => 'Manage Scholars', 'icon' => 'user-group', 'href' => route('scholars.index')], ['label' => 'Scholarship Programs', 'icon' => 'graduation-cap', 'href' => route('scholarship-programs.index')]];
         if ($request->user()->can('viewAny', ScholarshipApplication::class)) {
             $quickLinks[] = ['label' => 'Evaluation Queue', 'icon' => 'clipboard', 'href' => route('evaluations.index')];
         }

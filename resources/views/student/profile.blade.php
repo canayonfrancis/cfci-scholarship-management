@@ -1,7 +1,6 @@
 <x-records-page title="My student profile" eyebrow="Student portal" :description="$student ? $student->full_name.' · '.$student->student_number : ''">
     <x-slot:actions>
         @if($student) @can('updateOwnProfile', $student)<a class="records-button is-primary" href="{{ route('student.profile.edit') }}">Edit my information</a>@endcan @endif
-        @can('account-settings')<a class="records-button" href="{{ route('profile.edit') }}">Account settings</a>@endcan
     </x-slot:actions>
     @if($student)
         <section class="dashboard-card records-card">

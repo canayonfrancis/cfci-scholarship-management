@@ -31,9 +31,4 @@
         </div>
         <div class="records-pagination">{{ $students->links() }}</div>
     </section>
-    <section class="dashboard-card records-card" aria-labelledby="account-availability-title">
-        <h2 class="records-section-title" id="account-availability-title">Available account actions</h2>
-        <p>Create Student accounts, complete initial password setup from Manage login, and deactivate or reactivate eligible accounts. These actions do not send email.</p>
-        <p class="record-help">Configured profile access describes the current account link, Student permission and lifecycle state. Pending or inactive accounts cannot use the Student portal.</p>
-    </section>
 </x-records-page>

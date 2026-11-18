@@ -67,7 +67,6 @@
                 </button>
                 <div class="popover profile-popover" x-cloak x-show="profileOpen" x-transition @click.outside="profileOpen = false">
                     @can('viewSelf', \App\Models\Student::class)<a href="{{ route('student.profile') }}">My student profile</a>@endcan
-                    @can('account-settings')<a href="{{ route('profile.edit') }}">Profile &amp; settings</a>@endcan
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit">Log out</button>
@@ -88,6 +87,5 @@
                 <x-dashboard-icon :name="$icon" :size="19" /><span>{{ $label }}</span>
             </a>
         @endforeach
-        @can('account-settings')<a href="{{ route('profile.edit') }}" class="nav-item"><x-dashboard-icon name="settings" :size="19" /><span>Settings</span></a>@endcan
     </nav>
 </header>

@@ -16,7 +16,6 @@ use App\Policies\ScholarshipAssignmentPolicy;
 use App\Policies\ScholarshipProgramPolicy;
 use App\Policies\StudentAccountProvisioningPolicy;
 use App\Policies\StudentPolicy;
-use App\Services\Accounts\StudentAccess;
 use App\Services\Accounts\StudentCredentialDelivery;
 use App\Support\TablePagination;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -63,7 +62,6 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('financial-view', fn ($user) => app(FinancialRecordPolicy::class)->viewAny($user));
-        Gate::define('account-settings', fn ($user) => ! app(StudentAccess::class)->usesStudentCredentials($user));
         Gate::define('student-accounts.provision', [StudentAccountProvisioningPolicy::class, 'provision']);
         Gate::define('student-accounts.link', [StudentAccountProvisioningPolicy::class, 'linkExisting']);
         RateLimiter::for('student-account-links', function (Request $request) {

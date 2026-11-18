@@ -2,6 +2,10 @@
 
 Date: 2026-11-19 (Asia/Manila)
 
+**Superseded:** The later user request removes Profile & settings for every role.
+See [the all-role removal](26-profile-settings-removal.md). The permissions and
+test results below describe the earlier Student-only restriction.
+
 Verdict: **PASS** for this access restriction.
 
 The user requested that Students have no access to Profile & settings. Student
