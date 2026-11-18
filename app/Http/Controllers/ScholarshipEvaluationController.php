@@ -21,6 +21,7 @@ use App\Models\Student;
 use App\Services\Eligibility\OfficialRuleCatalog;
 use App\Services\Eligibility\PrivateEvidence;
 use App\Services\Eligibility\SchoolGradingPolicy;
+use App\View\EvaluationWorkspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -92,10 +93,10 @@ class ScholarshipEvaluationController extends Controller
         return to_route('evaluations.show', $application);
     }
 
-    public function show(ScholarshipApplication $application, OfficialRuleCatalog $catalog): View
+    public function show(ScholarshipApplication $application, OfficialRuleCatalog $catalog, EvaluationWorkspace $workspace): View
     {
         Gate::authorize('view', $application);
-        $application->load(['student', 'program', 'academicPeriod', 'assignment', 'terms.confirmedBy', 'documents.reviewedBy', 'evaluationRuns.evaluator', 'externalApprovals.documents']);
+        $application->load(['student.academicProgram', 'program', 'academicPeriod', 'assignment.activatedBy', 'assignment.closedBy', 'terms.confirmedBy', 'documents.reviewedBy', 'documents.uploadedBy', 'evaluationRuns.evaluator', 'evaluationRuns.coordinator', 'evaluationRuns.gradeRecord', 'evaluationRuns.enrollmentRecord', 'externalApprovals.documents', 'externalApprovals.recordedBy']);
         $runs = $application->evaluationRuns->sortByDesc('run_number');
         $context = AcademicValidationContext::current()->load(['activePeriod', 'sourcePeriod']);
         $gradeSource = $context->source_period_id ? $application->student->academicRecords()->with('grades')->where('academic_period_id', $context->source_period_id)->orderByDesc('revision')->first() : null;
@@ -109,7 +110,7 @@ class ScholarshipEvaluationController extends Controller
         }
         $enrollmentSnapshot = $contextValid && $academic?->verification_status === 'verified' && $academic->verified_by && $academic->verified_at ? $academic->only(['verification_status', 'enrollment_status']) : null;
 
-        return view('evaluations.show', [
+        $data = [
             'context' => $context,
             'gradeSource' => $gradeSource, 'academicRequirements' => $academicRequirements,
             'academicPolicyReady' => $academicPolicyReady,
@@ -120,7 +121,9 @@ class ScholarshipEvaluationController extends Controller
             'facts' => $application->program->code === 'EDUKAR' ? [] : OfficialRuleCatalog::FACTS,
             'documentTypes' => $application->program->code === 'EDUKAR' ? [] : $catalog->validationDocuments(),
             'approvals' => $application->externalApprovals->sortByDesc('id'),
-        ]);
+        ];
+
+        return view('evaluations.show', $data + ['workspace' => $workspace->present($data, $catalog)]);
     }
 
     public function confirmPolicy(Request $request, ScholarshipApplication $application, OfficialRuleCatalog $catalog, RecordAudit $audit): RedirectResponse
@@ -140,14 +143,14 @@ class ScholarshipEvaluationController extends Controller
             $audit->record($request->user(), $terms, 'semester_policy_confirmed');
         }, 3);
 
-        return back()->with('status', 'Official semester rules confirmed. Existing evaluation snapshots remain unchanged.');
+        return to_route('evaluations.show', ['application' => $application, 'tab' => 'school-compliance'])->with('status', 'Official semester rules confirmed. Existing evaluation snapshots remain unchanged.');
     }
 
     public function evaluate(EvaluateScholarshipRequest $request, ScholarshipApplication $application, EvaluateApplication $evaluate): RedirectResponse
     {
         $evaluate->handle($application, $request->user(), $request->validated());
 
-        return to_route('evaluations.show', $application)->with('status', 'A new school evaluation was recorded. External approval remains separate.');
+        return to_route('evaluations.show', ['application' => $application, 'tab' => 'school-compliance'])->with('status', 'A new school evaluation was recorded. External approval remains separate.');
     }
 
     public function evidence(ScholarshipEvidenceRequest $request, ScholarshipApplication $application, PrivateEvidence $evidence, RecordAudit $audit): RedirectResponse
@@ -172,7 +175,7 @@ class ScholarshipEvaluationController extends Controller
             throw $exception;
         }
 
-        return back()->with('status', 'Private evidence saved. Run a new evaluation to use this submission revision.');
+        return to_route('evaluations.show', ['application' => $application, 'tab' => 'supporting-evidence'])->with('status', 'Private evidence saved. Run a new evaluation to use this submission revision.');
     }
 
     public function reviewEvidence(Request $request, ScholarshipApplication $application, Document $document, RecordAudit $audit): RedirectResponse
@@ -194,7 +197,7 @@ class ScholarshipEvaluationController extends Controller
             $audit->record($request->user(), $document, 'evaluation_evidence_reviewed');
         });
 
-        return back()->with('status', 'Evidence review recorded. Reevaluate this submission.');
+        return to_route('evaluations.show', ['application' => $application, 'tab' => 'supporting-evidence'])->with('status', 'Evidence review recorded. Reevaluate this submission.');
     }
 
     public function download(ScholarshipApplication $application, Document $document): StreamedResponse
@@ -213,7 +216,7 @@ class ScholarshipEvaluationController extends Controller
     {
         $record->handle($application, $request->user(), $request->validated(), $request->file('certificate'));
 
-        return back()->with('status', 'External decision and verified evidence recorded separately from school eligibility.');
+        return to_route('evaluations.show', ['application' => $application, 'tab' => 'external-approval'])->with('status', 'External decision and verified evidence recorded separately from school eligibility.');
     }
 
     public function activate(Request $request, ScholarshipApplication $application, ActivateAward $activate): RedirectResponse
@@ -222,7 +225,7 @@ class ScholarshipEvaluationController extends Controller
         $data = $request->validate(['evaluation_id' => ['required', 'integer'], 'approval_id' => ['required', 'integer']]);
         $activate->handle($application, $request->user(), $data['evaluation_id'], $data['approval_id']);
 
-        return back()->with('status', 'Scholarship award activated. Evaluation and external approval references were retained.');
+        return to_route('evaluations.show', ['application' => $application, 'tab' => 'award-activation'])->with('status', 'Scholarship award activated. Evaluation and external approval references were retained.');
     }
 
     private function choices(): array

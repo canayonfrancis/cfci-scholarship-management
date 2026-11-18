@@ -1,0 +1,18 @@
+<div class="evaluation-overview-grid">
+    <section class="dashboard-card records-card"><h2 class="records-section-title">Evaluation overview</h2><dl class="evaluation-summary-grid">
+        <div><dt>Applicable evaluation period</dt><dd>{{ $application->academicPeriod->academic_year }} / {{ $application->academicPeriod->semester_code }}</dd></div>
+        <div><dt>Active validation period</dt><dd>{{ $context->activePeriod ? $context->activePeriod->academic_year.' / '.$context->activePeriod->semester_code : 'Not configured' }}</dd></div>
+        <div><dt>Source grading semester</dt><dd>{{ $context->sourcePeriod ? $context->sourcePeriod->academic_year.' / '.$context->sourcePeriod->semester_code : 'Not confirmed' }}</dd></div>
+        <div><dt>Academic policy</dt><dd>{{ $workspace['policyConfirmed'] ? 'Confirmed' : 'Unconfirmed' }}{{ $academicRequirements ? ' · Revision '.$academicRequirements->revision : '' }}</dd></div>
+        <div><dt>Official semester rules</dt><dd>{{ $workspace['officialConfirmed'] ? 'Confirmed and matching applicable rules' : 'Not confirmed / not applicable' }}</dd></div>
+        <div><dt>Academic compliance</dt><dd>{{ Str::headline($academicCheck['status']) }}</dd></div>
+        <div><dt>Latest school evaluation</dt><dd>{{ $latest ? 'Run '.$latest->run_number.' · '.Str::headline($latest->school_decision) : 'Not started' }}<span class="records-muted">{{ $latest ? ($workspace['current'] ? 'Current decision' : 'Requires reassessment / retained history') : 'No saved decision' }}</span></dd></div>
+        <div><dt>External approval</dt><dd>{{ $lastApproval ? ucfirst($lastApproval->decision).' · '.$lastApproval->authority : 'Not recorded' }}<span class="records-muted">{{ $workspace['externalReady'] ? 'Verified and currently applicable' : 'Approval prerequisites incomplete' }}</span></dd></div>
+        <div><dt>Award status</dt><dd>{{ $application->assignment?->statusLabel() ?? 'Missing assignment' }}</dd></div>
+        <div><dt>Current submission revision</dt><dd>{{ $application->submission_revision }}</dd></div>
+    </dl><p class="record-help">Enrollment, standing and GWA are summarized above. This overview uses saved records; unsaved form changes have not been assessed.</p></section>
+    <section class="dashboard-card records-card"><h2 class="records-section-title">Outstanding requirements</h2>
+        @if($workspace['outstanding'] === [])<p class="records-notice">No outstanding items were found by the displayed checks. Review Award activation for the separate manual action.</p>@else<ul class="evaluation-outstanding">@foreach($workspace['outstanding'] as $item)<li><a class="records-link" href="{{ route('evaluations.show', ['application' => $application, 'tab' => $item['tab']]) }}" @click.prevent="selectTab('{{ $item['tab'] }}', true)">{{ $item['label'] }}</a><details><summary>Review requirement</summary><p class="record-help records-preserve-lines">{{ $item['reason'] }}</p></details></li>@endforeach</ul>@endif
+    </section>
+</div>
+@if($latest)<section class="dashboard-card records-card"><h2 class="records-section-title">Latest recorded compliance checks</h2><p class="record-help">{{ $workspace['current'] ? 'Current saved evaluation.' : 'Retained prior checks; resolve source changes and record a new evaluation before relying on them.' }}</p><div class="evaluation-check-grid">@foreach($latest->check_results ?? [] as $key => $check)<details class="evaluation-check"><summary><span class="records-badge {{ ($check['status'] ?? '') === 'pass' ? 'is-green' : 'is-amber' }}">{{ Str::headline($check['status'] ?? 'review') }}</span> {{ Str::headline($key) }}</summary><p class="record-help">{{ $check['reason'] ?? 'No explanation recorded.' }}</p></details>@endforeach</div></section>@endif

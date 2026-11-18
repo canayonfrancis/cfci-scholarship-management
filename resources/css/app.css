@@ -900,6 +900,99 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
 .academic-dialog-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; flex: none; padding: 16px 24px; border-top: 1px solid var(--border); background: var(--surface); }
 .academic-confirmation-dialog { width: min(480px, calc(100% - 32px)); }
 .academic-confirmation-dialog .academic-dialog-body > p:first-child { margin: 0; font-size: 14px; line-height: 1.7; }
+
+/* Scholarship evaluation workspace; scoped to the detail page. */
+.evaluation-workspace { min-width: 0; }
+.records-page .evaluation-workspace .records-card { padding: 20px; margin-bottom: 16px; }
+.evaluation-workspace .records-section-title { margin-bottom: 12px; }
+.evaluation-workspace .record-field > label { display: block; }
+.evaluation-workspace .record-field { margin-bottom: 8px; }
+.evaluation-workspace .records-button:disabled { opacity: .5; cursor: not-allowed; }
+.evaluation-workspace :is(a, button, summary, [tabindex="0"]):focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 3px; }
+.evaluation-identity-heading, .evaluation-section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+.evaluation-section-heading > .records-button { flex: none; }
+.evaluation-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 20px; margin: 0; }
+.evaluation-summary-grid > div { min-width: 0; }
+.evaluation-summary-grid dt { margin-bottom: 5px; color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.evaluation-summary-grid dd { margin: 0; font-size: 13px; line-height: 1.6; font-weight: 550; overflow-wrap: anywhere; }
+.evaluation-progress { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 18px; padding: 0; list-style: none; }
+.evaluation-progress > li { min-width: 0; padding: 14px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); }
+.evaluation-progress > li.is-complete { border-color: #cde8db; }
+.evaluation-progress a { display: flex; gap: 10px; align-items: flex-start; }
+.evaluation-progress strong { display: block; margin: 0 0 8px; font-size: 12px; line-height: 1.5; }
+.evaluation-step-number { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; border-radius: 50%; font-size: 12px; font-weight: 650; color: var(--brand-primary); background: var(--brand-soft); }
+.evaluation-progress details { margin-top: 10px; }
+.evaluation-progress summary { font-size: 11px; color: var(--text-secondary); cursor: pointer; }
+.evaluation-tabs { display: flex; gap: 5px; margin: 0 0 18px; padding: 5px; max-width: 100%; overflow-x: auto; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); }
+.evaluation-tabs a { display: inline-flex; align-items: center; gap: 7px; flex: none; padding: 11px 13px; border-radius: 8px; color: var(--text-secondary); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.evaluation-tabs a.is-active, .evaluation-tabs a[aria-selected="true"] { color: var(--brand-primary); background: var(--brand-soft); }
+.evaluation-error-dot { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border-radius: 50%; color: white; background: var(--brand-primary); font-size: 11px; }
+.evaluation-tab-panel { min-width: 0; }
+.evaluation-overview-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 16px; align-items: start; }
+.evaluation-overview-grid .evaluation-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.evaluation-outstanding { margin: 0; padding: 0; list-style: none; }
+.evaluation-outstanding > li { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.evaluation-outstanding > li:last-child { border-bottom: 0; }
+.evaluation-outstanding summary { margin-top: 5px; font-size: 11px; color: var(--text-secondary); cursor: pointer; }
+.evaluation-check-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.evaluation-check { padding: 12px; border: 1px solid var(--border); border-radius: 9px; min-width: 0; }
+.evaluation-check summary { font-size: 12px; cursor: pointer; }
+.evaluation-check .records-badge { margin-right: 5px; }
+.evaluation-accordion { margin: 0 0 14px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); }
+.evaluation-accordion > summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 15px 18px; list-style: none; cursor: pointer; font-size: 13px; }
+.evaluation-accordion > summary::-webkit-details-marker { display: none; }
+.evaluation-accordion > summary::before { content: '›'; font-size: 20px; line-height: 1; color: var(--brand-primary); }
+.evaluation-accordion[open] > summary::before { transform: rotate(90deg); }
+.evaluation-accordion > summary > strong { flex: 1; min-width: 160px; font-weight: 600; }
+.evaluation-accordion-body { padding: 18px; border-top: 1px solid var(--border); min-width: 0; }
+.evaluation-fact-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.evaluation-condition-grid { margin-bottom: 0; }
+.evaluation-submit-footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.evaluation-submit-footer .record-help { max-width: 650px; margin-top: 0; }
+.evaluation-submit-footer > button { flex: none; }
+.evaluation-grade-summary .records-details, .evaluation-academic-policy .records-details { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.evaluation-grade-summary .records-details > div { min-width: 0; padding: 12px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 9px; }
+.evaluation-grade-summary .records-details dd { font-weight: 650; font-variant-numeric: tabular-nums; }
+.evaluation-workspace details > summary { overflow-wrap: anywhere; }
+.evaluation-workspace .records-table :is(td, th) { padding: 12px; }
+.evaluation-workspace .evaluation-file-name { max-width: 260px; overflow-wrap: anywhere; }
+.evaluation-evidence-review { min-width: 230px; margin-top: 12px; }
+.evaluation-evidence-review summary { color: var(--brand-primary); cursor: pointer; }
+.evaluation-evidence-review .record-field { margin: 12px 0; }
+.evaluation-file-link { display: block; margin: 4px 0; max-width: 260px; overflow-wrap: anywhere; }
+.evaluation-checkbox { display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; font-size: 13px; line-height: 1.6; }
+.evaluation-checkbox input { flex: none; margin-top: 4px; }
+.evaluation-dialog > form { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.evaluation-activation-dialog { width: min(560px, calc(100% - 32px)); }
+.evaluation-prerequisites { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.evaluation-prerequisites > div { display: flex; align-items: flex-start; gap: 12px; padding: 15px; border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
+.evaluation-prerequisites .records-badge { flex: none; }
+.evaluation-prerequisites strong { font-size: 13px; }
+.evaluation-history-checks { margin: 16px 0; padding: 0; list-style: none; }
+.evaluation-history-checks > li { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.evaluation-history-checks .records-badge { margin-right: 8px; }
+.evaluation-snapshot { margin-top: 18px; }
+.evaluation-snapshot > summary { margin-bottom: 14px; cursor: pointer; color: var(--brand-primary); }
+.evaluation-snapshot-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+.evaluation-snapshot-table :is(th, td) { padding: 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.evaluation-snapshot-table th { width: 30%; color: var(--text-secondary); font-weight: 500; }
+.evaluation-raw-snapshot { padding: 12px; border: 1px solid var(--border); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
+@media (max-width: 1100px) {
+    .evaluation-summary-grid, .evaluation-progress { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .evaluation-overview-grid { grid-template-columns: 1fr; gap: 0; }
+    .evaluation-check-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .evaluation-grade-summary .records-details, .evaluation-academic-policy .records-details { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+    .evaluation-identity-heading, .evaluation-section-heading, .evaluation-submit-footer { flex-direction: column; align-items: stretch; }
+    .evaluation-summary-grid, .evaluation-overview-grid .evaluation-summary-grid, .evaluation-fact-row, .evaluation-prerequisites, .evaluation-check-grid { grid-template-columns: 1fr; }
+    .evaluation-grade-summary .records-details, .evaluation-academic-policy .records-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .evaluation-progress > li { padding: 12px; }
+    .evaluation-progress a { gap: 6px; }
+    .evaluation-progress .records-badge { font-size: 10px; }
+    .evaluation-accordion-body { padding: 14px; }
+    .evaluation-snapshot-table th { width: 35%; }
+}
 @media (max-width: 1100px) {
     .academic-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

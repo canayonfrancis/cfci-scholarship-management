@@ -1,4 +1,4 @@
-@props(['record', 'showHistoricalEquivalents' => false])
+@props(['record', 'showHistoricalEquivalents' => false, 'summaryCompact' => false])
 @php
     $columns = array_diff_key(\App\Models\AcademicRecordGrade::COLUMNS, ['equivalent' => true]);
     $columns['average'] = 'Reported average';
@@ -20,4 +20,4 @@
         <details><summary>Retained historical equivalent grades — not used in any calculation or eligibility check</summary><ul class="records-timeline">@foreach($record->grades->whereNotNull('equivalent') as $grade)<li><strong>{{ $grade->subject_name }}</strong><span>{{ $grade->equivalent }}</span></li>@endforeach</ul></details>
     @endif
 </section>
-<x-academic-grade-summary :summary="$summary" />
+<x-academic-grade-summary :summary="$summary" :compact="$summaryCompact" />

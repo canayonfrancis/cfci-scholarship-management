@@ -5,11 +5,13 @@ import billingBatchFilter from './billing-batch-filter';
 import initializeDataTables from './data-tables';
 import academicGrades from './academic-grades';
 import academicSubjectEditor from './academic-subject-editor';
+import evaluationWorkspace from './evaluation-workspace';
 
 window.Alpine = Alpine;
 Alpine.data('billingBatchFilter', billingBatchFilter);
 Alpine.data('academicGrades', academicGrades);
 Alpine.data('academicSubjectEditor', academicSubjectEditor);
+Alpine.data('evaluationWorkspace', evaluationWorkspace);
 
 Alpine.data('scrollableNavigation', () => ({
     canScrollLeft: false,
