@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AcademicPeriodController;
 use App\Http\Controllers\AcademicProgramController;
+use App\Http\Controllers\AcademicRequirementController;
 use App\Http\Controllers\AcademicVerificationController;
 use App\Http\Controllers\BillingBatchController;
 use App\Http\Controllers\DashboardController;
@@ -127,6 +128,7 @@ Route::middleware('auth')->group(function () {
         });
     Route::resource('scholars', ScholarController::class)->only(['index', 'show', 'edit', 'update'])->middleware('cache.headers:no_store;private');
     Route::resource('scholarship-programs', ScholarshipProgramController::class)->parameters(['scholarship-programs' => 'program'])->except('destroy');
+    Route::post('scholarship-programs/{program}/academic-requirements', [AcademicRequirementController::class, 'store'])->middleware('throttle:12,1')->name('scholarship-programs.academic-requirements.store');
     Route::resource('academic-periods', AcademicPeriodController::class)->parameters(['academic-periods' => 'period'])->except('destroy');
     Route::scopeBindings()->group(function () {
         Route::get('scholars/{scholar}/assignments/create', [ScholarshipAssignmentController::class, 'create'])->name('scholars.assignments.create');

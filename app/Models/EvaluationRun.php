@@ -56,12 +56,15 @@ class EvaluationRun extends Model
     /** A historical decision is never implicitly reusable after its inputs change. */
     public function isCurrent(): bool
     {
+        if (! ProgramAcademicRequirement::storageReady()) {
+            return false;
+        }
         $run = $this->fresh();
         if (! $run || ! $run->completed_at || ! $run->decided_at || $run->school_decision === 'pending') {
             return false;
         }
         if (($run->input_snapshot['assessment_scope'] ?? null) !== SchoolGradingPolicy::SCOPE ||
-            ($run->input_snapshot['grading_policy_check']['status'] ?? 'review') !== 'pass') {
+            ! in_array($run->input_snapshot['grading_policy_check']['status'] ?? 'review', ['pass', 'fail'], true)) {
             return false;
         }
         $context = AcademicValidationContext::current();
@@ -73,6 +76,12 @@ class EvaluationRun extends Model
         $application = $run->application()->first();
         if (! $application || $application->status === 'withdrawn' || $application->submission_revision !== $run->application_revision ||
             $application->evaluationRuns()->where('run_number', '>', $run->run_number)->exists()) {
+            return false;
+        }
+        $academicPolicy = ProgramAcademicRequirement::where('program_period_term_id', $application->program_period_term_id)->orderByDesc('revision')->first();
+        $pinnedPolicy = $run->rule_snapshot['academic_requirements'] ?? [];
+        if (! $academicPolicy || $academicPolicy->status !== 'confirmed' || $academicPolicy->id !== ($pinnedPolicy['id'] ?? null)
+            || $academicPolicy->revision !== ($pinnedPolicy['revision'] ?? null)) {
             return false;
         }
         if (array_key_exists('conflicting_assignment_id', $run->input_snapshot ?? [])) {

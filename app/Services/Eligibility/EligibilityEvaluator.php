@@ -17,9 +17,10 @@ class EligibilityEvaluator
         $add('active_period', ($context['active_period_id'] ?? null) === $input['academic_period_id'] ? 'pass' : 'review', 'Validation must use the configured active academic year and semester.');
         $gradeSource = $input['grading_academic'] ?? null;
         $add('grade_source_policy', ! empty($context['source_period_id']) && ! empty($context['confirmed_by']) && ! empty($context['source_policy_reference']) ? 'pass' : 'review', 'A source grading semester must be confirmed against school policy; no first-semester default is assumed.');
-        $hasGrades = collect($gradeSource['subjects'] ?? [])->contains(fn ($subject) => collect($subject)->only(['prelim', 'midterm', 'semi_final', 'final', 'average', 'equivalent'])->contains(fn ($value) => $value !== null && $value !== ''));
+        $hasGrades = collect($gradeSource['subjects'] ?? [])->contains(fn ($subject) => collect($subject)->only(['prelim', 'midterm', 'semi_final', 'final', 'average'])->contains(fn ($value) => $value !== null && $value !== ''));
         $add('grade_source_data', $gradeSource && $hasGrades ? 'pass' : 'review', 'The configured grading source requires the latest Registrar-verified subject grades.');
-        $checks['school_grading_policy'] = $input['grading_policy_check'] ?? ['status' => 'review', 'reason' => 'School grading criteria remain unconfirmed.'];
+        $gradingCheck = $input['grading_policy_check'] ?? ['status' => 'review', 'reason' => 'Program academic requirements remain unconfirmed.'];
+        $checks['school_grading_policy'] = ['status' => $gradingCheck['status'], 'reason' => $gradingCheck['reason']];
         if ($input['program'] === 'EDUKAR') {
             $add('external_application_scope', 'review', 'EDUKAR/AKLAT application processing and its requirements are outside this system. Only existing academic records are reviewed; no EDUKAR application rules are implemented.');
 

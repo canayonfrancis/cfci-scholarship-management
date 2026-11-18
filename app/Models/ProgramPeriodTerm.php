@@ -58,6 +58,11 @@ class ProgramPeriodTerm extends Model
         return $this->hasMany(ScholarshipApplication::class, 'program_period_term_id');
     }
 
+    public function academicRequirements(): HasMany
+    {
+        return $this->hasMany(ProgramAcademicRequirement::class, 'program_period_term_id');
+    }
+
     public function billingBatches(): HasMany
     {
         return $this->hasMany(BillingBatch::class, 'program_period_term_id');

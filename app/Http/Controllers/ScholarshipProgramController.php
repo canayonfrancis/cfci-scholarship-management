@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Actions\Records\RecordAudit;
 use App\Http\Requests\ScholarshipProgramRequest;
 use App\Models\AcademicPeriod;
+use App\Models\ProgramAcademicRequirement;
+use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipProgram;
 use App\Services\Billing\BillingBatchOptions;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -56,11 +58,20 @@ class ScholarshipProgramController extends Controller
         return to_route('scholarship-programs.show', $program)->with('status', 'Scholarship program added.');
     }
 
-    public function show(ScholarshipProgram $program): View
+    public function show(Request $request, ScholarshipProgram $program): View
     {
         Gate::authorize('view', $program);
 
-        return view('programs.show', ['program' => $program, 'assignments' => $program->assignments()->with(['student', 'startPeriod'])->latest('id')->tablePaginate('program_assignments')]);
+        $filters = $request->validate(['academic_policy_period_id' => ['nullable', 'integer', 'exists:academic_periods,id']]);
+        $policyPeriod = isset($filters['academic_policy_period_id']) ? AcademicPeriod::findOrFail($filters['academic_policy_period_id']) : null;
+        $policyTerms = $policyPeriod ? ProgramPeriodTerm::where('program_id', $program->id)->where('academic_period_id', $policyPeriod->id)->first() : null;
+
+        return view('programs.show', ['program' => $program, 'assignments' => $program->assignments()->with(['student', 'startPeriod'])->latest('id')->tablePaginate('program_assignments')->withQueryString(),
+            'academicPolicyPeriods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),
+            'academicPolicyPeriod' => $policyPeriod,
+            'academicPolicyReady' => $academicPolicyReady = ProgramAcademicRequirement::storageReady(),
+            'academicPolicyVersions' => $policyTerms && $academicPolicyReady ? $policyTerms->academicRequirements()->with('confirmedBy')->orderByDesc('revision')->get() : collect(),
+        ]);
     }
 
     public function edit(Request $request, ScholarshipProgram $program, BillingBatchOptions $options): View

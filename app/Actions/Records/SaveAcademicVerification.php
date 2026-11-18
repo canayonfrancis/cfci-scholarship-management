@@ -3,6 +3,7 @@
 namespace App\Actions\Records;
 
 use App\Models\AcademicRecord;
+use App\Models\ProgramAcademicRequirement;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -19,6 +20,9 @@ class SaveAcademicVerification
 
     public function handle(User $actor, array $data, array $files = [], ?AcademicRecord $existing = null, bool $correction = false): AcademicRecord
     {
+        if (! ProgramAcademicRequirement::storageReady()) {
+            throw ValidationException::withMessages(['grades' => 'The developer must apply the academic computation migration before saving these academic forms.']);
+        }
         $stored = [];
         try {
             // Do not retry a transaction that has written files; cleanup applies to every failure.
@@ -39,9 +43,16 @@ class SaveAcademicVerification
                     }
                 }
 
+                $originalGrades = $existing ? $existing->grades()->lockForUpdate()->get()->keyBy('id') : collect();
                 $record = $correction || ! $existing ? new AcademicRecord : $existing;
                 $before = $record->exists ? $record->only($record->getFillable()) : [];
-                $record->fill(Arr::only($data, ['course', 'year_level', 'enrollment_status', 'academic_standing', 'source_reference', 'verification_notes']));
+                $record->fill(Arr::only($data, ['course', 'year_level', 'enrollment_status', 'academic_standing', 'source_reference', 'verification_notes', 'certified_percentage_gwa', 'certified_gwa_reference']));
+                if ($correction) {
+                    $record->grade_average = $existing->grade_average;
+                    $record->units_enrolled = $existing->units_enrolled;
+                    $record->units_completed = $existing->units_completed;
+                    $record->academic_summary = $existing->academic_summary;
+                }
                 $record->student_id = $student->id;
                 $record->academic_period_id = $periodId;
                 if (! $record->exists) {
@@ -56,13 +67,37 @@ class SaveAcademicVerification
                 $record->verification_status = 'pending';
                 $record->verified_by = null;
                 $record->verified_at = null;
-                $record->save();
+                if (! $record->save()) {
+                    throw new \RuntimeException('Academic record save was canceled.');
+                }
                 if (array_key_exists('grades', $data)) {
+                    $grades = [];
+                    foreach ($data['grades'] as $row) {
+                        $original = isset($row['grade_id']) ? $originalGrades->get($row['grade_id']) : null;
+                        if (isset($row['grade_id']) && ! $original) {
+                            throw ValidationException::withMessages(['grades' => 'A subject reference does not belong to this academic revision. Reload the record.']);
+                        }
+                        $grade = Arr::only($row, ['subject_code', 'subject_name', 'units', 'prelim', 'midterm', 'semi_final', 'final', 'average', 'remarks', 'reported_status']);
+                        if ($original) {
+                            $grade['equivalent'] = $original->equivalent;
+                        }
+                        $grades[] = $grade;
+                    }
                     $record->grades()->delete();
-                    $record->grades()->createMany($data['grades']);
+                    $savedGrades = $record->grades()->createMany($grades);
+                    if ($savedGrades->contains(fn ($grade) => ! $grade->exists)) {
+                        throw new \RuntimeException('Academic subject save was canceled.');
+                    }
+                } elseif ($correction) {
+                    $savedGrades = $record->grades()->createMany($originalGrades->map(fn ($grade) => $grade->only($grade->getFillable()))->values()->all());
+                    if ($savedGrades->contains(fn ($grade) => ! $grade->exists)) {
+                        throw new \RuntimeException('Academic subject revision copy was canceled.');
+                    }
                 }
                 if ($verifying) {
-                    $record->update(['verification_status' => 'verified', 'verified_by' => $actor->id, 'verified_at' => now()]);
+                    if (! $record->update(['verification_status' => 'verified', 'verified_by' => $actor->id, 'verified_at' => now()])) {
+                        throw new \RuntimeException('Academic verification was canceled.');
+                    }
                 }
 
                 foreach ($files as $file) {

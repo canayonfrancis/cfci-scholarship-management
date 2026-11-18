@@ -12,7 +12,7 @@ class AcademicRecordGrade extends Model
 
     public const COLUMNS = ['units' => 'Units', 'prelim' => 'Prelim', 'midterm' => 'Midterm', 'semi_final' => 'Semi-Final', 'final' => 'Final', 'average' => 'Average', 'equivalent' => 'Equivalent'];
 
-    protected $fillable = ['subject_code', 'subject_name', 'units', 'prelim', 'midterm', 'semi_final', 'final', 'average', 'equivalent', 'remarks'];
+    protected $fillable = ['subject_code', 'subject_name', 'units', 'prelim', 'midterm', 'semi_final', 'final', 'average', 'equivalent', 'remarks', 'reported_status'];
 
     public function academicRecord(): BelongsTo
     {

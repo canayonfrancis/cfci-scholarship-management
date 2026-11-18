@@ -19,6 +19,8 @@ class AcademicRecord extends Model
         'year_level',
         'enrollment_status',
         'grade_average',
+        'certified_percentage_gwa',
+        'certified_gwa_reference',
         'units_enrolled',
         'units_completed',
         'academic_summary',

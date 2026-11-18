@@ -12,6 +12,7 @@ use App\Http\Requests\ScholarshipEvidenceRequest;
 use App\Models\AcademicPeriod;
 use App\Models\AcademicValidationContext;
 use App\Models\Document;
+use App\Models\ProgramAcademicRequirement;
 use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipAssignment;
@@ -19,6 +20,7 @@ use App\Models\ScholarshipProgram;
 use App\Models\Student;
 use App\Services\Eligibility\OfficialRuleCatalog;
 use App\Services\Eligibility\PrivateEvidence;
+use App\Services\Eligibility\SchoolGradingPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -96,12 +98,24 @@ class ScholarshipEvaluationController extends Controller
         $application->load(['student', 'program', 'academicPeriod', 'assignment', 'terms.confirmedBy', 'documents.reviewedBy', 'evaluationRuns.evaluator', 'externalApprovals.documents']);
         $runs = $application->evaluationRuns->sortByDesc('run_number');
         $context = AcademicValidationContext::current()->load(['activePeriod', 'sourcePeriod']);
+        $gradeSource = $context->source_period_id ? $application->student->academicRecords()->with('grades')->where('academic_period_id', $context->source_period_id)->orderByDesc('revision')->first() : null;
+        $academic = $application->student->academicRecords()->where('academic_period_id', $application->academic_period_id)->orderByDesc('revision')->first();
+        $academicPolicyReady = ProgramAcademicRequirement::storageReady();
+        $academicRequirements = $academicPolicyReady ? $application->terms->academicRequirements()->orderByDesc('revision')->first() : null;
+        $contextValid = $context->active_period_id === $application->academic_period_id && $context->source_period_id && $context->confirmed_by && $context->confirmed_at && filled($context->source_policy_reference);
+        $gradeSnapshot = $contextValid && $gradeSource?->verification_status === 'verified' && $gradeSource->verified_by && $gradeSource->verified_at ? $gradeSource->only(['verification_status', 'verified_by', 'verified_at', 'academic_standing', 'certified_percentage_gwa', 'certified_gwa_reference']) : null;
+        if ($gradeSnapshot) {
+            $gradeSnapshot['subjects'] = $gradeSource->grades->map(fn ($grade) => $grade->only(array_diff($grade->getFillable(), ['equivalent'])))->all();
+        }
+        $enrollmentSnapshot = $contextValid && $academic?->verification_status === 'verified' && $academic->verified_by && $academic->verified_at ? $academic->only(['verification_status', 'enrollment_status']) : null;
 
         return view('evaluations.show', [
             'context' => $context,
-            'gradeSource' => $context->source_period_id ? $application->student->academicRecords()->with('grades')->where('academic_period_id', $context->source_period_id)->orderByDesc('revision')->first() : null,
+            'gradeSource' => $gradeSource, 'academicRequirements' => $academicRequirements,
+            'academicPolicyReady' => $academicPolicyReady,
+            'academicCheck' => app(SchoolGradingPolicy::class)->check($gradeSnapshot, $academicRequirements?->snapshot(), $enrollmentSnapshot),
             'application' => $application, 'runs' => $runs, 'latest' => $runs->first(),
-            'academic' => $application->student->academicRecords()->where('academic_period_id', $application->academic_period_id)->orderByDesc('revision')->first(),
+            'academic' => $academic,
             'policy' => $catalog->forProgram($application->program->code), 'policyApplicable' => $catalog->appliesTo($application->academicPeriod),
             'facts' => $application->program->code === 'EDUKAR' ? [] : OfficialRuleCatalog::FACTS,
             'documentTypes' => $application->program->code === 'EDUKAR' ? [] : $catalog->validationDocuments(),

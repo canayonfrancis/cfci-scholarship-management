@@ -1,12 +1,20 @@
 # Direct validation: confirmed scope and rule sources
 
+**2026-11-19 grading update:** Percentage grades, the four-period subject mean and
+the 75% passing threshold are now confirmed. See
+[REC-01 grade computation and validation](../19-academic-grade-computation-and-validation.md)
+for the implementation, provisional unit-weighted GWA, historical Equivalent
+preservation, program-period academic policy versions and manual verification guide.
+This update supersedes the earlier unconfirmed subject-formula/passing-scale notes
+below; official semester rules and provider scope remain unchanged.
+
 Updated 2026-11-11, Asia/Manila, after CFCI's clarification. The system validates existing scholars and Registrar academic records. Scholarship application processing, including EDUKAR/AKLAT intake, is outside scope.
 
 ## Confirmed CFCI requirements
 
 | Area | Confirmed | Pending |
 | --- | --- | --- |
-| Reported grades | Subject rows with Prelim, Midterm, Semi-Final, Final, Average, Equivalent, units and remarks. Reported examples include 92/93/94 and 1.1/1.2/1.5/1.7/2.2. | Grade conversion formula, passing thresholds and full scale. The examples are not an exhaustive scale. |
+| Reported grades | Percentage components 0–100; subject mean `(Prelim + Midterm + Semi-Final + Final) / 4`; subject passes at unrounded average ≥75. Equivalent is historical only and never used in calculations. | Official GWA formula/inclusion/rounding; approved program-specific thresholds and failed-subject policies. |
 | Target period | Use the single active academic year/semester configured in the system. | No year/semester is inferred from examples, the current date, or an open-for-maintenance flag. |
 | Grading source | Use the source semester specified by confirmed school policy for the active target period. | First semester is common, not an automatic source. The actual mapping requires a cited school policy. |
 | External applications | Students apply directly through the relevant provider. | No application intake, application checklist, submission flow, or EDUKAR exception engine belongs in this system. |
@@ -16,7 +24,7 @@ Administrators configure the active and source periods in **Academic periods**, 
 
 ## Recording grades
 
-`academic_record_grades` is a child of the versioned Registrar `academic_records` table. Enter reported values exactly; do not calculate Average from the grading columns, derive Equivalent, assign standing from a number, or total/interpret units as an eligibility rule. Numeric entries are stored as reported text so values such as `92.7500`, `1.10`, and `3.00` retain their precision. Format/length checks and a 60-row request limit are technical safeguards, not a grading scale or course-load limit. Remarks retain uninterpreted source text; no special-mark conversion is implemented.
+`academic_record_grades` is a child of versioned Registrar `academic_records`. Reported percentage components, reported subject average, units and remarks remain text so original precision such as `92.7500` is retained. A separate backend-derived four-period mean and provisional unit-weighted GWA are displayed; neither overwrites the reported average nor Registrar standing. INC/DRP/missing/reconciliation cases require review and are not zero. Existing Equivalent values are retained without new inputs, conversions or eligibility use. The 60-row limit is a technical form safeguard, not an academic course-load rule.
 
 Draft rows can be maintained. Verification records the Registrar and server date, then database triggers prevent adding, editing, moving or deleting grade rows under the verified revision. Corrections create another academic revision with its own subject rows and evidence. Previously stored semester averages remain historical values and are not converted into invented subject rows. Certificates remain private and authorization-protected.
 
@@ -39,13 +47,13 @@ Institutional/non-academic facts are checked by the Coordinator against private,
 
 ## Pending academic policy and outcomes
 
-The reported column format is now confirmed. The school rules needed to interpret those values for eligibility remain unconfirmed. `SchoolGradingPolicy` therefore returns review in the delivered application. High reported numbers, a manually selected standing, completed national fact fields, a confirmation checkbox or request-supplied policy flags cannot turn that unknown prerequisite into an eligible or ineligible automatic decision.
+The subject percentage formula and 75% pass threshold are confirmed. `SchoolGradingPolicy` now reviews the latest applicable confirmed program-period academic requirement version and Registrar-verified source. Provisional unit-weighted GWA never supplies an official minimum-GWA decision. Where an approved minimum exists, only separately recorded Registrar-certified percentage GWA can satisfy it. Unconfigured requirements, missing/unverified/discrepant grades, INC/dropped subjects and failed-subject cases retain academic review safeguards. No values are configured automatically for actual scholarship programs.
 
-Missing/unconfirmed active context, source policy, verified enrollment, reported source grades, mandatory evidence or school academic rules produce `needs_review` (pending review). This takes precedence over a separate national-rule failure while required facts/policies remain unresolved. Production validation will stay pending until the school supplies the required academic criteria and those confirmed checks are implemented. Tests of downstream national-rule/activation behavior use an explicitly synthetic resolved school prerequisite; they do not configure or enable any invented production rule.
+Missing/unconfirmed active context, source policy, verified enrollment, reported source grades, mandatory evidence or school academic rules produce `needs_review` (pending review). This takes precedence over a separate national-rule failure while required facts/policies remain unresolved. Production validation remains pending until approved program academic criteria and any required certified GWA are recorded through the authorized workflow. Older synthetic automation fixtures were left intact and may need developer updates for the new scope/schema; no functional tests were executed for REC-01.
 
 The pure `EligibilityEvaluator` aggregates confirmed checks; `EvaluateApplication` assembles trusted inputs, calls the policy checks and appends an immutable evaluation. It does not submit a scholarship application. Existing `scholarship_applications` and `submission_revision` identifiers are retained solely as legacy internal semester-validation storage, preserving FKs, existing rows and history. No new application lifecycle is added; old submitted states are retained as historical data.
 
-Each new run has scope version `cfci-direct-validation-v1` and retains its exact source/context, checked facts, applied rule/evidence keys, evidence checksums/reviewers, reasons, evaluator and date. Prior runs are not overwritten. Pre-clarification runs cannot be treated as current under the corrected scope. Current-decision checks also reject changed source revisions, context revisions, unavailable/corrupted evidence, newer runs and active-award conflicts.
+New percentage-validation runs use `cfci-percentage-validation-v2` and retain their exact source/context, calculation version, academic requirement version, checked facts, applied rule/evidence keys, evidence checksums/reviewers, reasons, evaluator and date. Prior runs are not overwritten. Earlier-scope runs require reassessment before current reliance. Current-decision checks reject changed academic policy/source/context revisions, unavailable/corrupted evidence, newer runs and active-award conflicts. Historical billing and assignment records are not rewritten.
 
 ## EDUKAR/AKLAT and external status
 
@@ -57,7 +65,7 @@ Activation remains a separate guarded action requiring current eligible school v
 
 ## Remaining decisions
 
-- Confirm actual CFCI conversion/eligibility interpretation, passing thresholds and full grading scale before implementing those checks. Do not derive them from the example grades.
+- Confirm official GWA formula, included/excluded subject treatment, rounding and actual program-period academic requirements. Equivalent conversion is excluded; no such conversion should be implemented.
 - Configure actual current and source periods with a school reference; migration and tests do not choose live school periods.
 - Review any special national categories, school-approved exceptions or custom-semester mappings before automatic decisions.
 - Confirmed national `program_period_terms` rows retain their existing immutability. No unknown amount is authorized here; later rate revisions need reviewed financial handling.

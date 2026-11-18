@@ -6,6 +6,7 @@ use App\Actions\Records\RecordAudit;
 use App\Models\AcademicValidationContext;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipAssignment;
+use App\Models\ScholarshipProgram;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\Eligibility\OfficialRuleCatalog;
@@ -27,6 +28,7 @@ class ActivateAward
                 AcademicValidationContext::whereKey(1)->lockForUpdate()->firstOrFail();
                 $application = ScholarshipApplication::whereKey($application->id)->lockForUpdate()->firstOrFail();
                 Gate::forUser($actor)->authorize('evaluate', $application);
+                $application->setRelation('program', ScholarshipProgram::whereKey($application->program_id)->lockForUpdate()->firstOrFail());
                 $assignment = $application->assignment()->lockForUpdate()->first();
                 $fail = fn (string $message) => throw ValidationException::withMessages(['award' => $message]);
                 if (! $assignment || $assignment->status !== 'pending' || $student->record_status !== 'active' || ! $application->program->is_active) {
