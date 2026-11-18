@@ -2,7 +2,6 @@
 
 namespace App\Services\Records;
 
-use DOMDocument;
 use DOMXPath;
 use Illuminate\Validation\ValidationException;
 use ZipArchive;
@@ -90,61 +89,10 @@ class ScholarSpreadsheet
             $this->reject('The Excel file is corrupted, encrypted or is not a valid .xlsx workbook.');
         }
         try {
-            if ($zip->numFiles > 200) {
-                $this->reject('The workbook contains too many internal files. Use the provided template.');
-            }
-            $total = 0;
-            $names = [];
-            for ($i = 0; $i < $zip->numFiles; $i++) {
-                $entry = $zip->statIndex($i);
-                $name = $entry['name'];
-                $total += $entry['size'];
-                if (isset($names[$name]) || str_contains($name, '..') || str_contains($name, '\\')
-                    || str_starts_with($name, '/') || preg_match('/(?:vbaProject|embeddings|externalLinks|activeX)/i', $name)
-                    || $total > config('scholar-imports.max_uncompressed_bytes')
-                    || $entry['size'] > config('scholar-imports.max_xml_bytes')) {
-                    $this->reject('The workbook is too complex or contains unsupported embedded content. Use the provided template.');
-                }
-                $names[$name] = true;
-                if (str_ends_with($name, '.rels')) {
-                    $relations = $this->xml($this->part($zip, $name));
-                    foreach ($relations->getElementsByTagNameNS('http://schemas.openxmlformats.org/package/2006/relationships', 'Relationship') as $relation) {
-                        if (strcasecmp($relation->getAttribute('TargetMode'), 'External') === 0) {
-                            $this->reject('External workbook links are not supported. Remove linked content before uploading.');
-                        }
-                    }
-                }
-            }
-            $types = $this->xml($this->part($zip, '[Content_Types].xml'));
-            $validWorkbookType = false;
-            foreach ($types->getElementsByTagNameNS('http://schemas.openxmlformats.org/package/2006/content-types', 'Override') as $type) {
-                if ($type->getAttribute('PartName') === '/xl/workbook.xml') {
-                    $validWorkbookType = $type->getAttribute('ContentType') === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml';
-                }
-            }
-            if (! $validWorkbookType) {
-                $this->reject('Upload an ordinary .xlsx workbook. Macro-enabled and other workbook formats are not supported.');
-            }
-            $workbook = $this->xml($this->part($zip, 'xl/workbook.xml'));
-            $sheet = $workbook->getElementsByTagNameNS(self::MAIN, 'sheet')->item(0);
-            if ($sheet === null) {
-                $this->reject('The workbook has no data worksheet.');
-            }
-            $relationshipId = $sheet->getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
-            $relations = $this->xml($this->part($zip, 'xl/_rels/workbook.xml.rels'));
-            $sheetPath = null;
-            foreach ($relations->getElementsByTagNameNS('http://schemas.openxmlformats.org/package/2006/relationships', 'Relationship') as $relation) {
-                if ($relation->getAttribute('Id') === $relationshipId) {
-                    $target = $relation->getAttribute('Target');
-                    $sheetPath = str_starts_with($target, '/') ? ltrim($target, '/') : 'xl/'.$target;
-                }
-            }
-            if (! is_string($sheetPath) || ! preg_match('#\Axl/worksheets/[A-Za-z0-9_.-]+\.xml\z#D', $sheetPath)) {
-                $this->reject('The first worksheet is not a supported data sheet.');
-            }
+            $package = (new ScholarWorkbookPackage($zip))->inspect();
             $strings = [];
-            if (isset($names['xl/sharedStrings.xml'])) {
-                $shared = $this->xml($this->part($zip, 'xl/sharedStrings.xml'));
+            if ($package['shared'] !== null) {
+                $shared = $package['shared'];
                 foreach ($shared->getElementsByTagNameNS(self::MAIN, 'si') as $string) {
                     $strings[] = $this->text($string);
                     if (count($strings) > 20000) {
@@ -152,7 +100,7 @@ class ScholarSpreadsheet
                     }
                 }
             }
-            $data = $this->xml($this->part($zip, $sheetPath));
+            $data = $package['data'];
             $xpath = new DOMXPath($data);
             $xpath->registerNamespace('s', self::MAIN);
             if ($xpath->query('/s:worksheet/s:mergeCells/s:mergeCell')->length > 0) {
@@ -187,13 +135,20 @@ class ScholarSpreadsheet
                     $seen[$column] = true;
                     $type = $cell->getAttribute('t');
                     $raw = $xpath->query('s:v', $cell)->item(0)?->textContent ?? '';
-                    $value = match ($type) {
-                        's' => ctype_digit($raw) && array_key_exists((int) $raw, $strings) ? $strings[(int) $raw] : throw new \RuntimeException('Invalid shared string.'),
-                        'inlineStr' => $this->text($cell),
+                    $inline = $type === 'inlineStr' ? $this->text($cell) : '';
+                    $hasFormula = $xpath->query('s:f', $cell)->length > 0;
+                    if (! $hasFormula && $this->trimValue($raw) === '' && $this->trimValue($inline) === '') {
+                        continue; // Excel may retain a type/style on a genuinely empty cell.
+                    }
+                    $value = $hasFormula ? '[Formula rejected]' : match ($type) {
+                        's' => ctype_digit(trim($raw)) && array_key_exists((int) $raw, $strings)
+                            ? $strings[(int) $raw]
+                            : $this->reject('The workbook contains a missing or invalid shared-string reference. Save a fresh .xlsx copy.'),
+                        'inlineStr' => $inline,
                         '', 'n', 'str' => $raw,
                         default => '',
                     };
-                    if ($xpath->query('s:f', $cell)->length > 0) {
+                    if ($hasFormula) {
                         $issues[] = 'Formulas are not accepted; replace formulas with plain text values.';
                         $value = '[Formula rejected]';
                     }
@@ -201,13 +156,13 @@ class ScholarSpreadsheet
                         $issues[] = 'Use plain text or numeric values; error, Boolean and date cells are unsupported.';
                     }
                     if ($column > 10) {
-                        if (trim($value) !== '') {
+                        if ($this->trimValue($value) !== '') {
                             $issues[] = 'Only the ten template columns are allowed.';
                         }
 
                         continue;
                     }
-                    if ($number > 1 && in_array($column, [1, 10], true) && trim($value) !== '' && ! in_array($type, ['s', 'inlineStr', 'str'], true)) {
+                    if ($number > 1 && in_array($column, [1, 10], true) && $this->trimValue($value) !== '' && ! in_array($type, ['s', 'inlineStr', 'str'], true)) {
                         $issues[] = self::HEADERS[$column - 1].' must be stored as Text in Excel. Re-enter it from the original record to retain leading zeros.';
                     }
                     $values[$column - 1] = $value;
@@ -234,36 +189,7 @@ class ScholarSpreadsheet
         }
     }
 
-    private function xml(string $content): DOMDocument
-    {
-        if (stripos($content, '<!DOCTYPE') !== false || stripos($content, '<!ENTITY') !== false) {
-            $this->reject('XML document types and entities are not allowed in uploaded workbooks.');
-        }
-        $previous = libxml_use_internal_errors(true);
-        try {
-            $document = new DOMDocument;
-            if (! $document->loadXML($content, LIBXML_NONET | LIBXML_COMPACT) || $document->doctype !== null) {
-                throw new \RuntimeException('Invalid XML.');
-            }
-
-            return $document;
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
-    private function part(ZipArchive $zip, string $name): string
-    {
-        $data = $zip->getFromName($name, config('scholar-imports.max_xml_bytes') + 1);
-        if (! is_string($data) || strlen($data) > config('scholar-imports.max_xml_bytes')) {
-            throw new \RuntimeException('Missing or oversized workbook part.');
-        }
-
-        return $data;
-    }
-
-    private function text(\DOMNode $node): string
+    private function text(\DOMElement $node): string
     {
         $value = '';
         foreach ($node->getElementsByTagNameNS(self::MAIN, 't') as $text) {
@@ -275,7 +201,7 @@ class ScholarSpreadsheet
 
     private function header(array $values): void
     {
-        if (array_map(fn ($value) => trim((string) $value), $values) !== self::HEADERS) {
+        if (array_map(fn ($value) => $this->trimValue((string) $value), $values) !== self::HEADERS) {
             $this->reject('Row 1 must contain these exact, unique columns in order: '.implode(', ', self::HEADERS).'.');
         }
     }
@@ -317,7 +243,7 @@ class ScholarSpreadsheet
 
     private function blank(array $values): bool
     {
-        return count(array_filter($values, fn ($value) => trim((string) $value) !== '')) === 0;
+        return count(array_filter($values, fn ($value) => $this->trimValue((string) $value) !== '')) === 0;
     }
 
     private function row(int $number, array $values, array $issues = []): array
@@ -327,7 +253,7 @@ class ScholarSpreadsheet
         }
         $values = array_slice(array_pad($values, 10, ''), 0, 10);
         foreach ($values as &$value) {
-            $value = trim((string) $value);
+            $value = $this->trimValue((string) $value);
             if (mb_strlen($value) > 1000 || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $value)) {
                 $issues[] = 'A cell contains excessive text or unsupported control characters.';
                 $value = mb_substr(preg_replace('/[\x00-\x1F\x7F]/u', '', $value), 0, 1000);
@@ -342,6 +268,11 @@ class ScholarSpreadsheet
         if (count($rows) > config('scholar-imports.max_rows')) {
             $this->reject('A file may contain at most '.config('scholar-imports.max_rows').' scholar records. Split it into smaller batches.');
         }
+    }
+
+    private function trimValue(string $value): string
+    {
+        return preg_replace('/\A[\s\p{Z}\x{FEFF}]+|[\s\p{Z}\x{FEFF}]+\z/u', '', $value) ?? trim($value);
     }
 
     private function reject(string $message): never

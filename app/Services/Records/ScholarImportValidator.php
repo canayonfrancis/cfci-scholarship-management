@@ -44,7 +44,7 @@ class ScholarImportValidator
             $course = count($matches) === 1 ? $matches[0] : null;
             $attributes = [
                 'student_number' => $values[0], 'last_name' => $values[1], 'first_name' => $values[2],
-                'middle_name' => $values[3] === '' ? null : $values[3], 'suffix' => $values[4] === '' ? null : $values[4],
+                'middle_name' => $values[3] === '' ? null : $values[3], 'suffix' => ScholarProfile::normalizeSuffix($values[4]),
                 'sex' => $sex, 'academic_program_id' => $course?->id, 'year_level' => ctype_digit($year) ? (int) $year : $year,
                 'email' => Str::lower($values[8]), 'phone' => $values[9], 'record_status' => 'active',
             ];
@@ -67,6 +67,7 @@ class ScholarImportValidator
                 'sex.required' => 'Sex must be Male, Female, 0 (Male) or 1 (Female).',
                 'academic_program_id.required' => 'Course must match one existing active registered course name. Unknown, inactive or ambiguous courses are not accepted.',
                 'year_level.in' => 'Year Level must be one of the configured year levels.',
+                'suffix.max' => 'EXT must not exceed 30 characters. Common forms such as JR, Jr., SR, Sr., II, III and IV are accepted.',
             ], [
                 'student_number' => 'Student ID', 'last_name' => 'Last Name', 'first_name' => 'First Name',
                 'middle_name' => 'Middle Name', 'suffix' => 'EXT', 'email' => 'Email', 'phone' => 'Contact', 'year_level' => 'Year Level',

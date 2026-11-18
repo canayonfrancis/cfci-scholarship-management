@@ -50,6 +50,22 @@ class ScholarProfile
         return preg_match('/^(?:9[0-9]{9}|[0-9]{8})$/D', $digits) ? $digits : null;
     }
 
+    /** Import normalization only; legacy saved suffixes are not rewritten. */
+    public static function normalizeSuffix(?string $suffix): ?string
+    {
+        $suffix = trim((string) $suffix);
+        if ($suffix === '') {
+            return null;
+        }
+
+        return match (strtoupper($suffix)) {
+            'JR', 'JR.' => 'Jr.',
+            'SR', 'SR.' => 'Sr.',
+            'II' => 'II', 'III' => 'III', 'IV' => 'IV',
+            default => $suffix, // Existing schema permits other legitimate suffixes up to 30 characters.
+        };
+    }
+
     public static function missing(Student $student): array
     {
         $missing = [];

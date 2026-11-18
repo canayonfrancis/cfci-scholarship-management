@@ -4,6 +4,12 @@ Date: 2026-11-19 (Asia/Manila)
 
 **Final implementation status: IMPLEMENTED — PENDING MANUAL VERIFICATION**
 
+**Compatibility update:** See [the template compatibility fix](17-bulk-upload-template-compatibility-fix.md)
+for the later OPC-aware package validation, narrowly allowed automatic Email mailto
+metadata, common suffix normalization and formatting-only/Unicode-whitespace row
+handling. That report supersedes this document's original blanket external-link
+restriction. Neither implementation has been functionally tested by the agent.
+
 ## 1. Executive summary
 
 The Scholars directory now offers **Bulk Upload** instead of manual Add scholar.

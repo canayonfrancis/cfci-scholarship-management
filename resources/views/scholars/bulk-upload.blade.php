@@ -12,11 +12,13 @@
             <summary>Accepted values and file instructions</summary>
             <ul>
                 <li><strong>Sex:</strong> Male or Female (case-insensitive), or 0 for Male and 1 for Female.</li>
+                <li><strong>EXT:</strong> optional. JR, Jr and Jr. are saved as Jr.; SR, Sr and Sr. as Sr.; II, III and IV are saved in uppercase. Other legitimate suffixes may contain up to 30 characters.</li>
                 <li><strong>Year Level:</strong> @foreach(\App\Services\Records\ScholarProfile::yearLevels() as $value => $label){{ $value }} ({{ $label }}){{ $loop->last ? '.' : '; ' }}@endforeach</li>
                 <li><strong>Contact:</strong> a Philippine mobile number such as 09171234567, 9171234567 or +639171234567, or an eight-digit landline. Original leading zeros are retained.</li>
                 <li><strong>Course:</strong> @if($courses->isEmpty())No active courses are registered. Ask an authorized administrator to register courses before uploading.@else{{ $courses->implode('; ') }}.@endif</li>
                 <li>Accepted files: .xlsx or comma-separated UTF-8 .csv. Maximum {{ number_format(config('scholar-imports.max_upload_kb')) }} KB and {{ number_format(config('scholar-imports.max_rows')) }} records per file.</li>
-                <li>Only the first worksheet is imported. Do not include totals, extra data columns, formulas, macros, external links or merged data cells. Blank rows are ignored.</li>
+                <li>Only the first worksheet is imported. Do not include totals, extra data columns, formulas, macros, external data connections or merged data cells. Formatting-only and blank rows are ignored.</li>
+                <li>Enter email addresses normally; Excel's automatic simple mailto links on Email cells can remain. Only the cell text is imported. Other external links are unsupported.</li>
                 <li>Student IDs must be new and unique. Existing records are never overwritten or merged. Contact email is not a login account and follows the existing shared-contact rules.</li>
             </ul>
         </details>
