@@ -77,7 +77,9 @@ class BillingBatchController extends Controller
                 ->withInput($request->only('scholarship_batch_id', 'reference'));
         }
 
-        return to_route('billing-batches.show', $batch)->with('status', 'Billing draft created. Review the retrieved roster members and select eligible scholars. Final submission is not yet available.');
+        return to_route('billing-batches.show', $batch)->with('status', app(BillingRoster::class)->demonstrationAvailable($batch)
+            ? 'UAT sample draft created. Review enrollment, compliance, external approvals and eligible scholars before fictional submission.'
+            : 'Billing draft created. Review the retrieved roster members and select eligible scholars. Final submission is not yet available.');
     }
 
     public function configure(Request $request, ManageBillingBatch $manage): RedirectResponse

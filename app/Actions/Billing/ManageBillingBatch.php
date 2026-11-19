@@ -210,6 +210,7 @@ class ManageBillingBatch
                     if ($items->isEmpty() || $reference === '') {
                         $this->fail('Submission requires at least one valid scholar and a submission reference.');
                     }
+                    $classification = $this->roster->demonstrationClassification($batch);
                     foreach ($items as $item) {
                         $application = $item->application()->lockForUpdate()->firstOrFail();
                         $application->assignment()->lockForUpdate()->first();
@@ -222,6 +223,9 @@ class ManageBillingBatch
                         if ($item->status !== 'draft' || $item->gross_amount !== $basis['gross_amount'] || $item->entitlement_snapshot !== $basis['entitlement_snapshot'] ||
                             $item->evaluation_run_id !== $basis['evaluation_run_id'] || $item->external_approval_id !== $basis['external_approval_id']) {
                             $this->fail('A billing item changed or its validation/approval was replaced. Remove and add it again before submission.');
+                        }
+                        if ($classification !== null) {
+                            $basis['basis_snapshot']['uat_classification'] = $classification;
                         }
                         $item->update([...$basis, 'status' => 'finalized', 'finalized_by' => $actor->id, 'finalized_at' => now()]);
                         $this->audit->record($actor, $item, 'billing_item_submitted');

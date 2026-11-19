@@ -35,6 +35,8 @@ class ScholarshipReportController extends Controller
         ]);
         $this->validateScope($filters);
         $result = $reports->build($report, $filters);
+        $result['demonstration'] = \App\Services\Eligibility\OfficialRuleCatalog::demonstrationDatabase()
+            || $result['rows']->contains('program', \App\Services\Eligibility\OfficialRuleCatalog::DEMO_PROGRAM);
         $result['filters'] = array_diff_key($filters, ['format' => true, 'page' => true]);
         if (($filters['format'] ?? null) === 'csv') {
             return $this->csv($result);
@@ -83,6 +85,9 @@ class ScholarshipReportController extends Controller
             $safe = fn ($value) => preg_match('/^[\s\x{FEFF}]*[=+@-]|^[\t\r\n]/u', (string) $value) ? "'".$value : $value;
             $write = fn ($values) => fputcsv($stream, array_map($safe, $values), ',', '"', '');
             $write(['CFCI scholarship report', $result['title']]);
+            if ($result['demonstration']) {
+                $write([\App\Services\Eligibility\OfficialRuleCatalog::DEMO_LABEL]);
+            }
             $write(['Generated (Asia/Manila)', $result['generated_at']]);
             $write(['Definition', $result['definition']]);
             foreach ($result['filters'] as $key => $value) {

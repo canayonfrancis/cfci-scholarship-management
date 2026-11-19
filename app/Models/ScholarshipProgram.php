@@ -32,7 +32,9 @@ class ScholarshipProgram extends Model
 
     public function usesFixedSemesterRate(): bool
     {
-        return in_array(strtoupper(trim($this->code)), ['TDP', 'TES', 'COSCHO'], true);
+        return in_array(strtoupper(trim($this->code)), ['TDP', 'TES', 'COSCHO'], true)
+            || ($this->code === \App\Services\Eligibility\OfficialRuleCatalog::DEMO_PROGRAM
+                && \App\Services\Eligibility\OfficialRuleCatalog::demonstrationEnabled());
     }
 
     public function assignments(): HasMany

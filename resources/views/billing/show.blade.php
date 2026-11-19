@@ -1,4 +1,5 @@
 @php
+    $demonstrationSubmission = app(\App\Services\Billing\BillingRoster::class)->demonstrationAvailable($batch);
     $tabs = ['roster' => 'Roster Validation', 'items' => 'Billing Items', 'submission' => 'Submission'];
     $editErrors = $errors->getBag('editBilling');
     $enrollmentErrors = $errors->getBag('enrollment');
@@ -26,7 +27,7 @@
                 <div><dt>Prepared billing total</dt><dd>{{ $preparedTotal === null ? 'Unconfirmed total' : 'PHP '.number_format((float) $preparedTotal, 2) }}</dd></div>
             </dl>
             @if(!$batch->scholarshipBatch)<p class="record-help">The original roster is unknown; none is inferred. Existing financial history is retained. An unlinked draft cannot add scholars or be submitted.</p>@endif
-            @if($batch->status === 'draft')<p class="billing-submission-notice"><strong>Final submission unavailable:</strong> approved Form 2/Form 3 templates and current payable classification are still required. <a class="records-link" href="{{ route('billing-batches.show', ['batch' => $batch, 'tab' => 'submission']) }}" @click.prevent="selectTab('submission', true)">View submission requirements</a>.</p>@endif
+            @if($batch->status === 'draft')<p class="billing-submission-notice">@if($demonstrationSubmission)<strong>{{ \App\Services\Eligibility\OfficialRuleCatalog::DEMO_LABEL }}:</strong> fictional whole-roster enrollment classification is checked at submission. Official forms remain unavailable.@else<strong>Final submission unavailable:</strong> approved Form 2/Form 3 templates and current payable classification are still required.@endif <a class="records-link" href="{{ route('billing-batches.show', ['batch' => $batch, 'tab' => 'submission']) }}" @click.prevent="selectTab('submission', true)">View submission requirements</a>.</p>@endif
             <details class="billing-additional-details"><summary>Additional billing details</summary>
                 <dl class="evaluation-summary-grid billing-summary-grid">
                     <div><dt>Prepared by</dt><dd>{{ $batch->preparedBy?->name ?? 'Not recorded' }}</dd></div>

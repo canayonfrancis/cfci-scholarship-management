@@ -12,7 +12,9 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\Billing\AllocationSummary;
 use App\Services\Billing\BillingEligibility;
+use App\Services\Billing\BillingRoster;
 use App\Services\Billing\Money;
+use App\Services\Eligibility\OfficialRuleCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -57,7 +59,17 @@ class ManageScholarshipFunds
             if ($items->isEmpty()) {
                 $this->fail('An empty allocation batch cannot be approved.');
             }
+            $classification = null;
+            if ($batch->program->code === OfficialRuleCatalog::DEMO_PROGRAM) {
+                $classification = app(BillingRoster::class)->demonstrationClassification($batch);
+                if ($classification === null) {
+                    $this->fail('Fictional billing can only be approved in the enabled isolated local defense database.');
+                }
+            }
             foreach ($items as $item) {
+                if ($classification !== null && ($item->basis_snapshot['uat_classification'] ?? null) != $classification) {
+                    $this->fail('UAT enrollment classification changed after submission. Preserve the original record; do not approve stale classification.');
+                }
                 $application = $item->application()->lockForUpdate()->firstOrFail();
                 $application->assignment()->lockForUpdate()->first();
                 $rate = $batch->appliedRate();

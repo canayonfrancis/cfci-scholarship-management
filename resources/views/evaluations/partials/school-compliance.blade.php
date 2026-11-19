@@ -1,4 +1,5 @@
 @php($hasComplianceBasis = (bool) ($policy && $policyApplicable))
+@php($demonstration = (bool) ($policy['demonstration'] ?? false))
 <section class="dashboard-card records-card">
     <h2 class="records-section-title">School compliance</h2>
     <dl class="evaluation-summary-grid">
@@ -17,7 +18,11 @@
     <details class="evaluation-accordion" @if($failedForm === 'policy') open @endif data-has-errors="{{ $failedForm === 'policy' && $errors->any() ? 'true' : 'false' }}">
         <summary><strong>Applicable {{ $application->program->code }} rules</strong><span class="records-badge {{ $workspace['officialConfirmed'] ? 'is-green' : 'is-amber' }}">{{ $workspace['officialConfirmed'] ? 'Confirmed' : 'Confirmation required' }}</span></summary>
         <div class="evaluation-accordion-body">
-            <p><a class="records-link" href="{{ $policy['source'] }}" target="_blank" rel="noopener">{{ $policy['version'] }}</a></p>
+            @if($demonstration)
+                <p class="records-alert">{{ $policy['source'] }}. This sample is not institutional or provider authorization for actual CoScho scholars. Requirements: Registrar-verified enrollment, reviewed fictional certification, accepted certification and enrollment evidence. External award approval remains separate.</p>
+            @else
+                <p><a class="records-link" href="{{ $policy['source'] }}" target="_blank" rel="noopener">{{ $policy['version'] }}</a></p>
+            @endif
             @if($application->terms->confirmed_at)
                 <p class="record-help">Recorded confirmation: {{ $application->terms->confirmedBy?->name ?? 'Historical actor' }} / {{ $application->terms->confirmed_at->timezone('Asia/Manila')->format('M j, Y') }}.</p>
                 @unless($workspace['officialConfirmed'])<p class="records-alert">The retained rule confirmation does not match the applicable basis. It cannot authorize a positive decision.</p>@endunless
@@ -37,7 +42,10 @@
     <form id="evaluation-school-form" method="POST" action="{{ route('evaluations.run', $application) }}" data-workspace-form="evaluate" data-tab="school-compliance">
         @csrf<input type="hidden" name="_workspace_form" value="evaluate"><input type="hidden" name="submission_revision" value="{{ $application->submission_revision }}"><input type="hidden" name="previous_run" value="{{ $latest?->run_number ?? 0 }}">
         <x-input-error :messages="$errorsFor('evaluate', 'submission_revision')" /><x-input-error :messages="$errorsFor('evaluate', 'previous_run')" />
-        @if($hasComplianceBasis)
+        @if($hasComplianceBasis && $demonstration)
+            <p class="records-alert">{{ \App\Services\Eligibility\OfficialRuleCatalog::DEMO_LABEL }}. Select the actual finding from the fictional certification; nothing is automatically satisfied.</p>
+            <x-evaluation-fact field="authenticity" label="Fictional institutional certification confirms demonstration compliance" :value="$oldFor('evaluate', 'facts.authenticity', $prior['facts']['authenticity'] ?? 'unverified')" :source="$oldFor('evaluate', 'fact_sources.authenticity', $prior['fact_sources']['authenticity'] ?? '')" :messages="$errorsFor('evaluate', 'facts.authenticity')" :source-messages="$errorsFor('evaluate', 'fact_sources.authenticity')" />
+        @elseif($hasComplianceBasis)
             <x-record-field name="applicant_type" label="Applicable beneficiary category" type="select" required x-model="applicantType">@foreach(['new' => 'New beneficiary', 'continuing' => 'Continuing grantee'] as $value => $label)<option value="{{ $value }}" @selected($beneficiary === $value)>{{ $label }}</option>@endforeach</x-record-field>
             <details id="compliance-details" class="evaluation-accordion" @if($failedForm === 'evaluate' && $errors->any()) open @endif data-has-errors="{{ $failedForm === 'evaluate' && $errors->any() ? 'true' : 'false' }}">
                 <summary><strong>Detailed {{ $application->program->code }} compliance checks</strong><span class="records-badge is-amber" x-text="groupStatus('compliance-details')">Review required findings</span></summary>

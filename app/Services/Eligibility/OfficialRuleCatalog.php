@@ -3,9 +3,38 @@
 namespace App\Services\Eligibility;
 
 use App\Models\AcademicPeriod;
+use App\Models\Student;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class OfficialRuleCatalog
 {
+    public const DEMO_PROGRAM = 'UAT-COSCHO';
+    public const DEMO_LABEL = 'UAT SAMPLE — NOT FOR OFFICIAL SUBMISSION';
+
+    public static function demonstrationDatabase(): bool
+    {
+        $connection = DB::connection();
+
+        return $connection->getDriverName() === 'mysql'
+            && $connection->getDatabaseName() === 'cfci_sms_defense_demo';
+    }
+
+    public static function demonstrationEnabled(): bool
+    {
+        return app()->environment('local') && config('sample-data.defense_demo') === true
+            && self::demonstrationDatabase();
+    }
+
+    public function assertDemonstrationStudent(string $program, Student $student): void
+    {
+        if ($program === self::DEMO_PROGRAM && (! self::demonstrationEnabled()
+            || ! str_starts_with($student->student_number, 'UAT-DEF-')
+            || ! str_ends_with(strtolower($student->email ?? ''), '@example.invalid'))) {
+            throw ValidationException::withMessages(['demonstration' => 'Fictional compliance requires the isolated local defense database and a UAT-DEF- scholar with an @example.invalid email. It cannot authorize actual scholarship records.']);
+        }
+    }
+
     public const FACTS = [
         'filipino' => 'Filipino citizenship verified',
         'recognized_program' => 'HEI/program recognition and CHED-UniFAST MOA verified',
@@ -34,6 +63,16 @@ class OfficialRuleCatalog
 
     public function forProgram(string $code): ?array
     {
+        if ($code === self::DEMO_PROGRAM && self::demonstrationEnabled()) {
+            return [
+                'version' => 'UAT-INSTITUTIONAL-CERTIFICATION-v1',
+                'source' => self::DEMO_LABEL.' / fictional institutional certification scenario v1',
+                'demonstration' => true,
+                'facts' => ['authenticity' => 'Fictional school certification confirms this sample meets the demonstration requirements'],
+                'documents' => ['eligibility_support', 'enrollment_certificate'],
+                'scope' => 'Fictional CoScho walkthrough only. Not an official CoScho policy or Form 2/Form 3 definition.',
+            ];
+        }
         if (! in_array($code, ['TDP', 'TES'], true)) {
             return null;
         }
@@ -62,6 +101,9 @@ class OfficialRuleCatalog
     {
         if (! $this->forProgram($program)) {
             return [];
+        }
+        if ($program === self::DEMO_PROGRAM) {
+            return ['authenticity'];
         }
         $keys = ['filipino', 'recognized_program', 'permitted_aid', 'authenticity'];
         if ($kind === 'new') {

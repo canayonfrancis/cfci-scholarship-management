@@ -29,6 +29,7 @@ class ActivateAward
                 $application = ScholarshipApplication::whereKey($application->id)->lockForUpdate()->firstOrFail();
                 Gate::forUser($actor)->authorize('evaluate', $application);
                 $application->setRelation('program', ScholarshipProgram::whereKey($application->program_id)->lockForUpdate()->firstOrFail());
+                app(OfficialRuleCatalog::class)->assertDemonstrationStudent($application->program->code, $student);
                 $assignment = $application->assignment()->lockForUpdate()->first();
                 $fail = fn (string $message) => throw ValidationException::withMessages(['award' => $message]);
                 if (! $assignment || $assignment->status !== 'pending' || $student->record_status !== 'active' || ! $application->program->is_active) {

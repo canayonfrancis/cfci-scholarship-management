@@ -34,6 +34,21 @@ class EligibilityEvaluator
             return $this->result($checks);
         }
         $program = $input['program'];
+        if ($program === OfficialRuleCatalog::DEMO_PROGRAM) {
+            $source = trim($data['fact_sources']['authenticity'] ?? '');
+            $finding = $data['facts']['authenticity'] ?? 'unverified';
+            $add('fictional_certification', ! str_starts_with($source, 'UAT-') || $finding === 'unverified'
+                ? 'review' : ($finding === 'yes' ? 'pass' : 'fail'),
+                OfficialRuleCatalog::DEMO_LABEL.': record a reviewed certification finding and UAT- evidence reference.');
+            foreach (['eligibility_support', 'enrollment_certificate'] as $key) {
+                $add('document_'.$key, isset($input['evidence'][$key]) ? 'pass' : 'review', 'Accepted fictional evidence required: '.$key.'.');
+            }
+            if ($input['conflicting_assignment_id']) {
+                $add('active_award', 'review', 'Another active scholarship must be resolved before activation.');
+            }
+
+            return $this->result($checks);
+        }
         $add('special_case', ($data['special_case'] ?? 'unverified') === 'none' ? 'pass' : 'review', 'Special categories require their separately approved guidelines and review.');
         foreach ($this->catalog->requiredFacts($program, $data['applicant_type']) as $key) {
             $value = $data['facts'][$key] ?? 'unverified';

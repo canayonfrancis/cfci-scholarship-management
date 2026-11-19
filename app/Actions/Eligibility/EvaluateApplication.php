@@ -32,6 +32,7 @@ class EvaluateApplication
                 throw ValidationException::withMessages(['previous_run' => 'This assessment changed. Reload before evaluating again.']);
             }
             $program = ScholarshipProgram::whereKey($application->program_id)->lockForUpdate()->firstOrFail();
+            $this->catalog->assertDemonstrationStudent($program->code, $application->student);
             $terms = $application->terms()->lockForUpdate()->firstOrFail();
             $policy = $this->catalog->forProgram($program->code);
             $confirmed = $policy && $terms->confirmed_by && $terms->confirmed_at && $terms->rule_version === $policy['version'] && $terms->criteria == $policy && $this->catalog->appliesTo($application->academicPeriod);
@@ -63,7 +64,7 @@ class EvaluateApplication
                 'rule_version' => $terms->rule_version, 'input_snapshot' => $input, 'rule_snapshot' => [
                     'confirmed' => (bool) $confirmed, 'policy' => $terms->criteria, 'confirmed_by' => $terms->confirmed_by, 'confirmed_at' => $terms->confirmed_at,
                     'assessment_scope' => EligibilityEvaluator::SCOPE,
-                    'applied_facts' => $confirmed ? $this->catalog->requiredFacts($program->code, $data['applicant_type']) : [],
+                    'applied_facts' => $confirmed ? $this->catalog->requiredFacts($program->code, $data['applicant_type'] ?? 'new') : [],
                     'required_documents' => $confirmed ? $this->catalog->requiredDocuments($program->code, $data) : [],
                 ],
                 'check_results' => $result['checks'], 'automatic_outcome' => $result['outcome'],

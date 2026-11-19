@@ -8,6 +8,7 @@ use App\Models\BillingItem;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipBatch;
 use App\Models\ScholarshipBatchMembership;
+use App\Services\Eligibility\OfficialRuleCatalog;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -102,9 +103,70 @@ class BillingRoster
         }
     }
 
-    /** Fail closed until approved templates and revision-traceable classification exist (CR-02). */
+    public function demonstrationAvailable(BillingBatch $batch): bool
+    {
+        return $batch->program->code === OfficialRuleCatalog::DEMO_PROGRAM
+            && OfficialRuleCatalog::demonstrationEnabled();
+    }
+
+    /** Fictional enrollment classification, never an official Form 2/Form 3 mapping. Caller holds the billing transaction. */
+    public function demonstrationClassification(BillingBatch $batch): ?array
+    {
+        if (! $this->demonstrationAvailable($batch)) {
+            return null;
+        }
+        $this->selection((int) $batch->scholarship_batch_id, $batch->program_id, $batch->academic_period_id);
+        $members = ScholarshipBatchMembership::where('scholarship_batch_id', $batch->scholarship_batch_id)
+            ->orderBy('student_id')->lockForUpdate()->get();
+        $items = $batch->items()->orderBy('student_id')->lockForUpdate()->get();
+        $rows = [];
+        $enrolled = [];
+        $catalog = app(OfficialRuleCatalog::class);
+        foreach ($members as $member) {
+            $student = $member->student()->lockForUpdate()->firstOrFail();
+            $catalog->assertDemonstrationStudent($batch->program->code, $student);
+            $record = $student->academicRecords()->where('academic_period_id', $batch->academic_period_id)
+                ->orderByDesc('revision')->lockForUpdate()->first();
+            if ($member->program_id !== $batch->program_id || $member->academic_period_id !== $batch->academic_period_id
+                || ! $record || $record->verification_status !== 'verified' || ! $record->verified_by || ! $record->verified_at
+                || ! in_array($record->enrollment_status, ['enrolled', 'not_enrolled'], true)) {
+                throw ValidationException::withMessages(['classification' => 'UAT submission requires matching roster records and a current Registrar-verified enrollment finding for every sample scholar.']);
+            }
+            if ($record->enrollment_status === 'enrolled') {
+                $enrolled[] = $student->id;
+            }
+            $rows[] = [
+                'student_id' => $student->id, 'membership_id' => $member->id, 'assignment_id' => $member->assignment_id,
+                'enrollment_record_id' => $record->id, 'revision' => $record->revision,
+                'lock_version' => $record->lock_version, 'verified_by' => $record->verified_by,
+                'verified_at' => $record->verified_at->toIso8601String(),
+                'class' => $record->enrollment_status === 'enrolled' ? 'UAT_ENROLLED' : 'UAT_NOT_ENROLLED',
+            ];
+        }
+        $included = $items->pluck('student_id')->all();
+        sort($enrolled);
+        sort($included);
+        if ($items->isEmpty() || $enrolled !== $included || $items->pluck('student_id')->unique()->count() !== $items->count()) {
+            throw ValidationException::withMessages(['classification' => 'The fictional whole-roster scenario must bill every enrolled sample exactly once and exclude every not-enrolled sample. Resolve remaining eligibility before submission.']);
+        }
+        foreach ($items as $item) {
+            $member = $members->firstWhere('student_id', $item->student_id);
+            if (! $member || $member->assignment_id !== $item->assignment_id || $item->program_id !== $batch->program_id || $item->academic_period_id !== $batch->academic_period_id) {
+                throw ValidationException::withMessages(['classification' => 'A UAT item no longer matches its exact roster assignment and academic period.']);
+            }
+        }
+
+        return ['label' => OfficialRuleCatalog::DEMO_LABEL, 'version' => 'UAT-ENROLLMENT-CLASSIFICATION-v1',
+            'roster_id' => $batch->scholarship_batch_id, 'program_id' => $batch->program_id,
+            'academic_period_id' => $batch->academic_period_id, 'rows' => $rows];
+    }
+
+    /** Real submissions fail closed until approved templates and classification exist (CR-02). */
     public function submissionClassification(BillingBatch $batch): void
     {
+        if ($this->demonstrationClassification($batch) !== null) {
+            return;
+        }
         throw ValidationException::withMessages(['classification' => 'Final billing submission is blocked: approved Form 2/Form 3 templates and current payable classification are not yet available. Roster membership does not establish payability.']);
     }
 }

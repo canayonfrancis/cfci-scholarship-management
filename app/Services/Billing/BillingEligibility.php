@@ -19,6 +19,7 @@ class BillingEligibility
     public function basis(ScholarshipApplication $application, ProgramPeriodTerm $terms, ?ScholarshipRate $rate = null): array
     {
         $fail = fn (string $message) => throw ValidationException::withMessages(['billing' => $message]);
+        $this->catalog->assertDemonstrationStudent($application->program->code, $application->student);
         if (strtoupper(trim($application->program->code)) === 'EDUKAR') {
             $fail('EDUKAR requires an approved individual variable entitlement workflow. A uniform semester rate cannot establish its payable amount.');
         }

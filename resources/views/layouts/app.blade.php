@@ -30,6 +30,9 @@
 
             <!-- Page Content -->
             <main id="main-content">
+                @if(\App\Services\Eligibility\OfficialRuleCatalog::demonstrationDatabase())
+                    <p class="records-alert" role="note"><strong>{{ \App\Services\Eligibility\OfficialRuleCatalog::DEMO_LABEL }}</strong> — isolated defense database. Records, certification and financial transactions are fictional. No official submission or money transfer is performed.</p>
+                @endif
                 {{ $slot }}
             </main>
         </div>

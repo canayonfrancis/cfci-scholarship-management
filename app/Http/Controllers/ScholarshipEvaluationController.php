@@ -151,7 +151,10 @@ class ScholarshipEvaluationController extends Controller
             $audit->record($request->user(), $terms, 'semester_policy_confirmed');
         }, 3);
 
-        return to_route('evaluations.show', ['application' => $application, 'tab' => 'school-compliance'])->with('status', 'Official semester rules confirmed. Existing evaluation snapshots remain unchanged.');
+        return to_route('evaluations.show', ['application' => $application, 'tab' => 'school-compliance'])->with('status',
+            $application->program->code === OfficialRuleCatalog::DEMO_PROGRAM
+                ? OfficialRuleCatalog::DEMO_LABEL.' — fictional semester requirements confirmed.'
+                : 'Official semester rules confirmed. Existing evaluation snapshots remain unchanged.');
     }
 
     public function evaluate(EvaluateScholarshipRequest $request, ScholarshipApplication $application, EvaluateApplication $evaluate): RedirectResponse

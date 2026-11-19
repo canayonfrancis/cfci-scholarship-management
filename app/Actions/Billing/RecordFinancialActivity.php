@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Billing\BillingEligibility;
 use App\Services\Billing\FinancialEvidence;
 use App\Services\Billing\Money;
+use App\Services\Eligibility\OfficialRuleCatalog;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -30,6 +31,9 @@ class RecordFinancialActivity
 
     public static function approved(BillingBatch $batch): bool
     {
+        if ($batch->program->code === OfficialRuleCatalog::DEMO_PROGRAM && ! OfficialRuleCatalog::demonstrationEnabled()) {
+            return false;
+        }
         return ($batch->status === 'submitted' && $batch->submitted_at && $batch->approval()->exists())
             || ($batch->status === 'finalized' && $batch->finalized_at && $batch->finalized_by);
     }

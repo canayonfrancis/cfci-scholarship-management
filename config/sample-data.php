@@ -9,4 +9,6 @@ return [
     'program_defaults' => ['TES' => '7500.00', 'TDP' => '13500.00', 'COSCHO' => '45000.00'],
     // Enabled only in memory by the explicit, isolated demo command.
     'synthetic_demo' => false,
+    // Runtime defense walkthrough only; the catalog also requires local + the exact isolated database.
+    'defense_demo' => env('SMS_DEFENSE_DEMO', false),
 ];
