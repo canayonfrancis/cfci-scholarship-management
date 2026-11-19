@@ -16,6 +16,7 @@
     <section class="dashboard-card records-card">
         <h2 class="records-section-title">Registered programs</h2>
         <p class="record-help">Existing profiles retain inactive programs. Linked names are preserved; register a new entry for a different program.</p>
+        <div class="records-list-scroll" tabindex="0" role="region" aria-label="Registered academic programs; scroll for more programs">
         @forelse($programs as $program)
             <div class="scholar-program-row">
                 <p><strong>{{ $program->name }}</strong><small class="records-muted">{{ $program->students_count }} student profiles · {{ $program->is_active ? 'Available' : 'Inactive' }}</small></p>
@@ -29,6 +30,7 @@
                 @endcan
             </div>
         @empty<p class="record-help">No academic programs are registered. A Coordinator can add the school’s confirmed program names above.</p>@endforelse
+        </div>
         <div class="records-pagination">{{ $programs->links() }}</div>
     </section>
 </x-records-page>

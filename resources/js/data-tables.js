@@ -74,7 +74,20 @@ function sortIcon() {
 function enhanceTable(table, index) {
     if (table.dataset.tableReady || !table.tHead || !table.tBodies.length) return;
     table.dataset.tableReady = 'true';
-    const wrap = table.closest('.records-table-wrap, .table-wrap') ?? table.parentElement;
+    let wrap = table.closest('.records-table-wrap, .table-wrap');
+    if (!wrap) {
+        wrap = element('div', 'records-table-wrap');
+        table.before(wrap);
+        wrap.append(table);
+    }
+    wrap.classList.add('data-table-scroll');
+    if (!wrap.hasAttribute('tabindex')) wrap.tabIndex = 0;
+    if (!wrap.hasAttribute('role')) wrap.setAttribute('role', 'region');
+    if (!wrap.hasAttribute('aria-label') && !wrap.hasAttribute('aria-labelledby')) {
+        const heading = wrap.closest('section, article')?.querySelector('h2, h3');
+        const title = table.caption?.textContent.trim() || heading?.textContent.trim() || 'Data table';
+        wrap.setAttribute('aria-label', `${title}; scroll vertically or horizontally for more records`);
+    }
     const marker = wrap.querySelector('.data-table-state');
     const server = marker ? JSON.parse(marker.textContent) : null;
     const id = server?.id ?? `local_${index}`;
@@ -179,13 +192,23 @@ function enhanceTable(table, index) {
     }
     updateSortIndicators();
 
-    const footer = element('div', 'data-table-toolbar data-table-footer');
-    footer.append(pageSizeControl());
     const existingPagination = wrap.nextElementSibling;
+    const toolbar = element('div', 'data-table-toolbar');
+    toolbar.append(pageSizeControl());
+    wrap.before(toolbar);
+    const footer = element('div', 'data-table-footer');
+    const resultCount = element('p', 'data-table-status data-table-result-count');
+    resultCount.setAttribute('role', 'status');
+    footer.append(resultCount);
     wrap.after(footer);
 
     if (server) {
-        if (existingPagination?.matches('.records-pagination')) footer.append(existingPagination);
+        resultCount.textContent = `Showing ${server.first ?? 0} to ${server.last ?? 0} of ${server.total} results`;
+        if (existingPagination?.matches('.records-pagination')) {
+            // Keep Laravel's links and query strings; expose one count on all screen sizes.
+            existingPagination.querySelector('nav[role="navigation"] p')?.classList.add('data-table-replaced-count');
+            footer.append(existingPagination);
+        }
         return;
     }
 
@@ -224,6 +247,7 @@ function enhanceTable(table, index) {
         placeholders.forEach((row) => { row.hidden = rows.length > 0; });
         empty.hidden = matching.length > 0 || rows.length === 0;
         pageLabel.textContent = `Page ${page} of ${range.lastPage}`;
+        resultCount.textContent = `Showing ${range.first} to ${range.last} of ${matching.length} results`;
         previous.disabled = page <= 1;
         next.disabled = page >= range.lastPage;
         const url = new URL(window.location.href);
