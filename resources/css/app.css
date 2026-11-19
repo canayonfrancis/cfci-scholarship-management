@@ -920,6 +920,19 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
 .academic-confirmation-dialog { width: min(480px, calc(100% - 32px)); }
 .academic-confirmation-dialog .academic-dialog-body > p:first-child { margin: 0; font-size: 14px; line-height: 1.7; }
 
+/* Reuse the academic/evaluation dialog shell for existing record creation forms. */
+.record-form-dialog { width: min(680px, calc(100% - 32px)); }
+.record-form-dialog > form { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.record-form-dialog .record-field { min-width: 0; }
+.record-form-dialog .record-field > label { display: block; margin-bottom: 6px; }
+.record-form-dialog .records-form-grid { margin-top: 16px; margin-bottom: 0; }
+.record-form-dialog .record-field:last-child { grid-column: 1 / -1; }
+.record-form-dialog .records-button:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 640px) {
+    .record-form-dialog .records-form-grid { grid-template-columns: 1fr; }
+    .record-form-dialog .academic-dialog-footer .records-button { flex: 1 1 120px; }
+}
+
 /* Scholarship evaluation workspace; scoped to the detail page. */
 .evaluation-workspace { min-width: 0; }
 .records-page .evaluation-workspace .records-card { padding: 20px; margin-bottom: 16px; }

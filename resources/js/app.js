@@ -5,11 +5,13 @@ import billingBatchFilter from './billing-batch-filter';
 import initializeDataTables from './data-tables';
 import evaluationWorkspace from './evaluation-workspace';
 import primaryNavigation from './primary-navigation';
+import recordFormDialog from './record-form-dialog';
 
 window.Alpine = Alpine;
 Alpine.data('billingBatchFilter', billingBatchFilter);
 Alpine.data('evaluationWorkspace', evaluationWorkspace);
 Alpine.data('primaryNavigation', primaryNavigation);
+Alpine.data('recordFormDialog', recordFormDialog);
 
 Alpine.data('scrollableNavigation', () => ({
     canScrollLeft: false,

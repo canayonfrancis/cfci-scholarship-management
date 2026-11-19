@@ -12,6 +12,7 @@ use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ScholarshipBatchController extends Controller
 {
@@ -34,13 +35,19 @@ class ScholarshipBatchController extends Controller
     public function store(Request $request, ManageScholarshipRoster $rosters)
     {
         Gate::authorize('create', ScholarshipBatch::class);
-        $data = $request->validate([
-            'program_id' => ['required', 'integer', 'exists:scholarship_programs,id'],
-            'academic_period_id' => ['required', 'integer', 'exists:academic_periods,id'],
-            'batch_number' => ['required', 'string', 'max:60', 'regex:/\S/'],
-        ]);
+        try {
+            $data = $request->validate([
+                'program_id' => ['required', 'integer', 'exists:scholarship_programs,id'],
+                'academic_period_id' => ['required', 'integer', 'exists:academic_periods,id'],
+                'batch_number' => ['required', 'string', 'max:60', 'regex:/\S/'],
+            ]);
+            $batch = $rosters->create($request->user(), $data);
+        } catch (ValidationException $exception) {
+            // Keep creation and duplicate-name errors separate from listing filters.
+            throw $exception->errorBag('createBatch');
+        }
 
-        return to_route('scholarship-batches.show', $rosters->create($request->user(), $data))->with('status', 'Semester roster created. No billing or financial amount was recorded.');
+        return to_route('scholarship-batches.show', $batch)->with('status', 'Semester roster created. No billing or financial amount was recorded.');
     }
 
     public function join(Request $request, Student $scholar, ManageScholarshipRoster $rosters)
