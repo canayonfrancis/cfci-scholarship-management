@@ -18,17 +18,19 @@ class EvaluateScholarshipRequest extends FormRequest
     {
         $application = $this->route('application');
         $catalog = app(OfficialRuleCatalog::class);
-        if (OfficialRuleCatalog::demonstrationProgram($application->program->code)) {
+        $policy = $catalog->forProgram($application->program->code, $application->terms);
+        $institutional = ($policy['mode'] ?? null) === OfficialRuleCatalog::INSTITUTIONAL_MODE;
+        if (OfficialRuleCatalog::demonstrationProgram($application->program->code) || $institutional) {
             return [
                 'submission_revision' => ['required', 'integer', 'min:1'],
                 'previous_run' => ['required', 'integer', 'min:0'],
                 'school_decision' => ['required', Rule::in(['qualified', 'not_qualified', 'needs_information'])],
-                'certification_reference' => ['required', 'string', 'max:1000', 'starts_with:UAT-'],
+                'certification_reference' => ['required', 'string', 'max:1000', 'regex:/\S/', ...($institutional ? [] : ['starts_with:UAT-'])],
                 'certification_verified' => ['accepted'],
                 'evaluator_notes' => ['required', 'string', 'max:3000', 'regex:/\S/'],
             ];
         }
-        if (! $catalog->forProgram($application->program->code) || ! $catalog->appliesTo($application->academicPeriod)) {
+        if (! $policy || ! $catalog->appliesTo($application->academicPeriod)) {
             return [
                 'submission_revision' => ['required', 'integer', 'min:1'], 'previous_run' => ['required', 'integer', 'min:0'],
                 'evaluator_notes' => ['nullable', 'string', 'max:3000'],

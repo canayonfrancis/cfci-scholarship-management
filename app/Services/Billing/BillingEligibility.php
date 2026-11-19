@@ -74,7 +74,10 @@ class BillingEligibility
             $fail('The active scholarship assignment must cover the selected academic year and semester. Unknown period ordering requires confirmed dates.');
         }
         $run = $application->currentSchoolDecision();
-        $policy = $this->catalog->forProgram($application->program->code);
+        $policy = $this->catalog->forProgram($application->program->code, $terms);
+        if (($policy['mode'] ?? null) === OfficialRuleCatalog::INSTITUTIONAL_MODE) {
+            $this->catalog->assertInstitutionalStudent($application->student);
+        }
         if (! $run || $run->automatic_outcome !== 'passed' || $run->school_decision !== 'qualified' || ! $run->evaluated_by ||
             ($run->rule_snapshot['confirmed'] ?? false) !== true || ! $policy || ($run->rule_snapshot['policy'] ?? null) != $policy ||
             ! $this->catalog->appliesTo($application->academicPeriod)) {

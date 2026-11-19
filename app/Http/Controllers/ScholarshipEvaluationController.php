@@ -112,13 +112,15 @@ class ScholarshipEvaluationController extends Controller
         $runs = $application->evaluationRuns->sortByDesc('run_number');
         $context = AcademicValidationContext::current()->load('activePeriod');
         $academic = $application->student->academicRecords()->with('documents')->where('academic_period_id', $application->academic_period_id)->orderByDesc('revision')->first();
-        $policy = $catalog->forProgram($application->program->code);
+        $policy = $catalog->forProgram($application->program->code, $application->terms);
         $demonstrationIdentityAllowed = ! OfficialRuleCatalog::demonstrationRecord($application->program->code, $application->terms?->criteria)
             || (OfficialRuleCatalog::demonstrationEnabled() && OfficialRuleCatalog::fictionalStudent($application->student));
-        $policyApplicable = $policy && $catalog->appliesTo($application->academicPeriod) && $demonstrationIdentityAllowed;
+        $institutional = ($policy['mode'] ?? null) === OfficialRuleCatalog::INSTITUTIONAL_MODE;
+        $policyApplicable = $policy && $catalog->appliesTo($application->academicPeriod) && $demonstrationIdentityAllowed
+            && (! $institutional || OfficialRuleCatalog::operationalStudent($application->student));
         $factKeys = $policyApplicable ? array_unique([
-            ...$catalog->requiredFacts($application->program->code, 'new'),
-            ...$catalog->requiredFacts($application->program->code, 'continuing'),
+            ...$catalog->requiredFacts($application->program->code, 'new', $application->terms),
+            ...$catalog->requiredFacts($application->program->code, 'continuing', $application->terms),
         ]) : [];
 
         $data = [
@@ -128,6 +130,9 @@ class ScholarshipEvaluationController extends Controller
             // Read-only History data; never assembled into the current evaluation input.
             'academicHistory' => $application->student->academicRecords()->with(['academicPeriod', 'grades', 'documents'])->orderByDesc('academic_period_id')->orderByDesc('revision')->get(),
             'policy' => $policy, 'policyApplicable' => (bool) $policyApplicable, 'demonstrationIdentityAllowed' => $demonstrationIdentityAllowed,
+            'institutional' => $institutional,
+            'canRecordInstitutionalBasis' => OfficialRuleCatalog::supportsInstitutionalCertification($application->program->code, $application->terms)
+                && OfficialRuleCatalog::operationalStudent($application->student) && $catalog->appliesTo($application->academicPeriod),
             'facts' => array_intersect_key(OfficialRuleCatalog::FACTS, array_flip($factKeys)),
             'documentTypes' => $application->program->code === 'EDUKAR' ? [] : $catalog->validationDocuments($application->program->code),
             'approvals' => $application->externalApprovals->sortByDesc('id'),
@@ -140,25 +145,45 @@ class ScholarshipEvaluationController extends Controller
     {
         Gate::authorize('evaluate', $application);
         $request->validate(['confirm_policy' => ['accepted']]);
-        DB::transaction(function () use ($application, $catalog, $request, $audit) {
+        $institutional = $request->boolean('institutional_basis');
+        $basis = $institutional ? $request->validate([
+            'source' => ['required', 'string', 'max:1000', 'regex:/\S/'],
+            'approved_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.now('Asia/Manila')->toDateString()],
+            'requirements_reference' => ['required', 'string', 'max:3000', 'regex:/\S/'],
+        ]) : [];
+        DB::transaction(function () use ($application, $catalog, $request, $audit, $institutional, $basis) {
             $student = Student::whereKey($application->student_id)->lockForUpdate()->firstOrFail();
+            $application = ScholarshipApplication::whereKey($application->id)->lockForUpdate()->firstOrFail();
+            Gate::authorize('evaluate', $application);
             $catalog->assertDemonstrationStudent($application->program->code, $student);
             $terms = $application->terms()->lockForUpdate()->firstOrFail();
-            $policy = $catalog->forProgram($application->program->code);
+            if ($terms->confirmed_at) {
+                throw ValidationException::withMessages(['confirm_policy' => 'The semester policy is already confirmed and immutable. Retain its history; an incompatible confirmation requires a separately reviewed correction.']);
+            }
+            if ($institutional) {
+                $catalog->assertInstitutionalStudent($student);
+                if (! OfficialRuleCatalog::supportsInstitutionalCertification($application->program->code, $terms)
+                    || OfficialRuleCatalog::sampleText($basis['source'], $basis['requirements_reference'])) {
+                    throw ValidationException::withMessages(['confirm_policy' => 'Record only actual applicable requirements for this program and semester. Fictional references cannot authorize operational beneficiaries.']);
+                }
+                $policy = $catalog->institutionalPolicy($terms, $basis);
+            } else {
+                $policy = $catalog->forProgram($application->program->code, $terms);
+            }
             if (! $policy || ! $catalog->appliesTo($application->academicPeriod)) {
                 throw ValidationException::withMessages(['confirm_policy' => 'No verified rule set is available for this program/period. Record needs_review; do not invent criteria.']);
             }
-            if ($terms->confirmed_at) {
-                throw ValidationException::withMessages(['confirm_policy' => 'The semester policy is already confirmed and immutable.']);
-            }
             $terms->update(['criteria' => $policy, 'rule_version' => $policy['version'], 'source_reference' => $policy['source'], 'confirmed_by' => $request->user()->id, 'confirmed_at' => now()]);
+            if ($institutional && $catalog->forProgram($application->program->code, $terms->fresh()) != $policy) {
+                throw ValidationException::withMessages(['confirm_policy' => 'The recorded requirements could not establish a valid semester basis. Nothing was confirmed.']);
+            }
             $audit->record($request->user(), $terms, 'semester_policy_confirmed');
         }, 3);
 
         return to_route('evaluations.show', ['application' => $application, 'tab' => 'school-compliance'])->with('status',
-            OfficialRuleCatalog::demonstrationProgram($application->program->code)
+            $institutional ? 'Approved institutional certification basis recorded for this program and semester. Each scholar still requires an individual evaluation and separate external approval.' : (OfficialRuleCatalog::demonstrationProgram($application->program->code)
                 ? OfficialRuleCatalog::DEMO_LABEL.' — fictional semester requirements confirmed.'
-                : 'Official semester rules confirmed. Existing evaluation snapshots remain unchanged.');
+                : 'Official semester rules confirmed. Existing evaluation snapshots remain unchanged.'));
     }
 
     public function evaluate(EvaluateScholarshipRequest $request, ScholarshipApplication $application, EvaluateApplication $evaluate): RedirectResponse

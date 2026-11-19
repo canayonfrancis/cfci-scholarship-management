@@ -3,12 +3,16 @@
 namespace App\Services\Eligibility;
 
 use App\Models\AcademicPeriod;
+use App\Models\Document;
+use App\Models\ProgramPeriodTerm;
 use App\Models\Student;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class OfficialRuleCatalog
 {
+    public const INSTITUTIONAL_MODE = 'institutional_certification';
+    public const AUTHORIZATION_DOCUMENT = 'compliance_authorization';
     public const DEMO_PROGRAM = 'UAT-COSCHO';
     public const DEMO_LABEL = 'UAT SAMPLE — NOT FOR OFFICIAL SUBMISSION';
 
@@ -76,7 +80,52 @@ class OfficialRuleCatalog
         'pwd_id' => 'PDAO-issued PWD ID when claiming TES-3A',
     ];
 
-    public function forProgram(string $code): ?array
+    public static function supportsInstitutionalCertification(string $code, ?ProgramPeriodTerm $terms = null): bool
+    {
+        return $code === 'COSCHO' && ! self::demonstrationRecord($code, $terms?->criteria);
+    }
+
+    public static function sampleText(string ...$values): bool
+    {
+        return preg_match('/\bUAT(?:\b|_)|NOT FOR OFFICIAL SUBMISSION|\bFICTIONAL\b|\bDEMONSTRATION\b/iu', implode(' ', $values)) === 1;
+    }
+
+    public static function operationalStudent(Student $student): bool
+    {
+        return ! str_starts_with($student->student_number, 'UAT-DEF-')
+            && ! str_ends_with(strtolower($student->email ?? ''), '.invalid');
+    }
+
+    public function assertInstitutionalStudent(Student $student): void
+    {
+        if (! self::operationalStudent($student)) {
+            throw ValidationException::withMessages(['certification_reference' => 'Fictional sample identities cannot receive an operational institutional certification. Use genuine existing beneficiary records and original authorized evidence.']);
+        }
+    }
+
+    /** Recorded requirements confirmed by an authorized evaluator; prior evidence-backed versions remain intact. */
+    public function institutionalPolicy(ProgramPeriodTerm $terms, array $basis, ?Document $document = null): array
+    {
+        $legacy = [];
+        if ($document) {
+            $approval = app(PrivateEvidence::class)->snapshot($document);
+            $approval['reviewed_at'] = $document->reviewed_at?->toIso8601String();
+            $legacy = ['authority' => $basis['authority'], 'authorization_document' => $approval];
+        }
+
+        return [
+            'version' => $document ? 'INSTITUTIONAL-CERTIFICATION-v1' : 'INSTITUTIONAL-CERTIFICATION-v2', 'mode' => self::INSTITUTIONAL_MODE,
+            'program_id' => $terms->program_id, 'academic_period_id' => $terms->academic_period_id,
+            ...$legacy,
+            'source' => $basis['source'], 'approved_on' => $basis['approved_on'],
+            'requirements_reference' => $basis['requirements_reference'],
+            'facts' => ['authenticity' => 'Institution-certified determination against the referenced approved requirements'],
+            'documents' => ['eligibility_support', 'enrollment_certificate'],
+            'scope' => 'School compliance only under the recorded approved certification basis. Mandatory provider requirements and external award approval remain separate.',
+        ];
+    }
+
+    public function forProgram(string $code, ?ProgramPeriodTerm $terms = null): ?array
     {
         if (self::demonstrationProgram($code)) {
             return [
@@ -89,6 +138,42 @@ class OfficialRuleCatalog
             ];
         }
         if (! in_array($code, ['TDP', 'TES'], true)) {
+            $basis = $terms?->criteria;
+            if (self::supportsInstitutionalCertification($code, $terms) && ($basis['mode'] ?? null) === self::INSTITUTIONAL_MODE
+                && $terms->confirmed_by && $terms->confirmed_at
+                && in_array($terms->rule_version, ['INSTITUTIONAL-CERTIFICATION-v1', 'INSTITUTIONAL-CERTIFICATION-v2'], true)) {
+                $legacy = $terms->rule_version === 'INSTITUTIONAL-CERTIFICATION-v1';
+                foreach (['source', 'approved_on', 'requirements_reference', ...($legacy ? ['authority'] : [])] as $field) {
+                    if (! is_string($basis[$field] ?? null) || trim($basis[$field]) === '' || self::sampleText($basis[$field])) {
+                        return null;
+                    }
+                }
+                if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $basis['approved_on'], $date) !== 1
+                    || ! checkdate((int) $date[2], (int) $date[3], (int) $date[1])
+                    || $basis['approved_on'] > now('Asia/Manila')->toDateString()) {
+                    return null;
+                }
+                if (! $legacy) {
+                    $policy = $this->institutionalPolicy($terms, $basis);
+
+                    return $basis == $policy ? $policy : null;
+                }
+                if (! is_array($basis['authorization_document'] ?? null)) {
+                    return null;
+                }
+                $document = Document::with('application')->find($basis['authorization_document']['id'] ?? 0);
+                try {
+                    if ($document && $document->document_type === self::AUTHORIZATION_DOCUMENT
+                        && $document->application?->program_period_term_id === $terms->id
+                        && ! self::sampleText($document->original_name) && app(PrivateEvidence::class)->usable($document)) {
+                        $policy = $this->institutionalPolicy($terms, $basis, $document);
+
+                        return $basis == $policy ? $policy : null;
+                    }
+                } catch (\Throwable) {
+                    // Missing/unreadable approval evidence cannot establish an applicable basis.
+                }
+            }
             return null;
         }
 
@@ -112,12 +197,13 @@ class OfficialRuleCatalog
             && in_array($period->semester_code, ['1', '2'], true);
     }
 
-    public function requiredFacts(string $program, string $kind): array
+    public function requiredFacts(string $program, string $kind, ?ProgramPeriodTerm $terms = null): array
     {
-        if (! $this->forProgram($program)) {
+        $policy = $this->forProgram($program, $terms);
+        if (! $policy) {
             return [];
         }
-        if (self::demonstrationProgram($program)) {
+        if (self::demonstrationProgram($program) || ($policy['mode'] ?? null) === self::INSTITUTIONAL_MODE) {
             return ['authenticity'];
         }
         $keys = ['filipino', 'recognized_program', 'permitted_aid', 'authenticity'];
@@ -137,9 +223,9 @@ class OfficialRuleCatalog
         return $keys;
     }
 
-    public function requiredDocuments(string $program, array $data): array
+    public function requiredDocuments(string $program, array $data, ?ProgramPeriodTerm $terms = null): array
     {
-        if (! $this->forProgram($program)) {
+        if (! $this->forProgram($program, $terms)) {
             return [];
         }
         $keys = ['eligibility_support', 'enrollment_certificate'];

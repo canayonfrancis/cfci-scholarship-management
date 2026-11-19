@@ -49,7 +49,7 @@ class EvaluationWorkspace
             return $usable[$document->id];
         };
         $latestDocuments = $application->documents->sortBy('id')->groupBy('document_type')->map->last();
-        $requiredDocuments = $data['policy'] && $data['policyApplicable'] ? $catalog->requiredDocuments($application->program->code, $prior) : [];
+        $requiredDocuments = $data['policy'] && $data['policyApplicable'] ? $catalog->requiredDocuments($application->program->code, $prior, $application->terms) : [];
         $missingDocuments = [];
         foreach ($requiredDocuments as $type) {
             $document = $latestDocuments->get($type);
@@ -130,7 +130,7 @@ class EvaluationWorkspace
             'prerequisites' => $prerequisites, 'canActivate' => $canActivate,
             'externalReady' => (bool) $externalReady, 'missingDocuments' => $missingDocuments,
             'requiredDocuments' => $requiredDocuments,
-            'requiredFacts' => $data['policy'] && $data['policyApplicable'] ? ['new' => $catalog->requiredFacts($application->program->code, 'new'), 'continuing' => $catalog->requiredFacts($application->program->code, 'continuing')] : null,
+            'requiredFacts' => $data['policy'] && $data['policyApplicable'] ? ['new' => $catalog->requiredFacts($application->program->code, 'new', $application->terms), 'continuing' => $catalog->requiredFacts($application->program->code, 'continuing', $application->terms)] : null,
             'assignmentEvents' => $assignment ? AuditEvent::where('subject_type', ScholarshipAssignment::class)->where('subject_id', $assignment->id)
                 ->orderByDesc('occurred_at')->orderByDesc('id')->limit(50)->get(['id', 'action', 'actor_snapshot', 'occurred_at', 'reason']) : collect(),
         ];

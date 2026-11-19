@@ -307,11 +307,12 @@ class BillingBatchController extends Controller
         if ($application && $assignment && $application->student_id === $student->id && $application->assignment_id === $assignment->id
             && $application->program_id === $batch->program_id && $application->academic_period_id === $batch->academic_period_id) {
             $application->loadMissing(['program', 'academicPeriod', 'terms', 'assignment', 'latestEvaluation', 'documents', 'externalApprovals.documents']);
-            $policy = $catalog->forProgram($application->program->code);
+            $policy = $catalog->forProgram($application->program->code, $application->terms);
             $state = $workspace->present(['application' => $application, 'context' => AcademicValidationContext::current(),
                 'latest' => $application->latestEvaluation, 'academic' => $row['record'], 'policy' => $policy,
                 'policyApplicable' => $policy && $catalog->appliesTo($application->academicPeriod)
-                    && (! ($policy['demonstration'] ?? false) || OfficialRuleCatalog::fictionalStudent($student)),
+                    && (! ($policy['demonstration'] ?? false) || OfficialRuleCatalog::fictionalStudent($student))
+                    && (($policy['mode'] ?? null) !== OfficialRuleCatalog::INSTITUTIONAL_MODE || OfficialRuleCatalog::operationalStudent($student)),
                 'approvals' => $application->externalApprovals->sortByDesc('id'),
             ], $catalog);
             if ($application->latestEvaluation) {

@@ -39,7 +39,11 @@ class ActivateAward
                     $fail('This scholar already has an active scholarship. Resolve that award before activation.');
                 }
                 $run = $application->currentSchoolDecision();
-                $policy = app(OfficialRuleCatalog::class)->forProgram($application->program->code);
+                $terms = $application->terms()->lockForUpdate()->firstOrFail();
+                $policy = app(OfficialRuleCatalog::class)->forProgram($application->program->code, $terms);
+                if (($policy['mode'] ?? null) === OfficialRuleCatalog::INSTITUTIONAL_MODE) {
+                    app(OfficialRuleCatalog::class)->assertInstitutionalStudent($student);
+                }
                 if (! $run || $run->id !== $expectedRun || $run->automatic_outcome !== 'passed' || $run->school_decision !== 'qualified' ||
                     ! $run->evaluated_by || ($run->rule_snapshot['confirmed'] ?? false) !== true || ! $policy || $run->rule_snapshot['policy'] != $policy) {
                     $fail('A current eligible school evaluation is required. Reevaluate changed or incomplete records.');

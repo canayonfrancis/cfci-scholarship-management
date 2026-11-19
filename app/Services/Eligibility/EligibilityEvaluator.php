@@ -9,7 +9,7 @@ class EligibilityEvaluator
     public function __construct(private OfficialRuleCatalog $catalog) {}
 
     /** Pure checks over server-assembled, snapshotted input; no request or database writes. */
-    public function evaluate(array $input, bool $policyConfirmed): array
+    public function evaluate(array $input, bool $policyConfirmed, ?array $policy = null): array
     {
         $checks = [];
         $add = function (string $key, string $status, string $reason) use (&$checks) {
@@ -28,12 +28,29 @@ class EligibilityEvaluator
 
             return $this->result($checks);
         }
-        if (! $policyConfirmed || ! $this->catalog->forProgram($input['program'])) {
+        $policy ??= $this->catalog->forProgram($input['program']);
+        if (! $policyConfirmed || ! $policy) {
             $add('policy', 'review', 'An approved program/semester compliance basis is unavailable or unconfirmed. School/provider certifications can be retained as evidence, but cannot establish eligibility until their approved applicability and acceptance rules are confirmed.');
 
             return $this->result($checks);
         }
         $program = $input['program'];
+        if (($policy['mode'] ?? null) === OfficialRuleCatalog::INSTITUTIONAL_MODE) {
+            $add('certified_determination', ($data['certification_verified'] ?? false) === true
+                && trim($data['certification_reference'] ?? '') !== '' && trim($data['evaluator_notes'] ?? '') !== '' ? 'pass' : 'review',
+                'An authorized evaluator must verify the individual certification against the recorded approved institutional/provider basis and mandatory requirements.');
+            $finding = $data['facts']['authenticity'] ?? 'unverified';
+            $add('school_compliance', match ($finding) { 'yes' => 'pass', 'no' => 'fail', default => 'review' },
+                'Recorded institutional certification finding: '.($data['certification_reference'] ?? 'unverified').'.');
+            foreach (['eligibility_support', 'enrollment_certificate'] as $key) {
+                $add('document_'.$key, isset($input['evidence'][$key]) ? 'pass' : 'review', 'Accepted private evidence required: '.OfficialRuleCatalog::DOCUMENTS[$key].'.');
+            }
+            if ($input['conflicting_assignment_id']) {
+                $add('active_award', 'review', 'Another active scholarship must be resolved before activation.');
+            }
+
+            return $this->result($checks);
+        }
         if (OfficialRuleCatalog::demonstrationProgram($program)) {
             $add('certification_verified', ($data['certification_verified'] ?? false) === true ? 'pass' : 'review',
                 'The evaluator must explicitly confirm review of the fictional institutional certification.');
