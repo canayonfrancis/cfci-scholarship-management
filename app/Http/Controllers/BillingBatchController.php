@@ -166,6 +166,7 @@ class BillingBatchController extends Controller
             'programs' => ScholarshipProgram::orderBy('code')->get(),
             'rosters' => ScholarshipBatch::with(['program', 'academicPeriod'])->orderBy('program_id')->orderBy('academic_period_id')->orderBy('batch_number')->get(),
             'periods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),
+            'creationPeriods' => AcademicPeriod::where('is_open', true)->orderByDesc('academic_year')->orderBy('semester_code')->get(),
             'years' => AcademicPeriod::distinct()->orderByDesc('academic_year')->pluck('academic_year'),
             'terms' => ProgramPeriodTerm::with(['program', 'academicPeriod', 'billingConfirmedBy'])->whereNotNull('billing_confirmed_at')->get(),
         ];

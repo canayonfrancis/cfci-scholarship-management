@@ -9,7 +9,7 @@
         $registry[] = $link('programs', 'Scholarship Grant / Program', 'graduation-cap', route('scholarship-programs.index'), request()->routeIs('scholarship-programs.*'));
     }
     if ($user->can('viewAny', \App\Models\ScholarshipBatch::class)) {
-        $registry[] = $link('batch', 'Batch', 'clipboard', route('scholarship-batches.index', ['registry' => 'batch']), request()->routeIs('scholarship-batches.*') && $registrySection === 'batch');
+        $registry[] = $link('batch', 'Batch', 'clipboard', route('scholarship-batches.index'), request()->routeIs('scholarship-batches.*'));
     }
     if ($user->can('viewAny', \App\Models\AcademicProgram::class)) {
         $registry[] = $link('courses', 'Course / Program', 'graduation-cap', route('academic-programs.index'), request()->routeIs('academic-programs.*'));
@@ -18,15 +18,14 @@
         $registry[] = $link('scholars', 'Scholars', 'users', route('scholars.index'), request()->routeIs('scholars.*'));
     }
     if ($user->can('viewAny', \App\Models\AcademicPeriod::class)) {
-        $registry[] = $link('academic-year', 'Academic Year', 'calendar', route('academic-periods.index', ['registry' => 'academic-year']), request()->routeIs('academic-periods.*') && $registrySection === 'academic-year');
-        $registry[] = $link('semester', 'Semester', 'calendar', route('academic-periods.index', ['registry' => 'semester']), request()->routeIs('academic-periods.*') && $registrySection !== 'academic-year');
+        $registry[] = $link('academic-year', 'Academic Year', 'calendar', route('academic-years.index'), request()->routeIs('academic-years.*') || (request()->routeIs('academic-periods.index') && $registrySection === 'academic-year'));
+        $registry[] = $link('semester', 'Semester', 'calendar', route('academic-periods.index'), request()->routeIs('academic-periods.*') && $registrySection !== 'academic-year');
     }
-    if ($user->can('viewAny', \App\Models\Student::class)) {
-        // No standalone registry exists; the user explicitly requested an unavailable item.
-        $registry[] = ['key' => 'delisting', 'label' => 'Reason for Delisting', 'icon' => 'document', 'active' => false, 'unavailable' => 'Unavailable — no separate registry exists.'];
+    if ($user->can('viewAny', \App\Models\DelistingReason::class)) {
+        $registry[] = $link('delisting', 'Reason for Delisting', 'document', route('delisting-reasons.index'), request()->routeIs('delisting-reasons.*'));
     }
     if ($user->can('viewAny', \App\Models\ScholarshipBatch::class)) {
-        $registry[] = $link('roster', 'Roster', 'user-group', route('scholarship-batches.index', ['registry' => 'roster']), request()->routeIs('scholarship-batches.*') && $registrySection !== 'batch');
+        $registry[] = $link('roster', 'Roster', 'user-group', route('rosters.index'), request()->routeIs('rosters.*'));
     }
     if ($user->can('student-accounts.provision')) {
         $registry[] = $link('student-accounts', 'Student accounts', 'user', route('student-accounts.index'), request()->routeIs('student-accounts.*'));

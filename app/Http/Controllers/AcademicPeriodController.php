@@ -17,12 +17,35 @@ use Illuminate\View\View;
 
 class AcademicPeriodController extends Controller
 {
+    public function years(Request $request): View
+    {
+        Gate::authorize('viewAny', AcademicPeriod::class);
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:30']]);
+        $query = AcademicPeriod::select('academic_year')
+            ->selectRaw('COUNT(*) AS semester_count, SUM(CASE WHEN is_open = 1 THEN 1 ELSE 0 END) AS open_count')
+            ->groupBy('academic_year')->orderByDesc('academic_year');
+        if (filled($filters['q'] ?? null)) {
+            $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], trim($filters['q'])).'%';
+            $query->whereRaw("academic_year LIKE ? ESCAPE '!'", [$term]);
+        }
+
+        return view('periods.years', ['years' => $query->tablePaginate('academic_years'), 'filters' => $filters]);
+    }
+
     public function index(Request $request): View
     {
         Gate::authorize('viewAny', AcademicPeriod::class);
-        $filters = $request->validate(['academic_year' => ['nullable', 'string', 'max:30']]);
+        if ($request->query('registry') === 'academic-year') {
+            return $this->years($request);
+        }
+        $filters = $request->validate(['academic_year' => ['nullable', 'string', 'max:30'], 'edit' => ['nullable', 'integer', 'exists:academic_periods,id']]);
+        $editing = isset($filters['edit']) ? AcademicPeriod::findOrFail($filters['edit']) : null;
+        if ($editing) {
+            Gate::authorize('update', $editing);
+        }
 
         return view('periods.index', [
+            'editing' => $editing, 'identityLocked' => $editing?->isInUse() ?? false,
             'periods' => AcademicPeriod::when($filters['academic_year'] ?? null, fn ($query, $year) => $query->where('academic_year', $year))->orderByDesc('academic_year')->orderBy('semester_code')->tablePaginate('periods')->withQueryString(),
             'years' => AcademicPeriod::distinct()->orderByDesc('academic_year')->pluck('academic_year'), 'filters' => $filters,
             'context' => AcademicValidationContext::current()->load(['activePeriod', 'sourcePeriod']),
@@ -30,11 +53,11 @@ class AcademicPeriodController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(): RedirectResponse
     {
         Gate::authorize('create', AcademicPeriod::class);
 
-        return view('periods.form', ['period' => new AcademicPeriod(['is_open' => false]), 'identityLocked' => false]);
+        return to_route('academic-periods.index', ['create' => 1]);
     }
 
     public function saveContext(AcademicContextRequest $request, RecordAudit $audit): RedirectResponse
@@ -62,13 +85,13 @@ class AcademicPeriodController extends Controller
     {
         try {
             $period = DB::transaction(function () use ($request, $audit) {
-                $period = AcademicPeriod::create($request->validated());
+                $period = AcademicPeriod::create($request->safe()->only(['academic_year', 'semester_code', 'starts_on', 'ends_on', 'is_open']));
                 $audit->record($request->user(), $period, 'academic_period_created');
 
                 return $period;
             });
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['semester_code' => 'This academic year and semester already exist.']);
+            throw ValidationException::withMessages(['semester_code' => 'This academic year and semester already exist.'])->errorBag('periodForm');
         }
 
         return to_route('academic-periods.show', $period)->with('status', 'Academic period added.');
@@ -81,11 +104,11 @@ class AcademicPeriodController extends Controller
         return view('periods.show', ['period' => $period, 'assignments' => $period->startingAssignments()->with(['student', 'program'])->latest('id')->tablePaginate('period_assignments')]);
     }
 
-    public function edit(AcademicPeriod $period): View
+    public function edit(AcademicPeriod $period): RedirectResponse
     {
         Gate::authorize('update', $period);
 
-        return view('periods.form', ['period' => $period, 'identityLocked' => $period->isInUse()]);
+        return to_route('academic-periods.index', ['academic_year' => $period->academic_year, 'edit' => $period->id]);
     }
 
     public function update(AcademicPeriodRequest $request, AcademicPeriod $period, RecordAudit $audit): RedirectResponse
@@ -93,16 +116,16 @@ class AcademicPeriodController extends Controller
         try {
             DB::transaction(function () use ($request, $period, $audit) {
                 $period = AcademicPeriod::whereKey($period->id)->lockForUpdate()->firstOrFail();
-                $data = $request->validated();
+                $data = $request->safe()->only(['academic_year', 'semester_code', 'starts_on', 'ends_on', 'is_open']);
                 if ($period->isInUse() && ($data['academic_year'] !== $period->academic_year || $data['semester_code'] !== $period->semester_code)) {
-                    throw ValidationException::withMessages(['academic_year' => 'A semester linked to existing records keeps its original academic year and code.']);
+                    throw ValidationException::withMessages(['academic_year' => 'A semester linked to existing records keeps its original academic year and code.'])->errorBag('periodForm');
                 }
                 $before = $period->only($period->getFillable());
                 $period->update($data);
                 $audit->record($request->user(), $period, 'academic_period_updated', $before);
             }, 3);
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['semester_code' => 'This academic year and semester already exist.']);
+            throw ValidationException::withMessages(['semester_code' => 'This academic year and semester already exist.'])->errorBag('periodForm');
         }
 
         return to_route('academic-periods.show', $period)->with('status', 'Academic period updated.');

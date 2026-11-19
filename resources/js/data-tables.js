@@ -159,7 +159,7 @@ function enhanceTable(table, index) {
     headers.forEach((header, column) => {
         const text = header.textContent.trim();
         header.scope = 'col';
-        if (/^(actions?|view|source record|recorded source|review)$/iu.test(text)) return;
+        if (header.hasAttribute('data-table-no-sort') || /^(actions?|view|source record|recorded source|review)$/iu.test(text)) return;
         const input = { value: server?.filters?.[column] ?? currentUrl.searchParams.get(`${prefix}[filters][${column}]`) ?? '' };
         const trigger = button('', (event) => {
             event.preventDefault();

@@ -6,6 +6,7 @@ use App\Http\Controllers\AcademicProgramController;
 use App\Http\Controllers\AcademicRequirementController;
 use App\Http\Controllers\BillingBatchController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DelistingReasonController;
 use App\Http\Controllers\FinancialRecordController;
 use App\Http\Controllers\PaymentAcknowledgmentController;
 use App\Http\Controllers\PayrollController;
@@ -58,6 +59,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('scholarship-reports/{report?}', [ScholarshipReportController::class, 'index'])->middleware('cache.headers:no_store;private')->name('scholarship-reports.index');
     Route::resource('scholarship-batches', ScholarshipBatchController::class)->parameters(['scholarship-batches' => 'batch'])->only(['index', 'store', 'show'])->middleware('cache.headers:no_store;private');
+    Route::get('rosters', [ScholarshipBatchController::class, 'index'])->name('rosters.index')->middleware('cache.headers:no_store;private');
+    Route::get('rosters/{batch}', [ScholarshipBatchController::class, 'show'])->name('rosters.show')->middleware('cache.headers:no_store;private');
+    Route::post('rosters/{batch}/scholars', [ScholarshipBatchController::class, 'addScholars'])->name('rosters.scholars.store')->middleware('cache.headers:no_store;private');
     Route::post('scholars/{scholar}/batch-memberships', [ScholarshipBatchController::class, 'join'])->name('scholars.batch-memberships.store');
     Route::prefix('financial-records')->name('financial.')->middleware('cache.headers:no_store;private')->controller(FinancialRecordController::class)->group(function () {
         Route::get('/', 'index')->name('index');
@@ -87,6 +91,8 @@ Route::middleware('auth')->group(function () {
         Route::post('evidence/{type}/{id}/{document}/review', 'reviewEvidence')->whereNumber('id')->name('evidence.review');
     });
     Route::resource('academic-programs', AcademicProgramController::class)->only(['index', 'store', 'update']);
+    Route::get('academic-years', [AcademicPeriodController::class, 'years'])->name('academic-years.index')->middleware('cache.headers:no_store;private');
+    Route::resource('delisting-reasons', DelistingReasonController::class)->only(['index', 'store', 'update'])->middleware('cache.headers:no_store;private');
     Route::get('billing-batches', [BillingBatchController::class, 'index'])->name('billing-batches.index');
     Route::get('billing-batches/options', [BillingBatchController::class, 'options'])->middleware('cache.headers:no_store;private')->name('billing-batches.options');
     Route::post('billing-batches/terms', [BillingBatchController::class, 'configure'])->name('billing-batches.terms');

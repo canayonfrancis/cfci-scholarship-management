@@ -31,10 +31,16 @@ class TableColumns
                 $row->is_active ? 'Available' : 'Unavailable for new active assignments',
             ],
             'periods' => [$row->academic_year, $row->semester_code, $row->starts_on?->format('M j, Y') ?? 'Not recorded', $row->ends_on?->format('M j, Y') ?? 'Not recorded', $row->is_open ? 'Open' : 'Closed'],
+            'academic_years' => [$row->academic_year, explode('-', $row->academic_year)[0], explode('-', $row->academic_year)[1] ?? '', $row->semester_count, $row->open_count],
+            'delisting_reasons' => [$row->name, $row->is_active ? 'Active' : 'Inactive'],
             'program_assignments' => [$row->student->student_number, $row->student->full_name, $row->startPeriod ? $row->startPeriod->academic_year.' · '.$row->startPeriod->semester_code : 'Not recorded', $row->statusLabel()],
             'period_assignments' => [$row->student->student_number, $row->student->full_name, $row->program->code, $row->statusLabel()],
             'rosters' => [$row->batch_number, $row->program->code, self::period($row->academicPeriod), $row->memberships_count],
             'members' => self::member($row),
+            'roster_candidates' => [null, $row['student']->student_number, $row['student']->full_name,
+                $row['student']->academicProgram?->name ?? 'Not provided',
+                $row['student']->year_level ? (ScholarProfile::yearLevels()[$row['student']->year_level] ?? 'Year '.$row['student']->year_level) : 'Not provided',
+                $row['selection']['reason']],
             'academic_records' => [
                 self::student($row->student), self::period($row->academicPeriod, semesterLabel: true),
                 $row->revision.' '.($row->isLatestRevision() ? 'Latest revision' : 'Superseded'),
@@ -100,7 +106,10 @@ class TableColumns
         $known = $record && $record->verification_status === 'verified' && $record->verified_by && $record->verified_at && in_array($record->enrollment_status, ['enrolled', 'not_enrolled'], true);
 
         return [
-            self::student($row->student), $row->assignment->statusLabel(),
+            $row->student->student_number, $row->student->full_name,
+            $row->student->academicProgram?->name ?? 'Not provided',
+            $row->student->year_level ? (ScholarProfile::yearLevels()[$row->student->year_level] ?? 'Year '.$row->student->year_level) : 'Not provided',
+            $row->assignment->statusLabel(),
             $record ? 'Revision '.$record->revision.' '.$record->verifiedBy?->name.' '.$record->verified_at?->timezone('Asia/Manila')->format('M j, Y g:i A') : 'No academic record',
             ($known ? ($record->enrollment_status === 'enrolled' ? 'Verified enrolled' : 'Verified not enrolled') : 'Awaiting Registrar verification').' Form classification pending approved template',
             ($row->submitted_billing_id ? 'Submitted billing item #'.$row->submitted_billing_id : 'Unbilled — no submitted billing').(! $row->submitted_billing_id && $row->reserved_billing_id ? ' Existing semester reservation #'.$row->reserved_billing_id.'; review its draft/history before preparing another bill.' : ''),

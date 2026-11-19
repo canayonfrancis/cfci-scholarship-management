@@ -164,7 +164,7 @@ class SyntheticDemoSeeder extends Seeder
                 foreach ($eligible as $index => $assessment) {
                     $roster = app(ManageScholarshipRoster::class)->create($coordinator, [
                         'program_id' => $assessment->program_id, 'academic_period_id' => $period->id,
-                        'batch_number' => 'SAMPLE-ROSTER-'.($index + 1),
+                        'batch_number' => (string) ($index + 1),
                     ]);
                     app(ManageScholarshipRoster::class)->join($assessment->student, $roster, $coordinator, $assessment->assignment_id);
                     $batch = app(ManageBillingBatch::class)->create($finance, [

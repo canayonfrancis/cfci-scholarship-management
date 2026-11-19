@@ -2,15 +2,19 @@
 export default function recordFormDialog(initial) {
     return {
         submitting: false,
-        returnedErrors: initial.reopen,
+        navigating: false,
+        returnedErrors: initial.hasErrors ?? initial.reopen,
         trigger: null,
         priorOverflow: null,
         baseline: '',
+        dialog: null,
 
         init() {
-            this.pageShowListener = () => { this.submitting = false; };
+            // $el is event-context dependent in Alpine; retain the native dialog.
+            this.dialog = this.$el;
+            this.pageShowListener = () => { this.submitting = false; this.navigating = false; };
             this.unloadListener = (event) => {
-                if (this.$el.open && !this.submitting && this.isDirty()) {
+                if (this.dialog.open && !this.submitting && !this.navigating && this.isDirty()) {
                     event.preventDefault();
                     event.returnValue = '';
                 }
@@ -29,11 +33,11 @@ export default function recordFormDialog(initial) {
             return this.returnedErrors || this.values() !== this.baseline;
         },
         open(trigger = null) {
-            if (this.$el.open) return;
-            this.trigger = trigger ?? document.querySelector(`[aria-controls="${this.$el.id}"]`);
+            if (this.dialog.open) return;
+            this.trigger = trigger ?? document.getElementById(initial.triggerId) ?? document.querySelector(`[aria-controls="${this.dialog.id}"]`);
             this.priorOverflow = document.body.style.overflow;
             document.body.style.overflow = 'hidden';
-            this.$el.showModal();
+            this.dialog.showModal();
             this.$nextTick(() => {
                 (this.$refs.form.querySelector('[aria-invalid="true"]')
                     ?? this.$refs.form.querySelector('[data-dialog-errors]')
@@ -56,14 +60,25 @@ export default function recordFormDialog(initial) {
             });
             this.returnedErrors = false;
             this.baseline = this.values();
-            this.$el.close();
+            // Keep dependent previews in sync after restoring the form's defaults.
+            form.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(field => {
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            this.dialog.close();
         },
         afterClose() {
             if (this.priorOverflow !== null) document.body.style.overflow = this.priorOverflow;
             this.priorOverflow = null;
+            if (initial.dismissQuery?.length) {
+                const url = new URL(window.location.href);
+                initial.dismissQuery.forEach(key => url.searchParams.delete(key));
+                window.history.replaceState(window.history.state, '', url);
+            }
             this.$nextTick(() => this.trigger?.focus());
         },
         submit(event) {
+            if (event.defaultPrevented) return;
             if (this.submitting) {
                 event.preventDefault();
                 return;
@@ -72,7 +87,7 @@ export default function recordFormDialog(initial) {
             this.submitting = true;
         },
         trapFocus(event) {
-            const fields = [...this.$el.querySelectorAll('button, input:not([type="hidden"]), select, textarea, [tabindex="0"]')]
+            const fields = [...this.dialog.querySelectorAll('button, input:not([type="hidden"]), select, textarea, [tabindex="0"]')]
                 .filter(field => !field.disabled && field.getClientRects().length);
             const first = fields[0], last = fields[fields.length - 1];
             if (!first) return;

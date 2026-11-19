@@ -928,6 +928,11 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
 .record-form-dialog .records-form-grid { margin-top: 16px; margin-bottom: 0; }
 .record-form-dialog .record-field:last-child { grid-column: 1 / -1; }
 .record-form-dialog .records-button:disabled { opacity: .5; cursor: not-allowed; }
+.roster-members-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.roster-members-heading .records-section-title { margin: 0; }
+.roster-selection .record-form-dialog { width: min(1100px, calc(100% - 32px)); }
+.roster-selection .records-table-wrap { --data-table-max-height: min(24rem, 42vh); margin-top: 14px; }
+.roster-selection .records-timeline { max-height: 18rem; overflow-y: auto; }
 @media (max-width: 640px) {
     .record-form-dialog .records-form-grid { grid-template-columns: 1fr; }
     .record-form-dialog .academic-dialog-footer .records-button { flex: 1 1 120px; }

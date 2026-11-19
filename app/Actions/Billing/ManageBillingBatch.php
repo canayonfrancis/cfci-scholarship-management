@@ -66,6 +66,9 @@ class ManageBillingBatch
                 Validator::make($data, ['scholarship_batch_id' => ['required', 'integer', 'min:1']])->validate();
                 $program = ScholarshipProgram::whereKey($data['program_id'])->lockForUpdate()->firstOrFail();
                 $period = AcademicPeriod::whereKey($data['academic_period_id'])->lockForUpdate()->firstOrFail();
+                if (! $period->is_open) {
+                    throw ValidationException::withMessages(['academic_period_id' => 'Select an open academic period to create a new billing batch. Closed periods remain available in history and reports.']);
+                }
                 $roster = $this->roster->selection((int) $data['scholarship_batch_id'], $program->id, $period->id);
                 $terms = ProgramPeriodTerm::where('program_id', $program->id)->where('academic_period_id', $period->id)->lockForUpdate()->first();
                 $rate = $terms?->rates()->orderByDesc('revision')->lockForUpdate()->first();

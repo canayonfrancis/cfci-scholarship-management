@@ -29,7 +29,8 @@
                 @change="if ($event.target.name === 'program_id') { program = $event.target.value; $refs.roster.value = ''; } if ($event.target.name === 'academic_period_id') { period = $event.target.value; $refs.roster.value = ''; }">
                 @csrf
                 <div class="records-form-grid">
-                    <x-billing-scope :programs="$programs" :periods="$periods" prefix="create" :selected-program="old('program_id', $filters['program_id'] ?? '')" :selected-period="old('academic_period_id', $filters['academic_period_id'] ?? '')" />
+                    <x-billing-scope :programs="$programs" :periods="$creationPeriods" prefix="create" :selected-program="old('program_id', $filters['program_id'] ?? '')" :selected-period="old('academic_period_id', $filters['academic_period_id'] ?? '')" />
+                    @if($creationPeriods->isEmpty())<p class="record-help">No open academic periods are available. An authorized user can open a semester under Information Registry → Semester.</p>@endif
                     <div class="record-field"><label for="create-roster">Scholarship semester roster</label>
                         <select class="record-input" id="create-roster" name="scholarship_batch_id" x-ref="roster" required>
                             <option value="">Select a matching semester roster</option>
