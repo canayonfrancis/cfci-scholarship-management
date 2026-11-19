@@ -9,12 +9,14 @@ use App\Models\BillingBatch;
 use App\Models\BillingItem;
 use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipApplication;
+use App\Models\ScholarshipBatch;
 use App\Models\ScholarshipProgram;
 use App\Models\Student;
 use App\Models\User;
 use App\Rules\PositiveBatchNumber;
 use App\Services\Billing\BillingEligibility;
 use App\Services\Billing\BillingRoster;
+use App\Services\Billing\Money;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -30,10 +32,41 @@ class ManageBillingBatch
         Gate::forUser($actor)->authorize('configure', BillingBatch::class);
 
         return DB::transaction(function () use ($actor, $data) {
-            ScholarshipProgram::whereKey($data['program_id'])->lockForUpdate()->firstOrFail();
+            $fromReference = ! empty($data['use_program_reference']);
+            if ($fromReference) {
+                $selected = ScholarshipBatch::findOrFail($data['scholarship_batch_id']);
+                $data['program_id'] = $selected->program_id;
+                $data['academic_period_id'] = $selected->academic_period_id;
+            }
+            $program = ScholarshipProgram::whereKey($data['program_id'])->lockForUpdate()->firstOrFail();
+            if ($fromReference) {
+                $period = AcademicPeriod::whereKey($data['academic_period_id'])->lockForUpdate()->firstOrFail();
+                $this->roster->selection((int) $selected->id, $program->id, $period->id);
+                if (! $program->is_active || ! $program->usesFixedSemesterRate() || ! $period->is_open) {
+                    $this->fail('Reference rate confirmation requires an available fixed-amount program and an open roster period.');
+                }
+                Validator::make($data, [
+                    'expected_reference_amount' => ['required', 'regex:/^\d{1,10}(\.\d{1,2})?$/', 'numeric', 'gt:0', 'max:9999999999.99'],
+                    'previous_rate' => ['required', 'integer', 'min:0'],
+                    'billing_source_reference' => ['required', 'string', 'max:3000', 'regex:/\S/'],
+                    'confirm_billing_policy' => ['accepted'],
+                ])->validate();
+                $amount = $program->school_stated_semester_amount;
+                if ($amount === null || Money::cents($amount) <= 0) {
+                    $this->fail('Configure a positive school-stated semester amount in the scholarship program before confirming its rate.');
+                }
+                if (Money::cents((string) $data['expected_reference_amount']) !== Money::cents($amount)) {
+                    $this->fail('The program reference amount changed. Reload and review the current amount before confirming.');
+                }
+                // The browser's displayed value is a stale-preview check, never the amount authority.
+                $data['semester_gross_amount'] = $amount;
+            }
             $terms = ProgramPeriodTerm::firstOrCreate(['program_id' => $data['program_id'], 'academic_period_id' => $data['academic_period_id']]);
             $terms = ProgramPeriodTerm::whereKey($terms->id)->lockForUpdate()->firstOrFail();
             $latest = $terms->rates()->orderByDesc('revision')->first();
+            if ($fromReference && $terms->rates()->whereNotNull('approved_by')->whereNotNull('approved_at')->where('amount', '>', 0)->exists()) {
+                $this->fail('An approved semester rate already exists. Reload the roster and use that rate; no additional confirmation is required.');
+            }
             if ((int) ($data['previous_rate'] ?? 0) !== (int) ($latest?->id ?? 0)) {
                 $this->fail('The semester rate changed. Reload its current revision before confirming a new rate.');
             }
@@ -64,15 +97,24 @@ class ManageBillingBatch
         try {
             return DB::transaction(function () use ($actor, $data) {
                 Validator::make($data, ['scholarship_batch_id' => ['required', 'integer', 'min:1']])->validate();
-                $program = ScholarshipProgram::whereKey($data['program_id'])->lockForUpdate()->firstOrFail();
-                $period = AcademicPeriod::whereKey($data['academic_period_id'])->lockForUpdate()->firstOrFail();
+                $selected = ScholarshipBatch::findOrFail($data['scholarship_batch_id']);
+                // Identity comes from the existing immutable roster, never from display text.
+                if ((isset($data['program_id']) && (int) $data['program_id'] !== $selected->program_id) ||
+                    (isset($data['academic_period_id']) && (int) $data['academic_period_id'] !== $selected->academic_period_id)) {
+                    $this->fail('The submitted program and period must match the selected roster.');
+                }
+                $program = ScholarshipProgram::whereKey($selected->program_id)->lockForUpdate()->firstOrFail();
+                $period = AcademicPeriod::whereKey($selected->academic_period_id)->lockForUpdate()->firstOrFail();
                 if (! $period->is_open) {
                     throw ValidationException::withMessages(['academic_period_id' => 'Select an open academic period to create a new billing batch. Closed periods remain available in history and reports.']);
                 }
                 $roster = $this->roster->selection((int) $data['scholarship_batch_id'], $program->id, $period->id);
+                if (strtoupper(trim($program->code)) === 'EDUKAR') {
+                    $this->fail('EDUKAR billing needs an approved variable entitlement workflow. A fixed-rate draft cannot be prepared for this program.');
+                }
                 $terms = ProgramPeriodTerm::where('program_id', $program->id)->where('academic_period_id', $period->id)->lockForUpdate()->first();
-                $rate = $terms?->rates()->orderByDesc('revision')->lockForUpdate()->first();
-                if (! $program->is_active || ! $rate) {
+                $rate = $terms?->rates()->whereNotNull('approved_by')->whereNotNull('approved_at')->where('amount', '>', 0)->orderByDesc('revision')->lockForUpdate()->first();
+                if (! $program->is_active || ! $rate || ! $rate->approved_by || ! $rate->approved_at || Money::cents($rate->amount) <= 0) {
                     $this->fail('Select an available program and explicitly approved semester billing terms.');
                 }
                 $numbers = $terms->billingBatches()->lockForUpdate()->pluck('batch_number')->map(fn ($label) => $this->numberFromLabel($label))->filter(fn ($number) => $number !== null);
@@ -105,12 +147,24 @@ class ManageBillingBatch
 
     public function change(BillingBatch $batch, User $actor, int $version, string $operation, array $data = []): BillingBatch
     {
+        Gate::forUser($actor)->authorize($operation === 'submit' ? 'submit' : 'update', $batch);
+        if ($operation === 'add_many') {
+            Validator::make($data, [
+                'application_ids' => ['required', 'array', 'min:1', 'max:200'],
+                'application_ids.*' => ['required', 'integer', 'distinct', 'exists:scholarship_applications,id'],
+            ])->validate();
+        }
         try {
             return DB::transaction(function () use ($batch, $actor, $version, $operation, $data) {
                 $ids = $batch->items()->orderBy('student_id')->lockForUpdate()->pluck('student_id')->all();
-                if ($operation === 'add') {
-                    $candidate = ScholarshipApplication::whereKey($data['application_id'])->lockForUpdate()->firstOrFail();
-                    $ids[] = $candidate->student_id;
+                $applications = collect();
+                if (in_array($operation, ['add', 'add_many'], true)) {
+                    $applicationIds = $operation === 'add' ? [$data['application_id']] : $data['application_ids'];
+                    $applications = ScholarshipApplication::whereIn('id', $applicationIds)->orderBy('student_id')->lockForUpdate()->get();
+                    if ($applications->count() !== count($applicationIds)) {
+                        $this->fail('A selected semester evaluation is missing. Reload and review the roster.');
+                    }
+                    $ids = array_merge($ids, $applications->pluck('student_id')->all());
                 }
                 Student::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
                 AcademicValidationContext::whereKey(1)->lockForUpdate()->firstOrFail();
@@ -129,19 +183,20 @@ class ManageBillingBatch
                         throw ValidationException::withMessages(['batch_number' => 'This Batch Number already exists for the selected scholarship program, academic year and semester.']);
                     }
                     $batch->fill(['batch_number' => trim($data['batch_number']), 'reference' => $data['reference'] ?? null]);
-                } elseif ($operation === 'add') {
-                    $application = ScholarshipApplication::whereKey($data['application_id'])->lockForUpdate()->firstOrFail();
-                    $application->assignment()->lockForUpdate()->first();
-                    $this->roster->member($batch, $application);
-                    if (BillingItem::where('student_id', $application->student_id)->where('academic_period_id', $application->academic_period_id)->exists()) {
-                        $this->fail('This scholar already has a semester allocation or draft reservation, including under a previous scholarship program. Use an authorized adjustment for approved records.');
+                } elseif (in_array($operation, ['add', 'add_many'], true)) {
+                    foreach ($applications as $application) {
+                        $application->assignment()->lockForUpdate()->first();
+                        $this->roster->member($batch, $application);
+                        if (BillingItem::where('student_id', $application->student_id)->where('academic_period_id', $application->academic_period_id)->exists()) {
+                            $this->fail('This scholar already has a semester allocation or draft reservation, including under a previous scholarship program. Use an authorized adjustment for approved records.');
+                        }
+                        $item = $batch->items()->create([
+                            'application_id' => $application->id, 'assignment_id' => $application->assignment_id,
+                            'student_id' => $application->student_id, 'program_id' => $batch->program_id, 'academic_period_id' => $batch->academic_period_id,
+                            ...$this->eligibility->basis($application, $terms, $batch->appliedRate()),
+                        ]);
+                        $this->audit->record($actor, $item, 'billing_item_added');
                     }
-                    $item = $batch->items()->create([
-                        'application_id' => $application->id, 'assignment_id' => $application->assignment_id,
-                        'student_id' => $application->student_id, 'program_id' => $batch->program_id, 'academic_period_id' => $batch->academic_period_id,
-                        ...$this->eligibility->basis($application, $terms, $batch->appliedRate()),
-                    ]);
-                    $this->audit->record($actor, $item, 'billing_item_added');
                 } elseif ($operation === 'remove') {
                     $item = $batch->items()->whereKey($data['item_id'])->lockForUpdate()->firstOrFail();
                     if ($item->status !== 'draft') {

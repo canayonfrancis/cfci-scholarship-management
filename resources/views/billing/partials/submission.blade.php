@@ -1,0 +1,16 @@
+    <section class="dashboard-card records-card"><h2>Coordinator allocation approval</h2>
+        @if($batch->approval)
+            <p class="records-notice">Approved by {{ $batch->approval->approvedBy->name }} on {{ $batch->approval->approved_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}. Reference: {{ $batch->approval->reference }}. Original approved total: ₱{{ number_format((float) $batch->approval->amount_snapshot, 2) }}.</p><p>This approval reserves scholarship budget. It does not confirm a receipt or payment.</p>
+        @elseif($batch->status === 'submitted')
+            <p>Awaiting independent Coordinator approval. Preparers and submitters cannot approve their own allocations.</p>
+        @else<p>A Registrar or Coordinator must submit a validated allocation record before a different Coordinator can approve it.</p>@endif
+        @can('approve', $batch)
+            <form class="records-form" method="POST" action="{{ route('billing-batches.approve', $batch) }}">@csrf<input type="hidden" name="billing_tab" value="submission"><div class="record-field"><label for="coordinator-approval-reference">Coordinator approval reference</label><input class="record-input" id="coordinator-approval-reference" name="reference" maxlength="255" required></div><button class="records-button is-primary" type="submit">Review eligibility, check budget and approve</button></form>
+        @endcan
+    </section>
+    @can('update', $batch)
+        <section class="dashboard-card records-card"><h2>Submit for Coordinator approval</h2><p>Roster membership, every scholar, amount, validation and verified semester approval are checked again. Submission requests Coordinator approval and does not release funds. Submitted records cannot be edited.</p>
+            <p class="records-alert" id="billing-classification-blocker">Final submission remains blocked until approved Form 2/Form 3 templates and current payable classification are implemented. Membership alone does not establish payability.</p>
+            <form class="records-form" method="POST" action="{{ route('billing-batches.submit', $batch) }}">@csrf<input type="hidden" name="billing_tab" value="submission"><input type="hidden" name="lock_version" value="{{ $batch->lock_version }}"><div class="record-field"><label for="submission-reference">Submission reference</label><input class="record-input" id="submission-reference" name="reference" value="{{ old('reference', $batch->reference) }}" maxlength="255" required></div><button class="records-button is-primary" type="submit" disabled aria-describedby="billing-classification-blocker">Final submission unavailable</button></form>
+        </section>
+    @endcan

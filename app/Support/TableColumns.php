@@ -54,6 +54,10 @@ class TableColumns
                 self::money($row->totalAmount(), 'Unconfirmed total'),
             ],
             'billing_items' => [$row->student->student_number, $row->student->full_name, self::money($row->gross_amount), 'Validation #'.$row->evaluation_run_id.' / Approval #'.$row->external_approval_id, ucfirst($row->status)],
+            'billing_members' => [null, $row['member']->student->student_number, $row['member']->student->full_name,
+                $row['member']->student->academicProgram?->name ?? 'Not provided',
+                $row['member']->student->year_level ? (ScholarProfile::yearLevels()[$row['member']->student->year_level] ?? 'Year '.$row['member']->student->year_level) : 'Not provided',
+                $row['member']->assignment->statusLabel(), $row['enrollment'], $row['eligibility'], $row['availability'], $row['reason'], self::money($row['amount'])],
             'candidates' => [$row['application']->student->student_number, $row['application']->student->full_name, $row['reason'] ?? 'Permitted under the confirmed billing policy'],
             'allocations' => [
                 self::student($row->student), $row->program->code.' '.self::period($row->academicPeriod),

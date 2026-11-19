@@ -18,7 +18,7 @@ class ScholarshipEvidenceRequest extends FormRequest
     {
         return [
             'submission_revision' => ['required', 'integer', 'min:1'],
-            'document_type' => ['required', Rule::in(array_keys(app(OfficialRuleCatalog::class)->validationDocuments()))],
+            'document_type' => ['required', Rule::in(array_keys(app(OfficialRuleCatalog::class)->validationDocuments($this->route('application')->program->code)))],
             'certificate' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'extensions:pdf,jpg,jpeg,png', 'max:2048'],
             'verified' => ['nullable', 'boolean'],
         ];

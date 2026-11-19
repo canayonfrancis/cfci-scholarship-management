@@ -1,11 +1,60 @@
 # Ngrok deployment investigation and fix
 
-Verified on 2026-11-19 (Asia/Manila), against the running application:
+Initially verified on 2026-11-19 and reverified on **2026-11-20** (Asia/Manila), against the running application:
 
 - Local: `http://127.0.0.1:8000`
 - Public: `https://stubble-moneybags-grafted.ngrok-free.dev`
 
-The missing styles and insecure generated URLs are fixed and verified over both origins. A successful real-account login over the public tunnel remains a manual check; successful authentication, session rotation, role restrictions, and logout were exercised with disposable test accounts in SQLite memory instead. The broader role test selection has existing route-reference failures described below.
+The missing styles and insecure generated URLs are fixed and verified over both origins. The 2026-11-20 follow-up also verified successful login, authenticated dashboard refresh, session ID rotation, and logout in Chrome using the application's existing designated test Administrator. Account, role, and audit records remained unchanged. The broader role test selection has existing route-reference failures described below.
+
+## Follow-up verification — 2026-11-20
+
+The user independently confirmed that login, authenticated-page refresh, and logout all worked through the public Ngrok URL with an existing test account. The account's role was not specified; this confirmation does not establish coverage of every role or remember-me persistence.
+
+The original fixes remain in place: `APP_DEBUG=false`, automatic cookie security, loopback-only proxy trust, no `public/hot`, and no listener on either IPv4 or IPv6 port 5173. Ngrok still forwards to the local server. Both login pages generate URLs for the correct origin, with HTTPS throughout the public page.
+
+There are unrelated, uncommitted billing and scholarship assignment changes in the workspace. Those files were left untouched. The current build outputs were verified as served; they were not rebuilt during this follow-up, to avoid publishing unrelated work. The successful build results later in this report describe the original fix on 2026-11-19.
+
+### Current assets
+
+Both manifest entries exist. HTTP downloads from localhost and Ngrok return identical bytes:
+
+| Path | Bytes | SHA-256 prefix | Local / Ngrok | Content type |
+| --- | ---: | --- | --- | --- |
+| `/build/assets/app-DjSHmIfs.css` | 102,472 | `e73647bdbd77fbb2` | 200 / 200 | `text/css; charset=UTF-8` |
+| `/build/assets/app-Dfw_00Kd.js` | 135,363 | `f00a1ed4d37d26bc` | 200 / 200 | `application/javascript` |
+| `/images/cronasia-logo-white.png` | 703,799 | `447dc5b201e4732d` | 200 / 200 | `image/png` |
+| `/images/cronasia-school.webp` | 101,466 | `01301baf1b1385c2` | 200 / 200 | `image/webp` |
+| `/images/favicon.webp` | 38,082 | `b1dc4bbba4150e5e` | 200 / 200 | `image/webp` |
+
+These asset names supersede the initial build's names recorded below. Public CSS and JS URLs begin with `https://stubble-moneybags-grafted.ngrok-free.dev`; local URLs begin with `http://127.0.0.1:8000`.
+
+### Live browser authentication
+
+Used normal form submission with real CSRF tokens in a fresh Chrome profile on each origin. The existing designated test Administrator's fixture credential was read from the repository inside the supervisor process. No account was created, reset, or provisioned. The credential was passed to the browser process through stdin and was not printed, copied into a report, or included in process arguments.
+
+Before testing, checked that the existing account has the designated technical role, the fixture credential matches its stored hash, no password rehash is needed, and no remember token exists. These checks matter: Laravel can otherwise update the password hash at login or rotate a stored remember token at logout. Remember me was left unchecked, and the normal authentication/authorization code was used throughout.
+
+| Check | Localhost | Ngrok |
+| --- | --- | --- |
+| Normal login form reaches authenticated `/dashboard` | 200 | 200 |
+| Refresh retains authenticated session | 200 | 200 |
+| Actual decrypted session ID changes at login | Pass | Pass |
+| Session cookie HttpOnly / SameSite | true / Lax | true / Lax |
+| Session cookie Secure | false for local HTTP | true for public HTTPS |
+| Normal logout form returns to `/login` | Pass | Pass |
+| Actual session ID changes at logout | Pass | Pass |
+| `/dashboard` after logout redirects to `/login` | Pass | Pass |
+| Login/dashboard console errors | None | None |
+| Login/dashboard failed network requests | None | None |
+
+Session IDs were compared inside the local supervisor after decrypting the cookies; neither cookie values nor session IDs were logged. Account, role, and audit-table fingerprints were identical before and after both browser runs. `APP_DEBUG` remained false. Sanitized authentication evidence is saved in [22-ngrok-live-auth-2026-11-20.json](verification/22-ngrok-live-auth-2026-11-20.json).
+
+The anonymous browser checks were also repeated at desktop 1440 × 1000 and mobile 390 × 844. Both origins render the existing UI with no horizontal overflow, a working password toggle, zero page/network errors, validation errors after an empty POST, rejection of deliberately invalid credentials, and 419 for a missing CSRF token. An initial browser load exceeded the diagnostic script's 15-second document-complete wait, despite receiving the application assets and initializing Alpine without errors. A repeat with a 45-second wait completed successfully; no application change was needed.
+
+New screenshots: [Ngrok desktop](screenshots/22-followup-2026-11-20-ngrok-login-desktop.png), [Ngrok mobile](screenshots/22-followup-2026-11-20-ngrok-login-mobile.png), [localhost desktop](screenshots/22-followup-2026-11-20-localhost-login-desktop.png), [localhost mobile](screenshots/22-followup-2026-11-20-localhost-login-mobile.png).
+
+The same focused PHP selection was rerun: **27 passed, 108 assertions**. The 14 historical route-reference failures below were not changed or suppressed; the broader suites were not rerun in this follow-up. Live checks under each Student/operational role and remember-me persistence remain additional manual coverage. No new application-code fix was necessary on 2026-11-20.
 
 ## Confirmed root causes
 
@@ -87,7 +136,7 @@ Temporary diagnostic scripts/logs were written under ignored `storage/framework/
 
 No Blade, CSS, authentication controller, authorization policy, business service, migration, or application database record was edited. HTTP testing naturally creates/updates framework session records and authentication rate-limit state. Automated account/role tests use the `phpunit.xml` SQLite `:memory:` database and disposable records; no application-database migration or seeding command was run.
 
-## Build results
+## Original build results — 2026-11-19
 
 Both `npm run build` and `npm run build:ngrok` exited successfully. Vite transformed 64 modules; the final build took approximately 1.03 seconds.
 
@@ -98,7 +147,7 @@ Both `npm run build` and `npm run build:ngrok` exited successfully. Vite transfo
 
 `public/build/manifest.json` contains both entries. Every referenced output exists. The bytes downloaded through Ngrok and localhost match for CSS, JS, logo, background, and linked favicon. No missing manifest dependency was found.
 
-## Verification results
+## Original verification results — 2026-11-19
 
 ### Generated URLs and HTTP responses
 
@@ -160,7 +209,7 @@ The original error's exact source is unresolved without its full script URL/stac
 
 ## Remaining issues and limits
 
-1. Successful login, authenticated pages, remember-me behavior, and logout using real deployment accounts over Ngrok still require the manual steps below. No real credentials were supplied or retrieved. Test-database results do not substitute for that end-to-end check.
+1. Successful live login, authenticated dashboard refresh, session rotation, and logout are now verified on both origins using the existing designated test Administrator, as recorded in the 2026-11-20 follow-up. Live coverage under each Student/operational role and remember-me persistence remains manual. Remember me was intentionally not exercised because it writes a persistent account token; account changes are outside this task's constraints.
 2. Fourteen existing role-suite failures reference removed/missing routes. Reconciling those tests belongs to the prior settings/scholar workflow changes.
 3. The legacy `/favicon.ico` file is empty and returns 200 with zero bytes. The actual login layouts explicitly link `/images/favicon.webp`, which loads correctly. The unused legacy file was left unchanged.
 4. Vite must remain stopped during build-based Ngrok sharing. Starting `npm run dev` recreates `public/hot` and selects development assets again. `build:ngrok` removes the hot file but does not manage or stop processes automatically.
@@ -218,7 +267,7 @@ For ordinary local development later, stop sharing, set private `APP_URL=http://
 10. Using an existing Student test account, repeat on both origins. Confirm the intended Student profile destination and that staff-only URLs remain denied. Test an existing restricted staff role against a forbidden page without submitting business-data changes.
 11. Verify Remember me with an approved test account if required, then log out. Confirm no authenticated response is accessible after logout.
 12. For a safe CSRF negative check, submit a login POST without `_token` in the same browser session; expect 419. Reload `/login` afterward. Do not change CSRF middleware.
-13. Record the real-account results separately. Do not mark them passed solely from this investigation's isolated account tests.
+13. Record results for each additional tested role separately. The 2026-11-20 Administrator results above come from real browser form submissions against the running deployment; isolated account tests alone do not establish live coverage for other roles.
 
 ## Framework references
 

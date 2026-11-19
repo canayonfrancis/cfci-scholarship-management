@@ -1,3 +1,11 @@
+<details class="dashboard-card records-card"><summary>Historical Registrar source revisions (read-only)</summary>
+    <p class="record-help">Original source records and reported academic information are retained for history. These values are not current grade requirements and are not recomputed.</p>
+    @foreach($academicHistory as $source)@can('view', $source)<details><summary>{{ $source->academicPeriod->academic_year }} / Semester {{ $source->academicPeriod->semester_code }} / Revision {{ $source->revision }}</summary>
+        <x-retained-academic-source :record="$source" />
+        <x-evaluation-snapshot :value="$source->only(['course', 'year_level', 'enrollment_status', 'academic_standing', 'grade_average', 'certified_percentage_gwa', 'certified_gwa_reference', 'academic_summary', 'verification_notes', 'correction_reason'])" />
+        @if($source->grades->isNotEmpty())<details><summary>Original reported subjects</summary><x-evaluation-snapshot :value="$source->grades->map(fn ($grade) => $grade->only($grade->getFillable()))->all()" /></details>@endif
+    </details>@endcan @endforeach
+</details>
 <section class="dashboard-card records-card"><h2 class="records-section-title">School evaluation history</h2><p class="record-help">Prior runs, school decisions and policy/source snapshots are retained. A historical decision does not authorize a current award.</p>
     @forelse($runs as $run)<details class="evaluation-accordion"><summary><strong>Run {{ $run->run_number }} · {{ Str::headline($run->resultLabel()) }}</strong><span class="records-badge {{ $run->id === $latest?->id && $workspace['current'] ? 'is-green' : 'is-amber' }}">{{ $run->id === $latest?->id && $workspace['current'] ? 'Current school decision' : 'Requires reassessment / retained history' }}</span></summary><div class="evaluation-accordion-body">
         <dl class="evaluation-summary-grid"><div><dt>School decision</dt><dd>{{ Str::headline($run->school_decision) }}</dd></div><div><dt>Evaluator</dt><dd>{{ $run->evaluator?->name ?? $run->coordinator?->name ?? 'Historical evaluator' }}</dd></div><div><dt>Evaluated at</dt><dd>{{ $run->evaluated_at?->timezone('Asia/Manila')->format('M j, Y · g:i A') ?? 'Not recorded' }}</dd></div><div><dt>Rule version</dt><dd>{{ $run->rule_version ?? 'Unconfirmed rules' }}</dd></div>

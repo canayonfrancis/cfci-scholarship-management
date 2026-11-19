@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing;
 
+use App\Models\AcademicRecord;
 use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipRate;
@@ -18,6 +19,9 @@ class BillingEligibility
     public function basis(ScholarshipApplication $application, ProgramPeriodTerm $terms, ?ScholarshipRate $rate = null): array
     {
         $fail = fn (string $message) => throw ValidationException::withMessages(['billing' => $message]);
+        if (strtoupper(trim($application->program->code)) === 'EDUKAR') {
+            $fail('EDUKAR requires an approved individual variable entitlement workflow. A uniform semester rate cannot establish its payable amount.');
+        }
         $rate ??= $terms->rates()->orderByDesc('revision')->first();
         if (! $rate || $rate->program_period_term_id !== $terms->id || ! $rate->approved_by || ! $rate->approved_at || Money::cents($rate->amount) <= 0) {
             $fail('A Coordinator-approved scholarship amount for the exact semester is required.');
@@ -25,6 +29,10 @@ class BillingEligibility
         $amount = $rate->amount;
         if ($application->program_period_term_id !== $terms->id || $application->program_id !== $terms->program_id || $application->academic_period_id !== $terms->academic_period_id) {
             $fail('The scholar validation must match this program and semester.');
+        }
+        $enrollment = AcademicRecord::where('student_id', $application->student_id)->where('academic_period_id', $application->academic_period_id)->orderByDesc('revision')->first();
+        if (! $enrollment || $enrollment->verification_status !== 'verified' || ! $enrollment->verified_by || ! $enrollment->verified_at || $enrollment->enrollment_status !== 'enrolled') {
+            $fail('Verified enrollment for this semester is required. Missing, unverified or not-enrolled records cannot authorize billing.');
         }
         if ($application->approved_gross_amount !== null) {
             $centavos = function (string $amount): int {

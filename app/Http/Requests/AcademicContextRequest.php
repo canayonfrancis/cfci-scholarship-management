@@ -18,9 +18,6 @@ class AcademicContextRequest extends FormRequest
         return [
             'revision' => ['required', 'integer', 'min:0'],
             'active_period_id' => ['required', 'integer', 'exists:academic_periods,id'],
-            'source_period_id' => ['nullable', 'integer', 'exists:academic_periods,id'],
-            'source_policy_reference' => [$this->filled('source_period_id') ? 'required' : 'prohibited', 'nullable', 'string', 'max:4000'],
-            'confirm_source' => [$this->filled('source_period_id') ? 'accepted' : 'prohibited'],
         ];
     }
 }

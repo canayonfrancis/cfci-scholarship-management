@@ -2,6 +2,8 @@ import './bootstrap';
 
 import Alpine from 'alpinejs';
 import billingBatchFilter from './billing-batch-filter';
+import billingRosterSelection from './billing-roster-selection';
+import billingWorkspace from './billing-workspace';
 import initializeDataTables from './data-tables';
 import evaluationWorkspace from './evaluation-workspace';
 import primaryNavigation from './primary-navigation';
@@ -10,6 +12,8 @@ import rosterScholarSelection from './roster-scholar-selection';
 
 window.Alpine = Alpine;
 Alpine.data('billingBatchFilter', billingBatchFilter);
+Alpine.data('billingRosterSelection', billingRosterSelection);
+Alpine.data('billingWorkspace', billingWorkspace);
 Alpine.data('evaluationWorkspace', evaluationWorkspace);
 Alpine.data('primaryNavigation', primaryNavigation);
 Alpine.data('recordFormDialog', recordFormDialog);

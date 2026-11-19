@@ -3,7 +3,6 @@
 use App\Http\Controllers\AcademicCertificateController;
 use App\Http\Controllers\AcademicPeriodController;
 use App\Http\Controllers\AcademicProgramController;
-use App\Http\Controllers\AcademicRequirementController;
 use App\Http\Controllers\BillingBatchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DelistingReasonController;
@@ -102,8 +101,10 @@ Route::middleware('auth')->group(function () {
     Route::post('billing-batches/{batch}/approve', [ScholarshipFundsController::class, 'approve'])->name('billing-batches.approve');
     Route::post('billing-batches/{batch}/items/{item}/adjust', [ScholarshipFundsController::class, 'adjust'])->name('billing-batches.items.adjust');
     Route::get('billing-batches/{batch}', [BillingBatchController::class, 'show'])->name('billing-batches.show');
+    Route::post('billing-batches/{batch}/enrollment', [BillingBatchController::class, 'enrollment'])->name('billing-batches.enrollment');
     Route::patch('billing-batches/{batch}', [BillingBatchController::class, 'update'])->name('billing-batches.update');
     Route::post('billing-batches/{batch}/items', [BillingBatchController::class, 'add'])->name('billing-batches.items.store');
+    Route::post('billing-batches/{batch}/items/bulk', [BillingBatchController::class, 'addMany'])->name('billing-batches.items.bulk');
     Route::delete('billing-batches/{batch}/items/{item}', [BillingBatchController::class, 'remove'])->name('billing-batches.items.destroy');
     Route::post('billing-batches/{batch}/submit', [BillingBatchController::class, 'submit'])->name('billing-batches.submit');
     Route::post('academic-periods/validation-context', [AcademicPeriodController::class, 'saveContext'])->name('academic-periods.context');
@@ -132,7 +133,6 @@ Route::middleware('auth')->group(function () {
         });
     Route::resource('scholars', ScholarController::class)->only(['index', 'show', 'edit', 'update'])->middleware('cache.headers:no_store;private');
     Route::resource('scholarship-programs', ScholarshipProgramController::class)->parameters(['scholarship-programs' => 'program'])->except('destroy');
-    Route::post('scholarship-programs/{program}/academic-requirements', [AcademicRequirementController::class, 'store'])->middleware('throttle:12,1')->name('scholarship-programs.academic-requirements.store');
     Route::resource('academic-periods', AcademicPeriodController::class)->parameters(['academic-periods' => 'period'])->except('destroy');
     Route::scopeBindings()->group(function () {
         Route::get('scholars/{scholar}/assignments/create', [ScholarshipAssignmentController::class, 'create'])->name('scholars.assignments.create');

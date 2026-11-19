@@ -1,4 +1,4 @@
-@props(['id', 'title', 'action', 'submitLabel', 'show' => false, 'defaults' => [], 'method' => 'POST', 'busyLabel' => 'Creating…', 'dismissQuery' => [], 'hasErrors' => null, 'triggerId' => null])
+@props(['id', 'title', 'action', 'submitLabel', 'show' => false, 'defaults' => [], 'method' => 'POST', 'busyLabel' => 'Creating…', 'dismissQuery' => [], 'hasErrors' => null, 'triggerId' => null, 'enctype' => 'application/x-www-form-urlencoded'])
 
 <dialog id="{{ $id }}" class="academic-subject-dialog record-form-dialog"
     x-data="recordFormDialog({ reopen: @js($show), hasErrors: @js($hasErrors), defaults: @js($defaults), dismissQuery: @js($dismissQuery), triggerId: @js($triggerId) })"
@@ -10,7 +10,7 @@
         <div><h3 id="{{ $id }}-title">{{ $title }}</h3><div id="{{ $id }}-description" class="record-help">{{ $description ?? '' }}</div></div>
         <button type="button" class="records-button academic-dialog-close" x-on:click="cancel()" x-bind:disabled="submitting" aria-label="Close {{ $title }}"><x-dashboard-icon name="close" :size="18" /></button>
     </div>
-    <form method="POST" action="{{ $action }}" x-ref="form" x-on:submit="submit($event)" x-bind:aria-busy="submitting">
+    <form method="POST" action="{{ $action }}" enctype="{{ $enctype }}" x-ref="form" x-on:submit="submit($event)" x-bind:aria-busy="submitting">
         @csrf
         @if(strtoupper($method) !== 'POST') @method($method) @endif
         <div class="academic-dialog-body">{{ $slot }}</div>

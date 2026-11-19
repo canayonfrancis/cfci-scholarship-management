@@ -167,6 +167,22 @@ Use existing authorized development accounts and isolated fictional profiles onl
 
 ## Limitations
 
+### Modal reopening correction
+
+Static review of the reported close/reopen loop found that shared modal cancellation
+dispatched synthetic `change` events to every select, including Rows per page.
+Its existing onchange handler navigated while `add=1` was still in the URL, causing
+the server to reopen the modal. Cancellation now notifies only Alpine-model fields
+and preserves table page-size values without emitting their navigation events.
+The clean-form baseline is refreshed after selection cleanup so a fresh reopening
+does not inherit a stale unsaved-change warning.
+Roster saving, validation recovery and deliberate search/paging navigation are unchanged.
+JavaScript syntax/whitespace checks were performed; no functional tests were run.
+Developer verification remains: close with Cancel, × and Escape after opening from
+Add scholars, after filtering/paging, and after a validation error. Repeat with page
+size changed; expect no reload/reopen on close, cleared selection and normal reopening
+only through Add scholars. Confirm successful saving returns to the closed roster page.
+
 Selections are bounded to 200 per atomic request; starting date is shared only by
 new assignments in that request. Search/filter navigation reloads the server-rendered
 modal with its selection state rather than adding a new API/library. Native dialogs

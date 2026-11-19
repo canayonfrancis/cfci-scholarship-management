@@ -48,7 +48,11 @@ export default function recordFormDialog(initial) {
             if (this.submitting) return;
             if (this.isDirty() && !window.confirm('Discard the unsaved information in this form? No changes will be saved.')) return;
             const form = this.$refs.form;
+            // Table page-size controls navigate on change; retain their UI state on cancel.
+            const tableSizes = [...form.querySelectorAll('.data-table-size select')]
+                .map(field => [field, field.value]);
             form.reset();
+            tableSizes.forEach(([field, value]) => { field.value = value; });
             for (const [name, value] of Object.entries(initial.defaults)) {
                 const field = form.elements.namedItem(name);
                 if (field) field.value = value ?? '';
@@ -60,8 +64,9 @@ export default function recordFormDialog(initial) {
             });
             this.returnedErrors = false;
             this.baseline = this.values();
-            // Keep dependent previews in sync after restoring the form's defaults.
-            form.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(field => {
+            // Sync Alpine models/previews only. Notifying every select also submits
+            // the table pager and reloads the URL's add=1 flag before close cleanup.
+            form.querySelectorAll('input[x-model], select[x-model], textarea[x-model]').forEach(field => {
                 field.dispatchEvent(new Event('input', { bubbles: true }));
                 field.dispatchEvent(new Event('change', { bubbles: true }));
             });
@@ -75,7 +80,11 @@ export default function recordFormDialog(initial) {
                 initial.dismissQuery.forEach(key => url.searchParams.delete(key));
                 window.history.replaceState(window.history.state, '', url);
             }
-            this.$nextTick(() => this.trigger?.focus());
+            this.$nextTick(() => {
+                // Selection templates settle after the close event clears their models.
+                this.baseline = this.values();
+                this.trigger?.focus();
+            });
         },
         submit(event) {
             if (event.defaultPrevented) return;

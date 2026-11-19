@@ -15,6 +15,13 @@ class BillingBatchOptions
             ->when($filters['academic_period_id'] ?? null, fn ($query, $id) => $query->where('academic_period_id', $id))
             ->when($filters['academic_year'] ?? null, fn ($query, $year) => $query->whereHas('academicPeriod', fn ($period) => $period->where('academic_year', $year)));
 
+        if (filled($filters['q'] ?? null)) {
+            $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], trim($filters['q'])).'%';
+            $query->where(fn ($q) => $q->whereRaw("batch_number LIKE ? ESCAPE '!'", [$term])
+                ->orWhereRaw("reference LIKE ? ESCAPE '!'", [$term])
+                ->orWhereHas('scholarshipBatch', fn ($q) => $q->whereRaw("batch_number LIKE ? ESCAPE '!'", [$term])));
+        }
+
         if (($filters['status'] ?? null) === 'approved') {
             $query->where(fn ($query) => $query->whereHas('approval')->orWhere('status', 'finalized'));
         } elseif (filled($filters['status'] ?? null)) {

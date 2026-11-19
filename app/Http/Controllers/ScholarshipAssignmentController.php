@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Actions\Records\SaveScholarshipAssignment;
 use App\Http\Requests\ScholarshipAssignmentRequest;
 use App\Models\AcademicPeriod;
+use App\Models\DelistingReason;
 use App\Models\ScholarshipAssignment;
 use App\Models\ScholarshipProgram;
 use App\Models\Student;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class ScholarshipAssignmentController extends Controller
@@ -50,6 +52,7 @@ class ScholarshipAssignmentController extends Controller
             'scholar' => $scholar, 'assignment' => $assignment,
             'programs' => ScholarshipProgram::orderBy('code')->get(),
             'periods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),
+            'delistingReasons' => Schema::hasTable('delisting_reasons') ? DelistingReason::where('is_active', true)->orderBy('name')->get() : collect(),
         ]);
     }
 }

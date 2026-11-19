@@ -30,6 +30,11 @@ class ScholarshipProgram extends Model
         return $this->hasMany(ProgramPeriodTerm::class, 'program_id');
     }
 
+    public function usesFixedSemesterRate(): bool
+    {
+        return in_array(strtoupper(trim($this->code)), ['TDP', 'TES', 'COSCHO'], true);
+    }
+
     public function assignments(): HasMany
     {
         return $this->hasMany(ScholarshipAssignment::class, 'program_id');

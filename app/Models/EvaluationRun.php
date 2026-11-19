@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Services\Eligibility\PrivateEvidence;
-use App\Services\Eligibility\SchoolGradingPolicy;
+use App\Services\Eligibility\EligibilityEvaluator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -56,32 +56,22 @@ class EvaluationRun extends Model
     /** A historical decision is never implicitly reusable after its inputs change. */
     public function isCurrent(): bool
     {
-        if (! ProgramAcademicRequirement::storageReady()) {
-            return false;
-        }
         $run = $this->fresh();
         if (! $run || ! $run->completed_at || ! $run->decided_at || $run->school_decision === 'pending') {
             return false;
         }
-        if (($run->input_snapshot['assessment_scope'] ?? null) !== SchoolGradingPolicy::SCOPE ||
-            ! in_array($run->input_snapshot['grading_policy_check']['status'] ?? 'review', ['pass', 'fail'], true)) {
+        if (($run->input_snapshot['assessment_scope'] ?? null) !== EligibilityEvaluator::SCOPE ||
+            ($run->rule_snapshot['assessment_scope'] ?? null) !== EligibilityEvaluator::SCOPE) {
             return false;
         }
         $context = AcademicValidationContext::current();
         $pinnedContext = $run->input_snapshot['academic_context'] ?? [];
-        if ($context->active_period_id !== $run->academic_period_id || $context->revision !== ($pinnedContext['revision'] ?? null) ||
-            $context->source_period_id !== ($pinnedContext['source_period_id'] ?? null)) {
+        if ($context->active_period_id !== $run->academic_period_id || $context->revision !== ($pinnedContext['revision'] ?? null)) {
             return false;
         }
         $application = $run->application()->first();
         if (! $application || $application->status === 'withdrawn' || $application->submission_revision !== $run->application_revision ||
             $application->evaluationRuns()->where('run_number', '>', $run->run_number)->exists()) {
-            return false;
-        }
-        $academicPolicy = ProgramAcademicRequirement::where('program_period_term_id', $application->program_period_term_id)->orderByDesc('revision')->first();
-        $pinnedPolicy = $run->rule_snapshot['academic_requirements'] ?? [];
-        if (! $academicPolicy || $academicPolicy->status !== 'confirmed' || $academicPolicy->id !== ($pinnedPolicy['id'] ?? null)
-            || $academicPolicy->revision !== ($pinnedPolicy['revision'] ?? null)) {
             return false;
         }
         if (array_key_exists('conflicting_assignment_id', $run->input_snapshot ?? [])) {
@@ -96,12 +86,12 @@ class EvaluationRun extends Model
                 return false;
             }
         }
-        foreach (['grade' => $run->gradeRecord()->first(), 'enrollment' => $run->enrollmentRecord()->first()] as $kind => $record) {
+        foreach (['enrollment' => $run->enrollmentRecord()->first()] as $kind => $record) {
             $snapshot = $run->input_snapshot['source_records'][$kind] ?? null;
             $pinnedVerified = $snapshot && ($snapshot['id'] ?? null) === $record?->id && ($snapshot['revision'] ?? null) === $record?->revision
                 && ($snapshot['lock_version'] ?? null) === $record?->lock_version && ($snapshot['verification_status'] ?? null) === 'verified'
                 && ($snapshot['verified_by'] ?? null) === $record?->verified_by;
-            if (! $record || $record->verification_status !== 'verified' || ! $record->verified_at || ! $record->isLatestRevision()) {
+            if (! $record || $record->verification_status !== 'verified' || ! $record->verified_by || ! $record->verified_at || ! $record->isLatestRevision()) {
                 return false;
             }
             if ($record->verified_at->gt($run->completed_at) || $record->verified_at->gt($run->decided_at)) {

@@ -12,7 +12,6 @@ use App\Http\Requests\ScholarshipEvidenceRequest;
 use App\Models\AcademicPeriod;
 use App\Models\AcademicValidationContext;
 use App\Models\Document;
-use App\Models\ProgramAcademicRequirement;
 use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipAssignment;
@@ -20,7 +19,6 @@ use App\Models\ScholarshipProgram;
 use App\Models\Student;
 use App\Services\Eligibility\OfficialRuleCatalog;
 use App\Services\Eligibility\PrivateEvidence;
-use App\Services\Eligibility\SchoolGradingPolicy;
 use App\View\EvaluationWorkspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,10 +48,24 @@ class ScholarshipEvaluationController extends Controller
     public function create(Request $request): View
     {
         Gate::authorize('create', ScholarshipApplication::class);
-        $filters = $request->validate(['program_id' => ['nullable', 'integer', 'exists:scholarship_programs,id'], 'academic_period_id' => ['nullable', 'integer', 'exists:academic_periods,id']]);
+        $filters = $request->validate([
+            'program_id' => ['nullable', 'integer', 'exists:scholarship_programs,id'],
+            'academic_period_id' => ['nullable', 'integer', 'exists:academic_periods,id'],
+            'assignment_id' => ['nullable', 'integer', 'exists:scholarship_assignments,id'],
+        ]);
+        $context = AcademicValidationContext::current()->load('activePeriod');
+        if (filled($filters['academic_period_id'] ?? null) && (int) $filters['academic_period_id'] !== $context->active_period_id) {
+            throw ValidationException::withMessages(['academic_period_id' => 'This roster semester is not the configured active validation period. A Coordinator must review the existing validation context before starting its evaluation. No other semester has been substituted.']);
+        }
+        if (filled($filters['assignment_id'] ?? null)) {
+            $selected = ScholarshipAssignment::findOrFail($filters['assignment_id']);
+            if (! filled($filters['academic_period_id'] ?? null) || $selected->program_id !== (int) ($filters['program_id'] ?? 0) || ! in_array($selected->status, ['pending', 'active'], true)) {
+                throw ValidationException::withMessages(['assignment_id' => 'Select the roster assignment with its matching scholarship program and semester. Only pending or active assignments can start validation.']);
+            }
+        }
 
         return view('evaluations.create', [
-            'context' => $context = AcademicValidationContext::current()->load(['activePeriod', 'sourcePeriod']),
+            'context' => $context,
             'assignments' => isset($filters['program_id']) && $context->active_period_id ? ScholarshipAssignment::with('student')->where('program_id', $filters['program_id'])->whereIn('status', ['pending', 'active'])->get() : collect(),
             ...$this->choices(),
         ]);
@@ -98,28 +110,24 @@ class ScholarshipEvaluationController extends Controller
         Gate::authorize('view', $application);
         $application->load(['student.academicProgram', 'program', 'academicPeriod', 'assignment.activatedBy', 'assignment.closedBy', 'terms.confirmedBy', 'documents.reviewedBy', 'documents.uploadedBy', 'evaluationRuns.evaluator', 'evaluationRuns.coordinator', 'evaluationRuns.gradeRecord.documents', 'evaluationRuns.enrollmentRecord.documents', 'externalApprovals.documents', 'externalApprovals.recordedBy']);
         $runs = $application->evaluationRuns->sortByDesc('run_number');
-        $context = AcademicValidationContext::current()->load(['activePeriod', 'sourcePeriod']);
-        $gradeSource = $context->source_period_id ? $application->student->academicRecords()->with(['grades', 'documents'])->where('academic_period_id', $context->source_period_id)->orderByDesc('revision')->first() : null;
+        $context = AcademicValidationContext::current()->load('activePeriod');
         $academic = $application->student->academicRecords()->with('documents')->where('academic_period_id', $application->academic_period_id)->orderByDesc('revision')->first();
-        $academicPolicyReady = ProgramAcademicRequirement::storageReady();
-        $academicRequirements = $academicPolicyReady ? $application->terms->academicRequirements()->orderByDesc('revision')->first() : null;
-        $contextValid = $context->active_period_id === $application->academic_period_id && $context->source_period_id && $context->confirmed_by && $context->confirmed_at && filled($context->source_policy_reference);
-        $gradeSnapshot = $contextValid && $gradeSource?->verification_status === 'verified' && $gradeSource->verified_by && $gradeSource->verified_at ? $gradeSource->only(['verification_status', 'verified_by', 'verified_at', 'academic_standing', 'certified_percentage_gwa', 'certified_gwa_reference']) : null;
-        if ($gradeSnapshot) {
-            $gradeSnapshot['subjects'] = $gradeSource->grades->map(fn ($grade) => $grade->only(array_diff($grade->getFillable(), ['equivalent'])))->all();
-        }
-        $enrollmentSnapshot = $contextValid && $academic?->verification_status === 'verified' && $academic->verified_by && $academic->verified_at ? $academic->only(['verification_status', 'enrollment_status']) : null;
+        $policy = $catalog->forProgram($application->program->code);
+        $policyApplicable = $policy && $catalog->appliesTo($application->academicPeriod);
+        $factKeys = $policyApplicable ? array_unique([
+            ...$catalog->requiredFacts($application->program->code, 'new'),
+            ...$catalog->requiredFacts($application->program->code, 'continuing'),
+        ]) : [];
 
         $data = [
             'context' => $context,
-            'gradeSource' => $gradeSource, 'academicRequirements' => $academicRequirements,
-            'academicPolicyReady' => $academicPolicyReady,
-            'academicCheck' => app(SchoolGradingPolicy::class)->check($gradeSnapshot, $academicRequirements?->snapshot(), $enrollmentSnapshot),
             'application' => $application, 'runs' => $runs, 'latest' => $runs->first(),
             'academic' => $academic,
-            'policy' => $catalog->forProgram($application->program->code), 'policyApplicable' => $catalog->appliesTo($application->academicPeriod),
-            'facts' => $application->program->code === 'EDUKAR' ? [] : OfficialRuleCatalog::FACTS,
-            'documentTypes' => $application->program->code === 'EDUKAR' ? [] : $catalog->validationDocuments(),
+            // Read-only History data; never assembled into the current evaluation input.
+            'academicHistory' => $application->student->academicRecords()->with(['academicPeriod', 'grades', 'documents'])->orderByDesc('academic_period_id')->orderByDesc('revision')->get(),
+            'policy' => $policy, 'policyApplicable' => (bool) $policyApplicable,
+            'facts' => array_intersect_key(OfficialRuleCatalog::FACTS, array_flip($factKeys)),
+            'documentTypes' => $application->program->code === 'EDUKAR' ? [] : $catalog->validationDocuments($application->program->code),
             'approvals' => $application->externalApprovals->sortByDesc('id'),
         ];
 

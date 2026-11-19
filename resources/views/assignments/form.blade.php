@@ -16,6 +16,16 @@
                 <x-record-field name="end_period_id" label="Closing academic semester" type="select" x-bind:disabled="!['ended', 'relinquished'].includes(assignmentStatus)" x-bind:required="['ended', 'relinquished'].includes(assignmentStatus)"><option value="">Select a closing semester</option>@foreach($periods as $period)<option value="{{ $period->id }}" @selected(old('end_period_id', $assignment->end_period_id) == $period->id)>{{ $period->academic_year }} · Semester {{ $period->semester_code }}</option>@endforeach</x-record-field>
                 <x-record-field name="ends_on" label="Exact closing date (optional)" type="date" :value="old('ends_on', $assignment->ends_on?->format('Y-m-d'))" x-bind:disabled="!['ended', 'relinquished'].includes(assignmentStatus)" />
             </div>
+            @if($assignment->exists && $delistingReasons->isNotEmpty())
+                <div class="record-field" x-show="['ended', 'relinquished'].includes(assignmentStatus)" x-cloak>
+                    <label for="assignment-reason-suggestion">Active reason from the Reason for Delisting registry (optional)</label>
+                    <select id="assignment-reason-suggestion" class="record-input" @change="if ($event.target.value) { const field = $event.currentTarget.form.elements.namedItem('status_reason'); field.value = $event.target.value + (field.value.trim() ? '\n' + field.value : ''); }">
+                        <option value="">Select a reason to copy into the school reference</option>
+                        @foreach($delistingReasons as $reason)<option value="{{ $reason->name }}">{{ $reason->name }}</option>@endforeach
+                    </select>
+                    <p class="record-help">The selected wording is retained in the existing status-change reason. This does not change status automatically or exclude a scholar from a semester bill. Add the supporting reference below.</p>
+                </div>
+            @endif
             <x-record-field name="status_reason" label="Reason / school reference" type="textarea" :value="old('status_reason')" maxlength="5000" help="Required when changing status or recording an ended or relinquished scholarship." />
             <div class="records-form-footer"><p class="record-help">Closed and relinquished assignments remain in the scholar's history and cannot be overwritten.</p><x-primary-button class="records-submit" :disabled="$programs->isEmpty() || $periods->isEmpty()">Save assignment</x-primary-button></div>
         </form>

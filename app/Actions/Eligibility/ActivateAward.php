@@ -43,6 +43,10 @@ class ActivateAward
                     ! $run->evaluated_by || ($run->rule_snapshot['confirmed'] ?? false) !== true || ! $policy || $run->rule_snapshot['policy'] != $policy) {
                     $fail('A current eligible school evaluation is required. Reevaluate changed or incomplete records.');
                 }
+                $enrollment = $run->enrollmentRecord()->first();
+                if (! $enrollment || $enrollment->verification_status !== 'verified' || ! $enrollment->verified_by || ! $enrollment->verified_at || $enrollment->enrollment_status !== 'enrolled') {
+                    $fail('Current Registrar-verified enrolled status is required before award activation.');
+                }
                 foreach ($run->input_snapshot['evidence'] ?? [] as $snapshot) {
                     $document = $application->documents()->find($snapshot['id']);
                     if (! $document || ! $this->evidence->usable($document) || $document->checksum !== $snapshot['checksum']) {

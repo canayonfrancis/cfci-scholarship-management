@@ -1,0 +1,214 @@
+{
+  "verification_date": "2026-11-20",
+  "timezone": "Asia/Manila",
+  "method": "Headless Chrome, normal login/logout forms, existing designated test Administrator",
+  "results": [
+    {
+      "origin": "http://127.0.0.1:8000",
+      "loginStatus": 200,
+      "refreshStatus": 200,
+      "secureCookie": false,
+      "httpOnly": true,
+      "sameSite": "Lax",
+      "logoutReturnedToLogin": true,
+      "protectedAfterLogout": {
+        "status": 200,
+        "redirected": true,
+        "url": "http://127.0.0.1:8000/login"
+      },
+      "consoleErrors": [],
+      "networkFailures": [],
+      "applicationResponses": [
+        {
+          "url": "http://127.0.0.1:8000/login",
+          "status": 200,
+          "mime": "text/html"
+        },
+        {
+          "url": "http://127.0.0.1:8000/images/cronasia-logo-white.png",
+          "status": 200,
+          "mime": "image/png"
+        },
+        {
+          "url": "http://127.0.0.1:8000/build/assets/app-DjSHmIfs.css",
+          "status": 200,
+          "mime": "text/css"
+        },
+        {
+          "url": "http://127.0.0.1:8000/build/assets/app-Dfw_00Kd.js",
+          "status": 200,
+          "mime": "application/javascript"
+        },
+        {
+          "url": "http://127.0.0.1:8000/images/cronasia-school.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "http://127.0.0.1:8000/dashboard",
+          "status": 200,
+          "mime": "text/html"
+        },
+        {
+          "url": "http://127.0.0.1:8000/images/cfc-logo.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "http://127.0.0.1:8000/images/cronasia-foundation-college.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "http://127.0.0.1:8000/build/assets/app-DjSHmIfs.css",
+          "status": 200,
+          "mime": "text/css"
+        },
+        {
+          "url": "http://127.0.0.1:8000/build/assets/app-Dfw_00Kd.js",
+          "status": 200,
+          "mime": "application/javascript"
+        },
+        {
+          "url": "http://127.0.0.1:8000/images/favicon.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "http://127.0.0.1:8000/dashboard",
+          "status": 200,
+          "mime": "text/html"
+        },
+        {
+          "url": "http://127.0.0.1:8000/build/assets/app-DjSHmIfs.css",
+          "status": 200,
+          "mime": "text/css"
+        },
+        {
+          "url": "http://127.0.0.1:8000/images/cfc-logo.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "http://127.0.0.1:8000/images/cronasia-foundation-college.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "http://127.0.0.1:8000/build/assets/app-Dfw_00Kd.js",
+          "status": 200,
+          "mime": "application/javascript"
+        },
+        {
+          "url": "http://127.0.0.1:8000/images/favicon.webp",
+          "status": 200,
+          "mime": "image/webp"
+        }
+      ],
+      "session_id_rotated_on_login": true,
+      "session_id_rotated_on_logout": true
+    },
+    {
+      "origin": "https://stubble-moneybags-grafted.ngrok-free.dev",
+      "loginStatus": 200,
+      "refreshStatus": 200,
+      "secureCookie": true,
+      "httpOnly": true,
+      "sameSite": "Lax",
+      "logoutReturnedToLogin": true,
+      "protectedAfterLogout": {
+        "status": 200,
+        "redirected": true,
+        "url": "https://stubble-moneybags-grafted.ngrok-free.dev/login"
+      },
+      "consoleErrors": [],
+      "networkFailures": [],
+      "applicationResponses": [
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/login",
+          "status": 200,
+          "mime": "text/html"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/images/cronasia-logo-white.png",
+          "status": 200,
+          "mime": "image/png"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/build/assets/app-DjSHmIfs.css",
+          "status": 200,
+          "mime": "text/css"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/build/assets/app-Dfw_00Kd.js",
+          "status": 200,
+          "mime": "application/javascript"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/images/cronasia-school.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/dashboard",
+          "status": 200,
+          "mime": "text/html"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/build/assets/app-DjSHmIfs.css",
+          "status": 200,
+          "mime": "text/css"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/images/cfc-logo.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/images/cronasia-foundation-college.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/build/assets/app-Dfw_00Kd.js",
+          "status": 200,
+          "mime": "application/javascript"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/images/favicon.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/dashboard",
+          "status": 200,
+          "mime": "text/html"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/build/assets/app-DjSHmIfs.css",
+          "status": 200,
+          "mime": "text/css"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/images/cfc-logo.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/images/cronasia-foundation-college.webp",
+          "status": 200,
+          "mime": "image/webp"
+        },
+        {
+          "url": "https://stubble-moneybags-grafted.ngrok-free.dev/build/assets/app-Dfw_00Kd.js",
+          "status": 200,
+          "mime": "application/javascript"
+        }
+      ],
+      "session_id_rotated_on_login": true,
+      "session_id_rotated_on_logout": true
+    }
+  ],
+  "account_role_audit_unchanged": true,
+  "debug": false
+}

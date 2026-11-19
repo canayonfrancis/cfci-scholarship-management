@@ -8,13 +8,13 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-/** Retained historical files only; academic record management has no public routes. */
+/** Protected Registrar sources; enrollment writes remain scoped to the billing workspace. */
 class AcademicCertificateController extends Controller
 {
     public function __invoke(AcademicRecord $record, Document $document): StreamedResponse
     {
         Gate::authorize('view', $record);
-        abort_unless($document->academic_record_id === $record->id && $document->disk === 'academic' && $document->document_type === 'grade_certificate' && str_starts_with($document->storage_path, 'certificates/'.$record->id.'/'), 404);
+        abort_unless($document->academic_record_id === $record->id && $document->disk === 'academic' && in_array($document->document_type, ['grade_certificate', 'enrollment_certificate'], true) && str_starts_with($document->storage_path, 'certificates/'.$record->id.'/'), 404);
         $disk = Storage::disk('academic');
         abort_unless($document->checksum && $disk->exists($document->storage_path), 404);
         $stream = $disk->readStream($document->storage_path);

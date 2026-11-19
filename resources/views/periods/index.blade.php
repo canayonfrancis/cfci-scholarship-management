@@ -1,4 +1,4 @@
-<x-records-page title="Semesters" description="Select an academic year, then manage semester dates and Open/Closed availability. Historical records and grading sources are preserved.">
+<x-records-page title="Semesters" description="Select an academic year, then manage semester dates and Open/Closed availability. Historical records are preserved.">
     <x-slot:actions>
         <a class="records-button" href="{{ route('academic-years.index') }}">Academic years</a>
         @can('create', \App\Models\AcademicPeriod::class)<button class="records-button is-primary" type="button" x-data @click="$dispatch('open-record-form-dialog', { id: 'create-semester', trigger: $el })" aria-haspopup="dialog" aria-controls="create-semester">Add semester</button>@endcan
@@ -9,10 +9,10 @@
             @forelse($periods as $period)<tr><td>{{ $period->academic_year }}</td><td>{{ $period->semester_code }}</td><td>{{ $period->starts_on?->format('M j, Y') ?? 'Not recorded' }}</td><td>{{ $period->ends_on?->format('M j, Y') ?? 'Not recorded' }}</td><td><span class="records-badge {{ $period->is_open ? 'is-green' : '' }}">{{ $period->is_open ? 'Open' : 'Closed' }}</span></td><td><div class="records-actions"><a class="records-link" href="{{ route('academic-periods.show', $period) }}">View</a>@can('update', $period)<a id="edit-semester-trigger-{{ $period->id }}" class="records-link" href="{{ route('academic-periods.index', request()->except('edit', 'create') + ['edit' => $period->id]) }}" aria-haspopup="dialog" aria-controls="edit-semester">Edit</a>@endcan</div></td></tr>@empty<tr><td colspan="6">No semesters match this academic year.</td></tr>@endforelse
         </tbody></table></div><div class="records-pagination">{{ $periods->appends(['edit' => null, 'create' => null])->links() }}</div>
     </section>
-    <details class="dashboard-card records-card"><summary>Active validation period and historical grading source</summary><x-academic-context-form :context="$context" :periods="$allPeriods" /></details>
+    <details class="dashboard-card records-card"><summary>Active validation period</summary><x-academic-context-form :context="$context" :periods="$allPeriods" /></details>
     @can('create', \App\Models\AcademicPeriod::class)
         <x-record-form-dialog id="create-semester" title="Add semester" :action="route('academic-periods.store')" submit-label="Save semester" :show="!$editing && ($errors->getBag('periodForm')->any() || request()->boolean('create'))" :has-errors="!$editing && $errors->getBag('periodForm')->any()" :dismiss-query="['create']" :defaults="['academic_year' => $filters['academic_year'] ?? '', 'semester_code' => '', 'starts_on' => '', 'ends_on' => '', 'is_open' => '0']">
-            <x-slot:description>Select an existing academic year and enter the institution's semester code. Closed periods remain accessible in history and grading sources.</x-slot:description>
+            <x-slot:description>Select an existing academic year and enter the institution's semester code. Closed periods remain accessible in history.</x-slot:description>
             @include('periods.fields', ['newYear' => false, 'recover' => !$editing && $errors->getBag('periodForm')->any(), 'prefix' => 'semester-create', 'identityLocked' => false, 'yearChoices' => $years, 'period' => new \App\Models\AcademicPeriod(['is_open' => false])])
         </x-record-form-dialog>
     @endcan

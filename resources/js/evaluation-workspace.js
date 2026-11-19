@@ -1,5 +1,6 @@
 export default function evaluationWorkspace(initial) {
     return {
+        root: null,
         activeTab: initial.activeTab,
         tabs: initial.tabs,
         applicantType: initial.applicantType,
@@ -14,6 +15,7 @@ export default function evaluationWorkspace(initial) {
         popstateListener: null,
 
         init() {
+            this.root = this.$el;
             this.unloadListener = (event) => {
                 if (this.dirtyForms.length && !this.submitting) {
                     event.preventDefault();
@@ -30,14 +32,14 @@ export default function evaluationWorkspace(initial) {
             this.updateUrl(false);
             this.$nextTick(() => {
                 this.formRevision++;
-                this.$el.querySelectorAll('details[data-has-errors="true"]').forEach(group => { group.open = true; });
+                this.root.querySelectorAll('details[data-has-errors="true"]').forEach(group => { group.open = true; });
                 if (initial.hasErrors && initial.failedForm !== 'activate') {
-                    const failed = [...this.$el.querySelectorAll('form[data-workspace-form]')].find(form =>
+                    const failed = [...this.root.querySelectorAll('form[data-workspace-form]')].find(form =>
                         form.dataset.workspaceForm === initial.failedForm && (initial.failedForm !== 'review'
                             || form.querySelector('[name="_workspace_document"]')?.value === initial.reviewDocument));
                     if (failed) this.dirtyForms.push(failed.id);
                 }
-                if (initial.evidenceErrors) this.openDialog('evidenceDialog', this.$el.querySelector('#evaluation-tab-supporting-evidence'));
+                if (initial.evidenceErrors) this.openDialog('evidenceDialog', this.root.querySelector('#evaluation-tab-supporting-evidence'));
                 if (initial.hasErrors) this.$nextTick(() => this.focusFirstError());
             });
         },
@@ -51,7 +53,7 @@ export default function evaluationWorkspace(initial) {
             if (tab !== this.activeTab) this.closeOpenDialogs();
             this.activeTab = tab;
             this.updateUrl(true);
-            if (focus) this.$nextTick(() => this.$el.querySelector(`#evaluation-tab-${tab}`)?.focus());
+            if (focus) this.$nextTick(() => this.root.querySelector(`#evaluation-tab-${tab}`)?.focus());
         },
         updateUrl(push) {
             const url = new URL(window.location.href);
@@ -92,7 +94,7 @@ export default function evaluationWorkspace(initial) {
         },
         focusFirstError() {
             const dialog = this.$refs.evidenceDialog?.open ? this.$refs.evidenceDialog : null;
-            const panel = dialog ?? this.$el.querySelector(`#evaluation-panel-${this.activeTab}`);
+            const panel = dialog ?? this.root.querySelector(`#evaluation-panel-${this.activeTab}`);
             const field = panel?.querySelector('[aria-invalid="true"]');
             if (field) {
                 let group = field.closest('details');
@@ -102,11 +104,11 @@ export default function evaluationWorkspace(initial) {
         },
         applicableFact(key) {
             if (initial.errorKeys.some(error => error === `facts.${key}` || error === `fact_sources.${key}`)) return true;
-            return !this.requiredFacts || (this.requiredFacts[this.applicantType] ?? []).includes(key);
+            return !!this.requiredFacts && (this.requiredFacts[this.applicantType] ?? []).includes(key);
         },
         applicableCondition(key) {
             if (initial.errorKeys.includes(key)) return true;
-            if (!this.requiredFacts) return true; // No approved applicability mapping: retain fields.
+            if (!this.requiredFacts) return false; // No mapping cannot make unrelated requirements mandatory.
             if (['legacy_pnsl_transfer', 'claiming_pwd'].includes(key)) return this.program === 'TES';
             if (key === 'smart_same_semester') return this.program === 'TDP';
             return true;
@@ -116,7 +118,7 @@ export default function evaluationWorkspace(initial) {
         },
         groupStatus(id) {
             this.formRevision; // Recompute from actual form values after input/change.
-            const group = this.$el.querySelector(`#${id}`);
+            const group = this.root.querySelector(`#${id}`);
             if (!group) return 'Pending review';
             if (group.dataset.hasErrors === 'true') return 'Validation errors';
             const facts = [...group.querySelectorAll('[data-fact]')].filter(row => this.applicableFact(row.dataset.fact));
@@ -151,7 +153,7 @@ export default function evaluationWorkspace(initial) {
             this.priorOverflow = null;
             this.$nextTick(() => {
                 if (this.dialogTrigger?.isConnected && this.dialogTrigger.getClientRects().length) this.dialogTrigger.focus();
-                else this.$el.querySelector(`#evaluation-tab-${this.activeTab}`)?.focus();
+                else this.root.querySelector(`#evaluation-tab-${this.activeTab}`)?.focus();
             });
         },
         closeOpenDialogs() {

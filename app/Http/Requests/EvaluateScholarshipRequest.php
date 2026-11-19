@@ -16,7 +16,9 @@ class EvaluateScholarshipRequest extends FormRequest
 
     public function rules(): array
     {
-        if ($this->route('application')->program->code === 'EDUKAR') {
+        $application = $this->route('application');
+        $catalog = app(OfficialRuleCatalog::class);
+        if (! $catalog->forProgram($application->program->code) || ! $catalog->appliesTo($application->academicPeriod)) {
             return [
                 'submission_revision' => ['required', 'integer', 'min:1'], 'previous_run' => ['required', 'integer', 'min:0'],
                 'evaluator_notes' => ['nullable', 'string', 'max:3000'],
@@ -33,9 +35,11 @@ class EvaluateScholarshipRequest extends FormRequest
             'fact_sources.*' => ['nullable', 'string', 'max:1000'],
             'returning' => ['nullable', Rule::in(['yes', 'no', 'unverified'])],
             'transferee' => ['nullable', Rule::in(['yes', 'no', 'unverified'])],
-            'legacy_pnsl_transfer' => ['nullable', Rule::in(['yes', 'no', 'unverified'])],
-            'claiming_pwd' => ['nullable', Rule::in(['yes', 'no', 'unverified'])],
-            'smart_same_semester' => ['nullable', Rule::in(['yes', 'no', 'unverified'])],
+            ...($application->program->code === 'TES' ? [
+                'legacy_pnsl_transfer' => ['nullable', Rule::in(['yes', 'no', 'unverified'])],
+                'claiming_pwd' => ['nullable', Rule::in(['yes', 'no', 'unverified'])],
+            ] : []),
+            ...($application->program->code === 'TDP' ? ['smart_same_semester' => ['nullable', Rule::in(['yes', 'no', 'unverified'])]] : []),
             'special_case' => ['nullable', Rule::in(['none', 'pnsl', 'sardo', 'other', 'unverified'])],
             'duration_review' => ['nullable', Rule::in(['within_limit', 'approved_exception', 'exceeded', 'unverified'])],
             'duration_basis' => ['nullable', 'string', 'max:3000'],

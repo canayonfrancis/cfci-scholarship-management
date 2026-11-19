@@ -4,6 +4,8 @@ namespace App\Services\Eligibility;
 
 class EligibilityEvaluator
 {
+    public const SCOPE = 'enrollment_school_compliance_v2';
+
     public function __construct(private OfficialRuleCatalog $catalog) {}
 
     /** Pure checks over server-assembled, snapshotted input; no request or database writes. */
@@ -15,27 +17,24 @@ class EligibilityEvaluator
         };
         $context = $input['academic_context'] ?? [];
         $add('active_period', ($context['active_period_id'] ?? null) === $input['academic_period_id'] ? 'pass' : 'review', 'Validation must use the configured active academic year and semester.');
-        $gradeSource = $input['grading_academic'] ?? null;
-        $add('grade_source_policy', ! empty($context['source_period_id']) && ! empty($context['confirmed_by']) && ! empty($context['source_policy_reference']) ? 'pass' : 'review', 'A source grading semester must be confirmed against school policy; no first-semester default is assumed.');
-        $hasGrades = collect($gradeSource['subjects'] ?? [])->contains(fn ($subject) => collect($subject)->only(['prelim', 'midterm', 'semi_final', 'final', 'average'])->contains(fn ($value) => $value !== null && $value !== ''));
-        $add('grade_source_data', $gradeSource && $hasGrades ? 'pass' : 'review', 'The configured grading source requires the latest Registrar-verified subject grades.');
-        $gradingCheck = $input['grading_policy_check'] ?? ['status' => 'review', 'reason' => 'Program academic requirements remain unconfirmed.'];
-        $checks['school_grading_policy'] = ['status' => $gradingCheck['status'], 'reason' => $gradingCheck['reason']];
+        $record = $input['academic'] ?? null;
+        $data = $input['facts_input'];
+        $verified = $record && ($record['verification_status'] ?? null) === 'verified' && ! empty($record['verified_by']) && ! empty($record['verified_at']);
+        $add('enrollment', $verified && $record['enrollment_status'] === 'enrolled' ? 'pass'
+            : ($verified && $record['enrollment_status'] === 'not_enrolled' && ($data['applicant_type'] ?? null) === 'new' ? 'fail' : 'review'),
+            'Current-semester enrollment must be Registrar-verified; continuing LOA cases need individual review.');
         if ($input['program'] === 'EDUKAR') {
-            $add('external_application_scope', 'review', 'EDUKAR/AKLAT application processing and its requirements are outside this system. Only existing academic records are reviewed; no EDUKAR application rules are implemented.');
+            $add('external_application_scope', 'review', 'EDUKAR/AKLAT application processing and its requirements are outside this system. Enrollment and external award status can be reviewed; no EDUKAR application rules are implemented.');
 
             return $this->result($checks);
         }
-        if (! $policyConfirmed) {
-            $add('policy', 'review', 'An applicable official rule set has not been confirmed for this program and semester.');
+        if (! $policyConfirmed || ! $this->catalog->forProgram($input['program'])) {
+            $add('policy', 'review', 'An approved program/semester compliance basis is unavailable or unconfirmed. School/provider certifications can be retained as evidence, but cannot establish eligibility until their approved applicability and acceptance rules are confirmed.');
 
             return $this->result($checks);
         }
         $program = $input['program'];
-        $data = $input['facts_input'];
-        $record = $input['academic'];
         $add('special_case', ($data['special_case'] ?? 'unverified') === 'none' ? 'pass' : 'review', 'Special categories require their separately approved guidelines and review.');
-        $add('enrollment', $record && $record['enrollment_status'] === 'enrolled' ? 'pass' : ($record && $record['enrollment_status'] === 'not_enrolled' && $data['applicant_type'] === 'new' ? 'fail' : 'review'), 'Current-semester enrollment must be Registrar-verified; continuing LOA cases need individual review.');
         foreach ($this->catalog->requiredFacts($program, $data['applicant_type']) as $key) {
             $value = $data['facts'][$key] ?? 'unverified';
             $source = trim($data['fact_sources'][$key] ?? '');

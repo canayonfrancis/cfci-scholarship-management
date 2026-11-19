@@ -60,6 +60,9 @@ class OfficialRuleCatalog
 
     public function requiredFacts(string $program, string $kind): array
     {
+        if (! $this->forProgram($program)) {
+            return [];
+        }
         $keys = ['filipino', 'recognized_program', 'permitted_aid', 'authenticity'];
         if ($kind === 'new') {
             $keys[] = 'first_degree';
@@ -79,7 +82,7 @@ class OfficialRuleCatalog
 
     public function requiredDocuments(string $program, array $data): array
     {
-        if ($program === 'EDUKAR') {
+        if (! $this->forProgram($program)) {
             return [];
         }
         $keys = ['eligibility_support', 'enrollment_certificate'];
@@ -99,9 +102,17 @@ class OfficialRuleCatalog
         return $keys;
     }
 
-    public function validationDocuments(): array
+    public function validationDocuments(?string $program = null): array
     {
         // Retain legacy source-profile metadata/snapshots; expose no intake or billing forms.
-        return array_diff_key(self::DOCUMENTS, array_flip(['application_form', 'income_evidence', 'annex_forms', 'registrar_certificate']));
+        $documents = array_diff_key(self::DOCUMENTS, array_flip(['application_form', 'income_evidence', 'annex_forms', 'registrar_certificate']));
+        if ($program === null || $program === 'TES') {
+            return $documents;
+        }
+        $types = $program === 'TDP'
+            ? ['eligibility_support', 'enrollment_certificate', 'approved_loa', 'previous_enrollment']
+            : ['eligibility_support', 'enrollment_certificate'];
+
+        return array_intersect_key($documents, array_flip($types));
     }
 }

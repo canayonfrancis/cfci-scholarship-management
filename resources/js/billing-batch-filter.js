@@ -18,6 +18,7 @@ export default (endpoint, optionsCount, configuration = {}) => ({
             academic_year: 'academic_year',
             academic_period_id: 'academic_period_id',
             status: 'status',
+            ...(configuration.searchField ? { q: configuration.searchField } : {}),
         })) {
             if (fields[field]?.value) parameters.set(parameter, fields[field].value);
         }

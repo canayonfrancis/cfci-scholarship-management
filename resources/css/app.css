@@ -1099,3 +1099,65 @@ tbody tr:hover, tbody tr:focus { background: var(--surface-muted); }
     .records-table-wrap > table.records-table > thead,
     .recent-card .table-wrap > table.recent-validations-table > thead { position: static; box-shadow: none; }
 }
+
+/* Billing detail layout only; reuse shared tabs, dialogs and scrolling tables. */
+.billing-workspace { min-width: 0; }
+.billing-workspace .billing-summary { padding: 20px 24px; }
+.billing-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 20px; }
+.billing-additional-details { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.billing-additional-details > summary { cursor: pointer; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.billing-additional-details[open] > summary { margin-bottom: 14px; }
+.billing-submission-notice { margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--brand-soft); color: var(--text-primary); font-size: 12px; line-height: 1.5; }
+.billing-readiness { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 0 0 16px; }
+.billing-readiness > div { min-width: 0; padding: 12px 14px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); }
+.billing-readiness dt { color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+.billing-readiness dd { margin: 7px 0 0; font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.billing-status { display: inline-flex; max-width: 100%; padding: 3px 7px; border-radius: 6px; background: var(--surface-muted); font-size: 11px; line-height: 1.4; font-weight: 550; }
+.billing-prepared-total { margin: 0 0 14px; font-size: 14px; }
+.records-page .billing-roster-table { min-width: 1760px; table-layout: fixed; }
+.records-page .billing-roster-table :is(th, td) { padding: 10px 12px; vertical-align: top; line-height: 1.45; overflow-wrap: anywhere; }
+.records-page .billing-roster-table th { white-space: normal; }
+.billing-roster-table th:nth-child(1) { width: 60px; }
+.billing-roster-table th:nth-child(2) { width: 125px; }
+.billing-roster-table th:nth-child(3) { width: 210px; }
+.billing-roster-table th:nth-child(4) { width: 190px; }
+.billing-roster-table th:nth-child(5) { width: 95px; }
+.billing-roster-table th:nth-child(6) { width: 125px; }
+.billing-roster-table th:nth-child(7) { width: 125px; }
+.billing-roster-table th:nth-child(8) { width: 125px; }
+.billing-roster-table th:nth-child(9) { width: 155px; }
+.billing-roster-table th:nth-child(10) { width: 235px; }
+.billing-roster-table th:nth-child(11) { width: 125px; }
+.billing-roster-table th:nth-child(12) { width: 135px; }
+.billing-reason > summary { cursor: pointer; font-size: 12px; }
+.billing-reason > p { margin: 8px 0 0; font-size: 12px; line-height: 1.5; }
+@media (max-width: 1000px) {
+    .billing-readiness { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .billing-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+    .billing-workspace .billing-summary { padding: 16px; }
+    .billing-readiness { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .billing-summary-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Enrollment operation inside the existing roster workspace. */
+.records-page .billing-roster-table { min-width: 1930px; }
+.records-page .billing-roster-table th { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+.billing-roster-table th:nth-child(2) { width: 140px; }
+.billing-roster-table th:nth-child(5) { width: 125px; }
+.billing-roster-table th:nth-child(6) { width: 180px; }
+.billing-roster-table th:nth-child(7) { width: 150px; }
+.billing-roster-table th:nth-child(8) { width: 145px; }
+.billing-roster-table th:nth-child(9) { width: 155px; }
+.billing-roster-table th:nth-child(11) { width: 170px; }
+.billing-roster-table th:nth-child(12) { width: 170px; }
+.billing-enrollment-row-action { padding: 6px 8px; margin-bottom: 6px; font-size: 11px; white-space: nowrap; }
+.billing-enrollment-members { max-height: 24rem; overflow: auto; padding: 12px; border: 1px solid var(--border-strong); border-radius: 10px; }
+.billing-enrollment-members legend { padding-inline: 6px; font-size: 12px; font-weight: 600; }
+.billing-enrollment-member { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.billing-enrollment-member:last-child { border-bottom: 0; }
+.billing-enrollment-member label { display: flex; gap: 8px; align-items: flex-start; }
+.billing-enrollment-member input[type="checkbox"] { margin-top: 2px; flex: none; }
+.billing-enrollment-member details > summary { cursor: pointer; }
+.billing-enrollment-history { margin: 10px 0 0 12px; padding-left: 12px; border-left: 2px solid var(--border); }

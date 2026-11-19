@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Actions\Records\RecordAudit;
 use App\Http\Requests\ScholarshipProgramRequest;
 use App\Models\AcademicPeriod;
-use App\Models\ProgramAcademicRequirement;
 use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipProgram;
 use App\Services\Billing\BillingBatchOptions;
@@ -14,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -69,7 +69,7 @@ class ScholarshipProgramController extends Controller
         return view('programs.show', ['program' => $program, 'assignments' => $program->assignments()->with(['student', 'startPeriod'])->latest('id')->tablePaginate('program_assignments')->withQueryString(),
             'academicPolicyPeriods' => AcademicPeriod::orderByDesc('academic_year')->orderBy('semester_code')->get(),
             'academicPolicyPeriod' => $policyPeriod,
-            'academicPolicyReady' => $academicPolicyReady = ProgramAcademicRequirement::storageReady(),
+            'academicPolicyReady' => $academicPolicyReady = Schema::hasTable('program_academic_requirements'),
             'academicPolicyVersions' => $policyTerms && $academicPolicyReady ? $policyTerms->academicRequirements()->with('confirmedBy')->orderByDesc('revision')->get() : collect(),
         ]);
     }

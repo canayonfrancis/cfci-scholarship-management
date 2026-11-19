@@ -1,5 +1,5 @@
 @php
-    $tabs = ['overview' => 'Overview', 'academic-records' => 'Academic records', 'school-compliance' => 'School compliance', 'supporting-evidence' => 'Supporting evidence', 'external-approval' => 'External approval', 'award-activation' => 'Award activation', 'history' => 'History'];
+    $tabs = ['overview' => 'Overview', 'school-compliance' => 'School compliance', 'supporting-evidence' => 'Supporting evidence', 'external-approval' => 'External approval', 'award-activation' => 'Award activation', 'history' => 'History'];
     $formTabs = ['policy' => 'school-compliance', 'evaluate' => 'school-compliance', 'evidence' => 'supporting-evidence', 'review' => 'supporting-evidence', 'external' => 'external-approval', 'activate' => 'award-activation'];
     $formHint = old('_workspace_form');
     $failedForm = is_string($formHint) && isset($formTabs[$formHint]) ? $formHint : null;
@@ -22,7 +22,6 @@
     $reviewTarget = old('_workspace_document');
     $reviewTarget = is_scalar($reviewTarget) ? (string) $reviewTarget : null;
     $initial = ['activeTab' => $activeTab, 'tabs' => array_keys($tabs), 'program' => $application->program->code, 'requiredFacts' => $workspace['requiredFacts'], 'factKeys' => array_keys($facts), 'applicantType' => $beneficiary, 'hasErrors' => $errors->any(), 'failedForm' => $failedForm, 'reviewDocument' => $reviewTarget, 'errorKeys' => $failedForm === 'evaluate' ? $errors->keys() : [], 'evidenceErrors' => $failedForm === 'evidence' && $errors->any()];
-    $gradeSummary = $workspace['gradeSummary'];
 @endphp
 <x-records-page :title="$application->student->full_name" :description="$application->program->code.' · '.$application->academicPeriod->academic_year.' / Semester '.$application->academicPeriod->semester_code">
     <x-slot:actions><a class="records-button" href="{{ route('evaluations.index') }}">Back to evaluations</a></x-slot:actions>
@@ -33,15 +32,9 @@
                 <div><dt>Student ID</dt><dd>{{ $application->student->student_number }}</dd></div>
                 <div><dt>Course / year level</dt><dd>{{ $academic?->course ?: ($application->student->academicProgram?->name ?? 'Not recorded') }} · {{ $academic?->year_level ?: ($application->student->year_level ?? 'Not recorded') }}</dd></div>
                 <div><dt>Enrollment</dt><dd>{{ $academic ? Str::headline($academic->enrollment_status).' · '.ucfirst($academic->verification_status) : 'No current-period record' }}</dd></div>
-                <div><dt>Registrar standing</dt><dd>{{ $gradeSource ? ucfirst($gradeSource->academic_standing).' · '.ucfirst($gradeSource->verification_status) : 'No source-period record' }}</dd></div>
-                <div><dt>Provisional percentage GWA</dt><dd>{{ $gradeSummary['gwa_display'] ?? 'Not available' }} <span class="records-badge is-amber">Provisional</span></dd></div>
-                <div><dt>Certified GWA for evaluation</dt><dd>{{ $academicCheck['summary']['certified_display'] ?? 'Not recorded / not usable' }}</dd></div>
-                <div><dt>Minimum required GWA</dt><dd>{{ ($academicRequirements?->criteria['minimum_gwa_required'] ?? null) === false ? 'Explicitly not required' : ($academicRequirements?->criteria['minimum_gwa'] ?? 'Unconfigured') }}@unless($workspace['policyConfirmed'])<span class="records-muted">Policy unconfirmed</span>@endunless</dd></div>
-                <div><dt>Academic requirement result</dt><dd>{{ match($academicCheck['status']) { 'pass' => 'Requirements met', 'fail' => 'Requirement not met', default => 'Pending review' } }}</dd></div>
             </dl>
-            <p class="record-help">Provisional GWA is not an officially certified Registrar GWA. Saved source records and decisions determine readiness; opening a tab does not complete a requirement.</p>
+            <p class="record-help">Current-semester Registrar enrollment and the remaining school-compliance requirements determine readiness. Opening a tab never verifies a source or activates an award.</p>
         </section>
-        @unless($academicPolicyReady)<div class="records-alert">The academic database upgrade is pending. New academic policies and evaluations remain unavailable until the existing upgrade is reviewed and applied.</div>@endunless
         @if($context->active_period_id !== $application->academic_period_id)<div class="records-alert">This evaluation belongs to a historical period. Its retained decisions cannot authorize a current award.</div>@endif
         <ol class="evaluation-progress" aria-label="Evaluation progress">
             @foreach($workspace['stages'] as $stage)<li class="{{ $stage['status'] === 'Completed' ? 'is-complete' : '' }}"><a href="{{ route('evaluations.show', ['application' => $application, 'tab' => $stage['tab']]) }}" @click.prevent="selectTab('{{ $stage['tab'] }}', true)"><span class="evaluation-step-number" aria-hidden="true">{{ $loop->iteration }}</span><span><strong>{{ $stage['title'] }}</strong><span class="records-badge {{ $stage['status'] === 'Completed' ? 'is-green' : 'is-amber' }}">{{ $stage['status'] }}</span></span></a><details><summary>Why this status?</summary><p class="record-help">{{ $stage['reason'] }}</p></details></li>@endforeach

@@ -68,17 +68,14 @@ class AcademicPeriodController extends Controller
                 throw ValidationException::withMessages(['revision' => 'The academic context changed. Reload before saving.']);
             }
             $before = $context->only($context->getFillable());
-            $source = $request->validated('source_period_id');
             $context->update([
-                'active_period_id' => $request->validated('active_period_id'), 'source_period_id' => $source,
-                'source_policy_reference' => $source ? $request->validated('source_policy_reference') : null,
-                'confirmed_by' => $source ? $request->user()->id : null, 'confirmed_at' => $source ? now() : null,
+                'active_period_id' => $request->validated('active_period_id'),
                 'revision' => $context->revision + 1,
             ]);
-            $audit->record($request->user(), $context, 'academic_validation_context_updated', $before, $context->source_policy_reference);
+            $audit->record($request->user(), $context, 'academic_validation_context_updated', $before);
         }, 3);
 
-        return to_route('academic-periods.index')->with('status', 'Active validation period and grading-source configuration saved. Prior decisions require reassessment.');
+        return to_route('academic-periods.index')->with('status', 'Active validation period saved. Prior decisions require reassessment when the validation context changes.');
     }
 
     public function store(AcademicPeriodRequest $request, RecordAudit $audit): RedirectResponse

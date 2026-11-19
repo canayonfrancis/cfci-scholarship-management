@@ -1,58 +1,74 @@
-<x-records-page :title="$batch->batch_number" description="Semester scholarship allocation. Preparation, submission and Coordinator approval are separate from actual receipts and releases.">
-    <x-slot:actions><a class="records-button" href="{{ route('billing-batches.index') }}">Scholarship funds</a></x-slot:actions>
-    <section class="dashboard-card records-card">
-        <h2>{{ $batch->program->code }} · {{ $batch->academicPeriod->academic_year }} · Semester {{ $batch->academicPeriod->semester_code }}</h2>
-        @if($batch->scholarshipBatch)
-            <p>Semester roster: <a class="records-link" href="{{ route('scholarship-batches.show', $batch->scholarshipBatch) }}">{{ $batch->scholarshipBatch->batch_number }}</a>. Only members with the matching scholarship assignment can be added.</p>
-        @else
-            <p class="records-notice">No recorded roster link. Existing financial history is retained; the original roster is unknown. No roster is inferred.</p>
-            @if($batch->status === 'draft')<p class="records-notice">This unlinked draft cannot add scholars or be submitted. Create a new linked draft to prepare new billing.</p>@endif
+@php
+    $tabs = ['roster' => 'Roster Validation', 'items' => 'Billing Items', 'submission' => 'Submission'];
+    $editErrors = $errors->getBag('editBilling');
+    $enrollmentErrors = $errors->getBag('enrollment');
+    $requestedTab = $enrollmentErrors->any() ? 'roster' : (($errors->any() || $editErrors->any()) ? old('billing_tab', request()->query('tab')) : request()->query('tab'));
+    $activeTab = is_string($requestedTab) && isset($tabs[$requestedTab]) ? $requestedTab : ($batch->status === 'draft' ? 'roster' : 'items');
+    $preparedTotal = $batch->totalAmount();
+    $approvedRate = $batch->appliedRate();
+    $allocationStatus = $batch->allocationStatus();
+    $editValue = fn ($field, $fallback) => $editErrors->any() ? old($field, $fallback) : $fallback;
+@endphp
+<x-records-page :title="$batch->batch_number" description="Review roster validation, prepared billing items and submission in one workspace.">
+    <x-slot:actions>
+        @can('update', $batch)<button id="edit-billing-trigger" class="records-button" type="button" aria-haspopup="dialog" aria-controls="edit-billing" x-data @click="$dispatch('open-record-form-dialog', { id: 'edit-billing', trigger: $el })">Edit details</button>@endcan
+        <a class="records-button" href="{{ route('billing-batches.index') }}">Back to billing</a>
+    </x-slot:actions>
+    <div class="billing-workspace" x-data="billingWorkspace(@js($activeTab), { rows: @js($enrollmentRows), selected: @js($enrollmentErrors->any() ? old('enrollment_student_ids', []) : []), outcome: @js($enrollmentErrors->any() && is_string(old('enrollment_status')) ? old('enrollment_status') : '') })"
+        @close.capture="if ($event.target.id === 'verify-enrollment') resetEnrollment()">
+        <section class="dashboard-card records-card billing-summary" aria-label="Billing summary">
+            <dl class="evaluation-summary-grid billing-summary-grid">
+                <div><dt>Scholarship program</dt><dd>{{ $batch->program->name }} ({{ $batch->program->code }})</dd></div>
+                <div><dt>Academic year / semester</dt><dd>{{ $batch->academicPeriod->academic_year }} / Semester {{ $batch->academicPeriod->semester_code }}</dd></div>
+                <div><dt>Semester roster</dt><dd>@if($batch->scholarshipBatch)<a class="records-link" href="{{ route('rosters.show', $batch->scholarshipBatch) }}">{{ $batch->scholarshipBatch->batch_number }}</a>@else No recorded roster link @endif</dd></div>
+                <div><dt>Billing status</dt><dd><span class="billing-status">{{ $allocationStatus === 'submitted' ? 'Awaiting Coordinator approval' : ucfirst($allocationStatus) }}</span></dd></div>
+                <div><dt>Approved semester rate</dt><dd>{{ $approvedRate === null ? 'Unconfirmed' : 'PHP '.number_format((float) $approvedRate->amount, 2) }}</dd></div>
+                <div><dt>Prepared billing total</dt><dd>{{ $preparedTotal === null ? 'Unconfirmed total' : 'PHP '.number_format((float) $preparedTotal, 2) }}</dd></div>
+            </dl>
+            @if(!$batch->scholarshipBatch)<p class="record-help">The original roster is unknown; none is inferred. Existing financial history is retained. An unlinked draft cannot add scholars or be submitted.</p>@endif
+            @if($batch->status === 'draft')<p class="billing-submission-notice"><strong>Final submission unavailable:</strong> approved Form 2/Form 3 templates and current payable classification are still required. <a class="records-link" href="{{ route('billing-batches.show', ['batch' => $batch, 'tab' => 'submission']) }}" @click.prevent="selectTab('submission', true)">View submission requirements</a>.</p>@endif
+            <details class="billing-additional-details"><summary>Additional billing details</summary>
+                <dl class="evaluation-summary-grid billing-summary-grid">
+                    <div><dt>Prepared by</dt><dd>{{ $batch->preparedBy?->name ?? 'Not recorded' }}</dd></div>
+                    <div><dt>Submission reference</dt><dd>{{ $batch->reference ?? 'Not recorded' }}</dd></div>
+                    <div><dt>Submitted by</dt><dd>{{ $batch->submittedBy?->name ?? 'Not submitted' }}</dd></div>
+                    <div><dt>Submitted at (Manila)</dt><dd>{{ $batch->submitted_at?->timezone('Asia/Manila')->format('M j, Y g:i A') ?? 'Not submitted' }}</dd></div>
+                    <div><dt>Amount / policy reference</dt><dd>{{ $approvedRate?->source_reference ?? $batch->terms?->billing_source_reference ?? 'Not recorded' }}</dd></div>
+                </dl>
+                <p class="record-help">Only roster members with the matching scholarship assignment can be added. Preparation, submission and Coordinator approval are separate from actual receipts and releases.</p>
+                @if($batch->status !== 'draft')<p class="record-help">Submitted records are retained. A Coordinator must approve the allocation; later corrections use a separate authorized adjustment.</p>@endif
+            </details>
+        </section>
+        <dl class="billing-readiness" aria-label="Whole-roster validation summary">
+            @foreach(['total' => 'Total roster members', 'eligible' => 'Eligible and available', 'review' => 'Pending review', 'excluded' => 'Excluded from draft selection', 'reserved' => 'Already billed or reserved'] as $state => $label)
+                <div><dt>{{ $label }}</dt><dd>{{ $readinessSummary[$state] }}</dd></div>
+            @endforeach
+        </dl>
+        <nav class="evaluation-tabs" role="tablist" aria-label="Billing sections" @keydown="tabKey($event)">
+            @foreach($tabs as $key => $label)
+                <a id="billing-tab-{{ $key }}" role="tab" href="{{ route('billing-batches.show', [...request()->query(), 'batch' => $batch, 'tab' => $key]) }}" aria-controls="billing-panel-{{ $key }}" aria-selected="{{ $activeTab === $key ? 'true' : 'false' }}" tabindex="{{ $activeTab === $key ? 0 : -1 }}" :aria-selected="activeTab === '{{ $key }}'" :tabindex="activeTab === '{{ $key }}' ? 0 : -1" :class="activeTab === '{{ $key }}' ? 'is-active' : ''" @click.prevent="selectTab('{{ $key }}')">{{ $label }}</a>
+            @endforeach
+        </nav>
+        @foreach($tabs as $key => $label)
+            <section id="billing-panel-{{ $key }}" class="evaluation-tab-panel" role="tabpanel" aria-labelledby="billing-tab-{{ $key }}" tabindex="0" x-show="activeTab === '{{ $key }}'" @if($activeTab !== $key) style="display:none" @endif>
+                @include('billing.partials.'.($key === 'roster' ? 'roster-validation' : $key))
+            </section>
+        @endforeach
+        @if($canVerifyEnrollment)
+            @include('billing.partials.enrollment-dialog')
         @endif
-        <dl class="records-details"><dt>Status</dt><dd>{{ ucfirst($batch->allocationStatus()) }}</dd><dt>Prepared total</dt><dd>{{ $batch->totalAmount() === null ? 'Unconfirmed total' : '₱'.number_format((float) $batch->totalAmount(), 2) }}</dd><dt>Prepared by</dt><dd>{{ $batch->preparedBy?->name ?? 'Not recorded' }}</dd><dt>Submission reference</dt><dd>{{ $batch->reference ?? 'Not recorded' }}</dd><dt>Submitted by</dt><dd>{{ $batch->submittedBy?->name ?? 'Not submitted' }}</dd><dt>Submitted at (Manila)</dt><dd>{{ $batch->submitted_at?->timezone('Asia/Manila')->format('M j, Y g:i A') ?? 'Not submitted' }}</dd><dt>Approved semester amount</dt><dd>{{ $batch->appliedRate() === null ? 'Unconfirmed' : '₱'.number_format((float) $batch->appliedRate()->amount, 2) }}</dd><dt>Amount / policy reference</dt><dd>{{ $batch->appliedRate()?->source_reference ?? $batch->terms->billing_source_reference }}</dd></dl>
-        @if($batch->status !== 'draft')<p class="records-notice">Submitted records are retained. A Coordinator must approve the allocation; later corrections use a separate authorized adjustment.</p>@endif
-    </section>
-    <section class="dashboard-card records-card"><h2>Coordinator allocation approval</h2>
-        @if($batch->approval)
-            <p class="records-notice">Approved by {{ $batch->approval->approvedBy->name }} on {{ $batch->approval->approved_at->timezone('Asia/Manila')->format('M j, Y g:i A') }}. Reference: {{ $batch->approval->reference }}. Original approved total: ₱{{ number_format((float) $batch->approval->amount_snapshot, 2) }}.</p><p>This approval reserves scholarship budget. It does not confirm a receipt or payment.</p>
-        @elseif($batch->status === 'submitted')
-            <p>Awaiting independent Coordinator approval. Preparers and submitters cannot approve their own allocations.</p>
-        @else<p>A Registrar or Coordinator must submit a validated allocation record before a different Coordinator can approve it.</p>@endif
-        @can('approve', $batch)
-            <form class="records-form" method="POST" action="{{ route('billing-batches.approve', $batch) }}">@csrf<div class="record-field"><label for="coordinator-approval-reference">Coordinator approval reference</label><input class="record-input" id="coordinator-approval-reference" name="reference" maxlength="255" required></div><button class="records-button is-primary" type="submit">Review eligibility, check budget and approve</button></form>
+        @can('update', $batch)
+            <x-record-form-dialog id="edit-billing" title="Edit draft details" :action="route('billing-batches.update', $batch)" method="PATCH" submit-label="Save draft" busy-label="Saving..." :show="$editErrors->any()" :has-errors="$editErrors->any()" trigger-id="edit-billing-trigger"
+                :defaults="['batch_number' => $batch->batch_number, 'reference' => $batch->reference]">
+                <x-slot:description>Update the existing batch name and preparation reference. The roster, semester, approved rate and billing items are unchanged.</x-slot:description>
+                @if($editErrors->any())<div class="records-alert" role="alert" tabindex="-1" data-dialog-errors><strong>The draft was not saved.</strong><ul>@foreach($editErrors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+                <input type="hidden" name="lock_version" value="{{ $batch->lock_version }}">
+                <input type="hidden" name="billing_tab" value="{{ $activeTab }}" :value="activeTab">
+                <div class="records-form-grid">
+                    <x-record-field name="batch_number" id="edit-billing-name" label="Batch name" :value="$editValue('batch_number', $batch->batch_number)" maxlength="60" required error-bag="editBilling" />
+                    <x-record-field name="reference" id="edit-billing-reference" label="Draft reference" :value="$editValue('reference', $batch->reference)" maxlength="255" error-bag="editBilling" />
+                </div>
+            </x-record-form-dialog>
         @endcan
-    </section>
-    @can('update', $batch)
-        <section class="dashboard-card records-card"><h2>Edit draft details</h2><form class="records-form" method="POST" action="{{ route('billing-batches.update', $batch) }}">@csrf @method('PATCH')<input type="hidden" name="lock_version" value="{{ $batch->lock_version }}">
-            <div class="records-form-grid"><x-record-field name="batch_number" label="Batch name" :value="old('batch_number', $batch->batch_number)" maxlength="60" required /><x-record-field name="reference" label="Draft reference" :value="old('reference', $batch->reference)" maxlength="255" /></div><button class="records-button is-primary" type="submit">Save draft</button>
-        </form></section>
-    @endcan
-    <section class="dashboard-card records-card"><h2>Scholar allocation items</h2>
-        <div class="records-table-wrap"><x-table-state :paginator="$items" /><table class="records-table"><thead><tr><th>Student number</th><th>Scholar</th><th>Semester amount</th><th>Validation / approval</th><th>Item status</th><th>Actions</th></tr></thead><tbody>
-            @forelse($items as $item)<tr><td>{{ $item->student->student_number }}</td><td>{{ $item->student->full_name }}</td><td>{{ $item->gross_amount === null ? 'Unconfirmed' : '₱'.number_format((float) $item->gross_amount, 2) }}</td><td>Validation #{{ $item->evaluation_run_id }} / Approval #{{ $item->external_approval_id }}</td><td>{{ ucfirst($item->status) }}</td><td>@can('update', $batch)<form method="POST" action="{{ route('billing-batches.items.destroy', [$batch, $item]) }}">@csrf @method('DELETE')<input type="hidden" name="lock_version" value="{{ $batch->lock_version }}"><button class="records-button" type="submit">Remove draft item</button></form>@endcan</td></tr>
-            @empty<tr><td colspan="6">No scholars added to this allocation batch.</td></tr>@endforelse
-        </tbody></table></div><div class="records-pagination">{{ $items->links() }}</div>
-    </section>
-    @can('update', $batch)
-        <section class="dashboard-card records-card"><h2>Add an individual scholar</h2><p>Only active, validated and verified scholars with a semester rate can be added. A reservation in any program prevents another allocation for this scholar and semester.</p>
-            <form class="records-filters" method="GET" action="{{ route('billing-batches.show', $batch) }}"><x-record-field name="q" label="Find scholar by name or student number" :value="$search['q'] ?? ''" maxlength="100" /><button class="records-button" type="submit">Search</button></form>
-            <div class="records-table-wrap"><x-table-state :paginator="$candidates" /><table class="records-table"><thead><tr><th>Student number</th><th>Scholar</th><th>Allocation eligibility</th><th>Action</th></tr></thead><tbody>
-                @forelse($candidates as $candidate)@php($application = $candidate['application'])<tr><td>{{ $application->student->student_number }}</td><td>{{ $application->student->full_name }}</td><td>{{ $candidate['reason'] ?? 'Permitted under the confirmed billing policy' }}</td><td>@if(!$candidate['reason'])<form method="POST" action="{{ route('billing-batches.items.store', $batch) }}">@csrf<input type="hidden" name="lock_version" value="{{ $batch->lock_version }}"><input type="hidden" name="application_id" value="{{ $application->id }}"><button class="records-button is-primary" type="submit">Add scholar</button></form>@endif</td></tr>
-                @empty<tr><td colspan="4">No unbilled semester validations match this search.</td></tr>@endforelse
-            </tbody></table></div>@if($candidates instanceof \Illuminate\Contracts\Pagination\Paginator)<div class="records-pagination">{{ $candidates->links() }}</div>@endif
-        </section>
-        <section class="dashboard-card records-card"><h2>Submit for Coordinator approval</h2><p>Roster membership, every scholar, amount, validation and verified semester approval are checked again. Submission requests Coordinator approval and does not release funds. Submitted records cannot be edited.</p>
-            <p class="records-notice">Final submission remains blocked until approved Form 2/Form 3 templates and current payable classification are implemented. Membership alone does not establish payability.</p>
-            <form class="records-form" method="POST" action="{{ route('billing-batches.submit', $batch) }}">@csrf<input type="hidden" name="lock_version" value="{{ $batch->lock_version }}"><div class="record-field"><label for="submission-reference">Submission reference</label><input class="record-input" id="submission-reference" name="reference" value="{{ old('reference', $batch->reference) }}" maxlength="255" required></div><button class="records-button is-primary" type="submit">Validate and submit batch</button></form>
-        </section>
-    @endcan
-    @if($batch->allocationStatus() === 'approved')
-        <section class="dashboard-card records-card"><h2>Approved allocation and adjustment history</h2><p>Original amounts remain unchanged. Authorized adjustments revise the effective allocation and remaining budget; they never create a second semester allocation.</p>
-            @foreach($items as $item)<article class="records-card"><h3>{{ $item->student->full_name }} · {{ $item->student->student_number }}</h3><p>Original: ₱{{ number_format((float) $item->gross_amount, 2) }} · Effective: ₱{{ number_format((float) $item->effectiveAmount(), 2) }}</p>
-                <ul>@forelse($item->adjustments->sortBy('sequence') as $adjustment)<li>Adjustment {{ $adjustment->sequence }} · {{ ucfirst($adjustment->direction) }} ₱{{ number_format((float) $adjustment->amount, 2) }} · {{ $adjustment->authorizedBy->name }} · {{ $adjustment->authorized_at->timezone('Asia/Manila')->format('M j, Y g:i A') }} · {{ $adjustment->reference }}<p>{{ $adjustment->reason }}</p></li>@empty<li>No adjustments.</li>@endforelse</ul>
-                @can('adjust', $batch)<details><summary>Authorize a financial adjustment</summary><form class="records-form" method="POST" action="{{ route('billing-batches.items.adjust', [$batch, $item]) }}">@csrf<input type="hidden" name="previous_adjustment" value="{{ $item->adjustments->max('sequence') ?? 0 }}">
-                    <div class="records-form-grid"><div class="record-field"><label for="adjust-amount-{{ $item->id }}">Correct effective allocation amount (PHP)</label><input class="record-input" id="adjust-amount-{{ $item->id }}" name="new_amount" inputmode="decimal" value="{{ $item->effectiveAmount() }}" required></div><div class="record-field"><label for="adjust-reference-{{ $item->id }}">Authorization reference</label><input class="record-input" id="adjust-reference-{{ $item->id }}" name="reference" maxlength="255" required></div><div class="record-field"><label for="adjust-reason-{{ $item->id }}">Correction reason</label><textarea class="record-input" id="adjust-reason-{{ $item->id }}" name="reason" maxlength="3000" required></textarea></div></div><button class="records-button" type="submit">Authorize adjustment</button>
-                </form></details>@endcan
-            </article>@endforeach
-        </section>
-    @endif
+    </div>
 </x-records-page>
