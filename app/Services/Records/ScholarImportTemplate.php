@@ -15,7 +15,7 @@ class ScholarImportTemplate
         $body = $this->row(1, ScholarSpreadsheet::HEADERS, 2);
         // Explicit Text formatting on blank cells preserves IDs and contacts when entered.
         for ($n = 2; $n <= $last; $n++) {
-            $body .= $this->row($n, array_fill(0, 10, ''), 1);
+            $body .= $this->row($n, array_fill(0, count(ScholarSpreadsheet::HEADERS), ''), 1);
         }
         $validation = '<dataValidations count="'.($courses !== [] ? '3' : '2').'">';
         $validation .= $this->listValidation('F2:F'.$last, '"Male,Female"');
@@ -23,12 +23,13 @@ class ScholarImportTemplate
         if ($courses !== []) {
             $validation .= $this->listValidation('G2:G'.$last, 'ActiveCourses');
         }
-        $parts['xl/worksheets/sheet1.xml'] = '<worksheet xmlns="'.self::NS.'"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="21" customWidth="1" style="1"/><col min="2" max="4" width="24" customWidth="1" style="1"/><col min="5" max="6" width="14" customWidth="1" style="1"/><col min="7" max="7" width="52" customWidth="1" style="1"/><col min="8" max="8" width="16" customWidth="1" style="1"/><col min="9" max="9" width="34" customWidth="1" style="1"/><col min="10" max="10" width="22" customWidth="1" style="1"/></cols><sheetData>'.$body.'</sheetData><autoFilter ref="A1:J'.$last.'"/>'.$validation.'</dataValidations></worksheet>';
+        $parts['xl/worksheets/sheet1.xml'] = '<worksheet xmlns="'.self::NS.'"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="21" customWidth="1" style="1"/><col min="2" max="4" width="24" customWidth="1" style="1"/><col min="5" max="6" width="14" customWidth="1" style="1"/><col min="7" max="7" width="52" customWidth="1" style="1"/><col min="8" max="8" width="16" customWidth="1" style="1"/><col min="9" max="9" width="34" customWidth="1" style="1"/><col min="10" max="10" width="22" customWidth="1" style="1"/><col min="11" max="11" width="38" customWidth="1" style="1"/></cols><sheetData>'.$body.'</sheetData><autoFilter ref="A1:K'.$last.'"/>'.$validation.'</dataValidations></worksheet>';
         $instructions = [
             'Bulk Upload Scholars - instructions',
-            'Enter scholar records on the first worksheet, Scholars. Keep row 1 and all ten column names in exactly the supplied order.',
+            'Enter scholar records on the first worksheet, Scholars. Keep row 1 and all eleven column names in exactly the supplied order. Previous ten-column templates ending at Contact remain accepted.',
             'Required: Student ID, Last Name, First Name, Sex, Course, Year Level, Email, Contact. Middle Name may be blank; EXT is optional. JR/Jr/Jr. become Jr.; SR/Sr/Sr. become Sr.; II/III/IV are uppercase. Other legitimate suffixes remain allowed up to 30 characters.',
-            'Student ID and Contact must remain Text. Enter the original identifiers, including leading zeros. Do not use formulas or paste numeric cells into these columns.',
+            'Student ID, Contact and LANDBANK Savings Account Number must remain Text. Enter original values, including leading zeros. Do not use formulas or paste numeric cells into these columns.',
+            'LANDBANK Savings Account Number follows Contact and is optional. Enter digits only, with no spaces or hyphens (technical maximum: 100 characters; no exact bank length is imposed). The preview masks it. Blank values do not change existing accounts; existing Student IDs cannot be overwritten by import.',
             'Sex: Male or Female (case-insensitive), or the existing numeric codes 0 = Male and 1 = Female.',
             'Course: use an exact registered active course name from Courses. The database has course names, not a separate course-code column. Unknown or inactive courses are rejected.',
             'Year Level: '.implode('; ', array_map(fn ($key, $label) => $key.' = '.$label, array_keys(ScholarProfile::yearLevels()), ScholarProfile::yearLevels())).'.',

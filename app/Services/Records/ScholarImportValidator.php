@@ -48,6 +48,9 @@ class ScholarImportValidator
                 'sex' => $sex, 'academic_program_id' => $course?->id, 'year_level' => ctype_digit($year) ? (int) $year : $year,
                 'email' => Str::lower($values[8]), 'phone' => $values[9], 'record_status' => 'active',
             ];
+            if (($values[10] ?? '') !== '') {
+                $attributes['landbank_account_number'] = $values[10];
+            }
             $validation = Validator::make($attributes, [
                 'student_number' => ['required', 'string', 'max:50'],
                 'last_name' => ['required', 'string', 'max:255'],
@@ -58,6 +61,7 @@ class ScholarImportValidator
                 'academic_program_id' => ['required'],
                 'year_level' => ['required', 'integer', Rule::in(array_keys(ScholarProfile::yearLevels()))],
                 'email' => ['required', 'email', 'max:255'],
+                'landbank_account_number' => ScholarProfile::bankAccountRules(),
                 'phone' => ['required', 'string', 'max:40', function ($attribute, $value, $fail) {
                     if (ScholarProfile::normalizePhone($value) === null) {
                         $fail('Contact must be a recognized Philippine mobile number or an eight-digit landline.');
@@ -68,9 +72,11 @@ class ScholarImportValidator
                 'academic_program_id.required' => 'Course must match one existing active registered course name. Unknown, inactive or ambiguous courses are not accepted.',
                 'year_level.in' => 'Year Level must be one of the configured year levels.',
                 'suffix.max' => 'EXT must not exceed 30 characters. Common forms such as JR, Jr., SR, Sr., II, III and IV are accepted.',
+                'landbank_account_number.regex' => 'LANDBANK Savings Account Number must contain digits only, including any leading zeros.',
             ], [
                 'student_number' => 'Student ID', 'last_name' => 'Last Name', 'first_name' => 'First Name',
                 'middle_name' => 'Middle Name', 'suffix' => 'EXT', 'email' => 'Email', 'phone' => 'Contact', 'year_level' => 'Year Level',
+                'landbank_account_number' => 'LANDBANK Savings Account Number',
             ]);
             $issues = [...$row['issues'], ...$validation->errors()->all()];
             foreach ($values as $index => $value) {

@@ -50,6 +50,23 @@ class ScholarProfile
         return preg_match('/^(?:9[0-9]{9}|[0-9]{8})$/D', $digits) ? $digits : null;
     }
 
+    /** Technical size limit only; no official LANDBANK account length is assumed. */
+    public static function bankAccountRules(): array
+    {
+        return ['nullable', 'string', 'max:100', 'regex:/^[0-9]+$/D'];
+    }
+
+    public static function maskBankAccount(?string $number): ?string
+    {
+        if ($number === null || $number === '') {
+            return null;
+        }
+
+        $length = mb_strlen($number);
+
+        return $length <= 4 ? str_repeat('*', $length) : str_repeat('*', $length - 4).mb_substr($number, -4);
+    }
+
     /** Import normalization only; legacy saved suffixes are not rewritten. */
     public static function normalizeSuffix(?string $suffix): ?string
     {

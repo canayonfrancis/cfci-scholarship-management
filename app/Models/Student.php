@@ -22,6 +22,7 @@ class Student extends Model
         'last_name',
         'email',
         'phone',
+        'landbank_account_number',
         'user_id',
         'record_status',
         'lrn', 'philsys_id', 'four_ps_id', 'suffix', 'sex', 'birthdate',
@@ -32,7 +33,7 @@ class Student extends Model
         'disability_type', 'solo_parent_dependent', 'first_generation_student', 'indigenous_people_group',
     ];
 
-    public const PROTECTED_IDENTIFIERS = ['lrn', 'philsys_id', 'four_ps_id'];
+    public const PROTECTED_IDENTIFIERS = ['lrn', 'philsys_id', 'four_ps_id', 'landbank_account_number'];
 
     protected $hidden = self::PROTECTED_IDENTIFIERS;
 
@@ -40,6 +41,7 @@ class Student extends Model
     {
         return [
             'lrn' => 'encrypted', 'philsys_id' => 'encrypted', 'four_ps_id' => 'encrypted',
+            'landbank_account_number' => 'encrypted',
             'sex' => 'integer', 'birthdate' => 'immutable_date', 'year_level' => 'integer',
             'solo_parent_dependent' => 'boolean', 'first_generation_student' => 'boolean',
         ];
@@ -48,6 +50,11 @@ class Student extends Model
     protected function fullName(): Attribute
     {
         return Attribute::get(fn () => implode(' ', array_filter([$this->first_name, $this->middle_name, $this->last_name, $this->suffix], fn ($part) => filled($part))));
+    }
+
+    public function maskedLandbankAccountNumber(): ?string
+    {
+        return ScholarProfile::maskBankAccount($this->landbank_account_number);
     }
 
     public function academicProgram(): BelongsTo

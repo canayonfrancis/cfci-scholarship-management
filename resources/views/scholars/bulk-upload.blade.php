@@ -6,8 +6,8 @@
 
     <section class="dashboard-card records-card records-form-card" aria-labelledby="upload-title">
         <h2 class="records-section-title" id="upload-title">{{ $preview ? 'Upload a corrected file' : 'Prepare your spreadsheet' }}</h2>
-        <p>Download the template, enter new scholars on its first worksheet, and keep all ten column headers in their original order. Middle Name may be blank; EXT is optional. All other columns are required.</p>
-        <p class="record-help">Keep Student ID and Contact formatted as <strong>Text</strong> to retain leading zeros. Use an existing active course name. Import creates profile records only; it does not create login accounts, assign scholarships or approve eligibility.</p>
+        <p>Download the template, enter new scholars on its first worksheet, and keep its eleven column headers in order. Middle Name, EXT and LANDBANK Savings Account Number are optional. Previous ten-column templates ending at Contact are also accepted.</p>
+        <p class="record-help">Keep Student ID, Contact and LANDBANK Savings Account Number formatted as <strong>Text</strong> to retain leading zeros. Use an existing active course name. Import creates profile records only; it does not create login accounts, assign scholarships or approve eligibility.</p>
         <details class="scholar-import-instructions">
             <summary>Accepted values and file instructions</summary>
             <ul>
@@ -15,6 +15,7 @@
                 <li><strong>EXT:</strong> optional. JR, Jr and Jr. are saved as Jr.; SR, Sr and Sr. as Sr.; II, III and IV are saved in uppercase. Other legitimate suffixes may contain up to 30 characters.</li>
                 <li><strong>Year Level:</strong> @foreach(\App\Services\Records\ScholarProfile::yearLevels() as $value => $label){{ $value }} ({{ $label }}){{ $loop->last ? '.' : '; ' }}@endforeach</li>
                 <li><strong>Contact:</strong> a Philippine mobile number such as 09171234567, 9171234567 or +639171234567, or an eight-digit landline. Original leading zeros are retained.</li>
+                <li><strong>LANDBANK Savings Account Number:</strong> optional, after Contact. Digits only, including leading zeros; no exact account length is required (technical maximum: 100 characters). Account numbers are masked in preview.</li>
                 <li><strong>Course:</strong> @if($courses->isEmpty())No active courses are registered. Ask an authorized administrator to register courses before uploading.@else{{ $courses->implode('; ') }}.@endif</li>
                 <li>Accepted files: .xlsx or comma-separated UTF-8 .csv. Maximum {{ number_format(config('scholar-imports.max_upload_kb')) }} KB and {{ number_format(config('scholar-imports.max_rows')) }} records per file.</li>
                 <li>Only the first worksheet is imported. Do not include totals, extra data columns, formulas, macros, external data connections or merged data cells. Formatting-only and blank rows are ignored.</li>
@@ -61,7 +62,7 @@
                         @foreach($preview['rows'] as $row)
                             <tr>
                                 <td>{{ $row['number'] }}</td>
-                                @foreach($row['values'] as $value)<td>{{ $value === '' ? '—' : $value }}</td>@endforeach
+                                @foreach(array_pad($row['values'], count(\App\Services\Records\ScholarSpreadsheet::HEADERS), '') as $index => $value)<td>{{ $value === '' ? '—' : ($index === 10 ? \App\Services\Records\ScholarProfile::maskBankAccount($value) : $value) }}</td>@endforeach
                                 <td class="scholar-import-validation">
                                     <span class="records-badge {{ $row['issues'] === [] ? 'is-green' : 'is-amber' }}">{{ $row['issues'] === [] ? 'Valid' : ($row['duplicate'] ? 'Duplicate / invalid' : 'Invalid') }}</span>
                                     @if($row['issues'] !== [])<ul>@foreach($row['issues'] as $issue)<li>{{ $issue }}</li>@endforeach</ul>@endif

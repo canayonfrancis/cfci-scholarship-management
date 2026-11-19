@@ -51,9 +51,13 @@ class ScholarController extends Controller
         ]);
     }
 
-    public function show(Student $scholar): View
+    public function show(Request $request, Student $scholar): View
     {
         Gate::authorize('view', $scholar);
+        $showBankAccount = $request->boolean('show_bank_account');
+        if ($showBankAccount) {
+            Gate::authorize('viewBankAccount', $scholar);
+        }
         $scholar->load(['academicProgram', 'academicPeriod', 'assignments' => fn ($query) => $query->with(['program', 'startPeriod', 'endPeriod', 'activatedBy', 'closedBy'])->orderByDesc('id')]);
         $history = AuditEvent::with('actor')->where('subject_type', ScholarshipAssignment::class)->whereIn('subject_id', $scholar->assignments->modelKeys())->latest('id')->get();
         $profileHistory = AuditEvent::where('subject_type', Student::class)->where('subject_id', $scholar->id)
@@ -63,7 +67,7 @@ class ScholarController extends Controller
         $memberships = $scholar->batchMemberships()->with(['batch.program', 'batch.academicPeriod'])->latest('id')->paginate(10, ['*'], 'roster_page')->withQueryString();
         $rosters = ScholarshipBatch::with(['program', 'academicPeriod'])->whereIn('program_id', $scholar->assignments->whereIn('status', ['pending', 'active'])->pluck('program_id'))->latest('id')->get();
 
-        return view('scholars.show', compact('scholar', 'history', 'profileHistory', 'memberships', 'rosters'));
+        return view('scholars.show', compact('scholar', 'history', 'profileHistory', 'memberships', 'rosters', 'showBankAccount'));
     }
 
     public function edit(Student $scholar): View
@@ -82,7 +86,17 @@ class ScholarController extends Controller
                     throw ValidationException::withMessages(['record_status' => 'Close the active scholarship before archiving this scholar.']);
                 }
                 $before = $scholar->only($scholar->getFillable());
-                $scholar->update($request->validated());
+                $data = $request->safe()->except(['clear_landbank_account_number']);
+                // An empty edit is not a request to erase a retained bank account.
+                if ($request->boolean('clear_landbank_account_number')) {
+                    Gate::authorize('manageBankAccount', $scholar);
+                    $data['landbank_account_number'] = null;
+                } elseif (! filled($data['landbank_account_number'] ?? null)) {
+                    unset($data['landbank_account_number']);
+                } else {
+                    Gate::authorize('manageBankAccount', $scholar);
+                }
+                $scholar->update($data);
                 $audit->record($request->user(), $scholar, 'scholar_updated', $before);
             }, 3);
         } catch (UniqueConstraintViolationException) {

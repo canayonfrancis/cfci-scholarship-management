@@ -39,6 +39,8 @@ class ScholarRequest extends FormRequest
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
+            'landbank_account_number' => [...ScholarProfile::bankAccountRules(), Rule::prohibitedIf(fn () => ! Gate::allows('manageBankAccount', $this->route('scholar')))],
+            'clear_landbank_account_number' => ['nullable', 'boolean', Rule::prohibitedIf(fn () => ! Gate::allows('manageBankAccount', $this->route('scholar')) || $this->filled('landbank_account_number'))],
             'phone' => ['nullable', 'string', 'max:40', function ($attribute, $value, $fail) {
                 if (! is_string($value)) {
                     return;
@@ -78,6 +80,11 @@ class ScholarRequest extends FormRequest
 
     public function messages(): array
     {
-        return ['lrn.regex' => 'LRN must contain exactly 12 digits, or 0 if unavailable.', 'philsys_id.regex' => 'Use the National ID format XXXX-XXXX-XXXX-XXXX (digits only).'];
+        return [
+            'lrn.regex' => 'LRN must contain exactly 12 digits, or 0 if unavailable.',
+            'philsys_id.regex' => 'Use the National ID format XXXX-XXXX-XXXX-XXXX (digits only).',
+            'landbank_account_number.regex' => 'LANDBANK Savings Account Number must contain digits only, including any leading zeros.',
+            'clear_landbank_account_number.prohibited' => 'Choose either a replacement account number or removal of the saved number, not both.',
+        ];
     }
 }

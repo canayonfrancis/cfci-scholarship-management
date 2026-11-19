@@ -9,7 +9,8 @@ use ZipArchive;
 /** Bounded, data-only OOXML/CSV support; never calculates spreadsheet formulas. */
 class ScholarSpreadsheet
 {
-    public const HEADERS = ['Student ID', 'Last Name', 'First Name', 'Middle Name', 'EXT', 'Sex', 'Course', 'Year Level', 'Email', 'Contact'];
+    public const LEGACY_HEADERS = ['Student ID', 'Last Name', 'First Name', 'Middle Name', 'EXT', 'Sex', 'Course', 'Year Level', 'Email', 'Contact'];
+    public const HEADERS = [...self::LEGACY_HEADERS, 'LANDBANK Savings Account Number'];
 
     private const MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 
@@ -51,6 +52,7 @@ class ScholarSpreadsheet
             $rows = [];
             $line = 1;
             $first = true;
+            $columns = count(self::HEADERS);
             while (! feof($stream)) {
                 $start = ftell($stream);
                 $values = fgetcsv($stream, null, ',', '"', '');
@@ -68,10 +70,10 @@ class ScholarSpreadsheet
                     $this->reject('The file contains too many physical rows. Remove unused rows.');
                 }
                 if ($first) {
-                    $this->header($values);
+                    $columns = $this->header($values);
                     $first = false;
                 } elseif (! $this->blank($values)) {
-                    $rows[] = $this->row($rowNumber, $values);
+                    $rows[] = $this->row($rowNumber, $values, columns: $columns);
                     $this->limit($rows);
                 }
             }
@@ -109,13 +111,14 @@ class ScholarSpreadsheet
             $rows = [];
             $previous = 0;
             $headerFound = false;
+            $columns = count(self::HEADERS);
             foreach ($xpath->query('/s:worksheet/s:sheetData/s:row') as $node) {
                 $number = filter_var($node->getAttribute('r'), FILTER_VALIDATE_INT);
                 if ($number === false || $number <= $previous || $number > config('scholar-imports.max_scanned_rows')) {
                     $this->reject('Worksheet row numbers are invalid or exceed the physical row limit.');
                 }
                 $previous = $number;
-                $values = array_fill(0, 10, '');
+                $values = array_fill(0, count(self::HEADERS), '');
                 $issues = [];
                 $seen = [];
                 foreach ($xpath->query('s:c', $node) as $cell) {
@@ -155,30 +158,30 @@ class ScholarSpreadsheet
                     if (! in_array($type, ['', 'n', 's', 'inlineStr', 'str'], true)) {
                         $issues[] = 'Use plain text or numeric values; error, Boolean and date cells are unsupported.';
                     }
-                    if ($column > 10) {
+                    if ($column > count(self::HEADERS) || ($headerFound && $column > $columns)) {
                         if ($this->trimValue($value) !== '') {
-                            $issues[] = 'Only the ten template columns are allowed.';
+                            $issues[] = 'Only the columns declared in the template header are allowed.';
                         }
 
                         continue;
                     }
-                    if ($number > 1 && in_array($column, [1, 10], true) && $this->trimValue($value) !== '' && ! in_array($type, ['s', 'inlineStr', 'str'], true)) {
+                    if ($number > 1 && in_array($column, [1, 10, 11], true) && $this->trimValue($value) !== '' && ! in_array($type, ['s', 'inlineStr', 'str'], true)) {
                         $issues[] = self::HEADERS[$column - 1].' must be stored as Text in Excel. Re-enter it from the original record to retain leading zeros.';
                     }
                     $values[$column - 1] = $value;
                 }
                 if ($number === 1) {
                     if ($issues !== []) {
-                        $this->reject('The header row must contain plain text and exactly the ten template columns.');
+                        $this->reject('The header row must contain plain text and only the supplied template columns.');
                     }
-                    $this->header($values);
+                    $columns = $this->header($values);
                 } elseif (! $headerFound) {
                     $this->reject('Column headers must be on worksheet row 1.');
                 }
                 if ($number === 1) {
                     $headerFound = true;
                 } elseif (! $this->blank($values) || $issues !== []) {
-                    $rows[] = $this->row($number, $values, $issues);
+                    $rows[] = $this->row($number, array_slice($values, 0, $columns), $issues, $columns);
                     $this->limit($rows);
                 }
             }
@@ -199,11 +202,18 @@ class ScholarSpreadsheet
         return $value;
     }
 
-    private function header(array $values): void
+    private function header(array $values): int
     {
-        if (array_map(fn ($value) => $this->trimValue((string) $value), $values) !== self::HEADERS) {
-            $this->reject('Row 1 must contain these exact, unique columns in order: '.implode(', ', self::HEADERS).'.');
+        $values = array_map(fn ($value) => $this->trimValue((string) $value), $values);
+        if ($values === self::HEADERS) {
+            return count(self::HEADERS);
         }
+        // XLSX rows are padded; older workbooks have no optional K header.
+        if ($values === self::LEGACY_HEADERS || $values === [...self::LEGACY_HEADERS, '']) {
+            return count(self::LEGACY_HEADERS);
+        }
+
+        $this->reject('Row 1 must contain these exact, unique columns in order: '.implode(', ', self::HEADERS).'. Older templates ending at Contact are also accepted.');
     }
 
     private function csvSyntax(string $content): void
@@ -246,12 +256,13 @@ class ScholarSpreadsheet
         return count(array_filter($values, fn ($value) => $this->trimValue((string) $value) !== '')) === 0;
     }
 
-    private function row(int $number, array $values, array $issues = []): array
+    private function row(int $number, array $values, array $issues = [], int $columns = 11): array
     {
-        if (count($values) !== 10) {
-            $issues[] = 'Expected exactly ten columns; check commas and quoted values.';
+        $omittedOptionalBank = $columns === count(self::HEADERS) && count($values) === count(self::LEGACY_HEADERS);
+        if (count($values) !== $columns && ! $omittedOptionalBank) {
+            $issues[] = 'Expected '.$columns.' columns matching the header; check commas and quoted values.';
         }
-        $values = array_slice(array_pad($values, 10, ''), 0, 10);
+        $values = array_slice(array_pad($values, count(self::HEADERS), ''), 0, count(self::HEADERS));
         foreach ($values as &$value) {
             $value = $this->trimValue((string) $value);
             if (mb_strlen($value) > 1000 || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $value)) {

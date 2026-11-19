@@ -25,5 +25,5 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', EnsureStudentAccess::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->dontFlash(['lrn', 'philsys_id', 'four_ps_id', 'token']);
+        $exceptions->dontFlash(['lrn', 'philsys_id', 'four_ps_id', 'landbank_account_number', 'token']);
     })->create();

@@ -2,6 +2,10 @@
     <x-slot:actions><a class="records-button" href="{{ route('financial.batch', $payout->billing_batch_id) }}">Back to batch</a></x-slot:actions>
     @if($payout->entry_type === 'reversal')<section class="records-alert">Retained reversal of payment {{ $payout->reversal_of_id }}. Its amounts are subtracted from totals; the original record remains unchanged. {{ $payout->correction_reason }}</section>@endif
     <section class="dashboard-card records-card"><dl class="records-details"><div><dt>Institutional Student ID</dt><dd>{{ $payout->institutional_student_id ?: 'Missing' }}</dd></div><div><dt>Payment path</dt><dd>{{ $payout->payment_mode === 'direct' ? 'Direct to student — no school receipt' : 'Through the school' }}</dd></div><div><dt>Gross benefit / actual student amount (PHP)</dt><dd>{{ $payout->gross_amount }} / {{ $payout->net_amount }}</dd></div><div><dt>Actual date / method</dt><dd>{{ $payout->paid_on?->toDateString() }} / {{ Str::headline($payout->method ?? '') }}</dd></div><div><dt>Reference</dt><dd>{{ $payout->reference }}</dd></div><div><dt>Status</dt><dd>{{ $payout->status === 'posted' ? 'Verified payment record' : 'Draft — not counted as paid' }}</dd></div></dl>
+    @can('viewBankAccount', $payout->billingItem->student)
+        <dl class="records-details"><div><dt>Current profile LANDBANK Savings Account Number</dt><dd>{{ $payout->billingItem->student->maskedLandbankAccountNumber() ?? 'Not provided' }}</dd></div></dl>
+        <p class="record-help"><a class="records-link" href="{{ route('scholars.show', $payout->billingItem->student) }}#landbank-account-details">Review scholar bank information</a>. This is current profile information, not a historical payment-destination snapshot. Original payment records remain unchanged.</p>
+    @endcan
     @include('financial.evidence', ['owner' => $payout, 'kind' => 'payout'])
     @include('financial.acknowledgment')
     @can('financial-verify')@if($payout->status === 'draft' && $payout->recorded_by !== auth()->id())<form method="POST" action="{{ route('financial.payouts.post', $payout) }}">@csrf<button class="records-button is-primary">Verify recorded payment</button></form>@endif

@@ -38,6 +38,23 @@
         </section>
     @endif
 @endforeach
+@if(auth()->user()->can('viewBankAccount', $scholar) || auth()->user()->can('viewOwnProfile', $scholar))
+    <section id="landbank-account-details" class="dashboard-card records-card">
+        <h2 class="records-section-title">Bank Account Information</h2>
+        <dl class="records-details"><div><dt>LANDBANK Savings Account Number</dt><dd>{{ $scholar->maskedLandbankAccountNumber() ?? 'Not provided' }}</dd></div></dl>
+        @can('viewBankAccount', $scholar)
+            @if($scholar->maskedLandbankAccountNumber() !== null)
+                @if($showBankAccount ?? false)
+                    <p>{{ $scholar->landbank_account_number }}</p>
+                    <a class="records-link" href="{{ route('scholars.show', $scholar) }}#landbank-account-details">Hide full account number</a>
+                @else
+                    <a class="records-link" href="{{ route('scholars.show', ['scholar' => $scholar, 'show_bank_account' => 1]) }}#landbank-account-details">View full account number</a>
+                @endif
+            @endif
+        @endcan
+        <p class="record-help">Optional profile information. A missing account number does not determine scholarship eligibility or initiate a bank transfer.</p>
+    </section>
+@endif
 @if($protected && $profileHistory->isNotEmpty())
     <section class="dashboard-card records-card">
         <h2 class="records-section-title">Academic profile activity</h2>

@@ -50,6 +50,15 @@
                 @endforeach
             </div>
             <h2 class="records-section-title">Contact Information</h2>
+            @can('manageBankAccount', $scholar)
+                <div class="record-field" x-data="{ showAccount: false }">
+                    <p class="record-help">Saved LANDBANK account: {{ $scholar->maskedLandbankAccountNumber() ?? 'Not provided' }}</p>
+                    <x-record-field name="landbank_account_number" label="LANDBANK Savings Account Number (optional)" type="password" x-bind:type="showAccount ? 'text' : 'password'" maxlength="100" inputmode="numeric" autocomplete="new-password" help="Enter digits only, including leading zeros. Leave blank to keep the saved number. Re-enter after a validation error; bank numbers are not restored from session input." />
+                    <button type="button" class="records-button" @click="showAccount = !showAccount" :aria-pressed="showAccount" aria-controls="landbank_account_number" x-text="showAccount ? 'Hide new account number' : 'Show new account number'">Show new account number</button>
+                    <label for="clear_landbank_account_number"><input id="clear_landbank_account_number" name="clear_landbank_account_number" type="checkbox" value="1"> Remove the saved LANDBANK account number</label>
+                    <x-input-error :messages="$errors->get('clear_landbank_account_number')" />
+                </div>
+            @endcan
             <div class="records-form-grid">
                 <x-record-field name="phone" label="Contact number *" type="tel" :value="old('phone', $scholar->phone)" maxlength="40" autocomplete="tel" help="Mobile: 9171234567, 09171234567 or +639171234567; landline: 8 digits. Recognized formats are normalized. Unchanged legacy numbers are retained for review." />
                 <x-record-field name="email" label="Email address *" type="email" :value="old('email', $scholar->email)" maxlength="255" autocomplete="email" help="Contact email only. Editing this field does not change the linked login account." />

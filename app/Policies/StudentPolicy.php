@@ -25,6 +25,16 @@ class StudentPolicy extends RecordPolicy
         return $user->hasAnyRole(static::WRITERS) || $this->viewOwnProfile($user, $student);
     }
 
+    public function viewBankAccount(User $user, Student $student): bool
+    {
+        return $user->hasAnyRole([...static::WRITERS, 'finance']);
+    }
+
+    public function manageBankAccount(User $user, Student $student): bool
+    {
+        return $this->update($user, $student);
+    }
+
     public function updateOwnProfile(User $user, Student $student): bool
     {
         return $this->viewOwnProfile($user, $student)
