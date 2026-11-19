@@ -3,6 +3,7 @@
 namespace App\Actions\Records;
 
 use App\Models\AcademicPeriod;
+use App\Models\DelistingReason;
 use App\Models\ScholarshipAssignment;
 use App\Models\ScholarshipProgram;
 use App\Models\Student;
@@ -10,6 +11,8 @@ use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class SaveScholarshipAssignment
@@ -38,6 +41,20 @@ class SaveScholarshipAssignment
                     throw ValidationException::withMessages(['end_period_id' => 'The closing semester must not precede the starting semester.']);
                 }
                 $closed = in_array($data['status'], ['ended', 'relinquished'], true);
+                if (! empty($data['delisting_reason_id'])) {
+                    if (! $closed || ! Schema::hasTable('delisting_reasons')) {
+                        throw ValidationException::withMessages(['delisting_reason_id' => 'A registry reason can accompany only an explicit scholarship closure with the registry available.']);
+                    }
+                    $reason = DelistingReason::whereKey($data['delisting_reason_id'])->lockForUpdate()->first();
+                    if (! $reason || ! $reason->is_active) {
+                        throw ValidationException::withMessages(['delisting_reason_id' => 'Select an available Active reason from the registry.']);
+                    }
+                    $data['status_reason'] = 'Reason for Delisting: '.$reason->name."\nRemarks / school reference: ".trim($data['status_reason'] ?? '');
+                    if (Str::length($data['status_reason']) > 5000) {
+                        throw ValidationException::withMessages(['status_reason' => 'Keep the reason and remarks together within 5,000 characters. Shorten the remarks without omitting the required reference.']);
+                    }
+                }
+                unset($data['delisting_reason_id']);
                 $status = $closed ? 'ended' : $data['status'];
                 if ($current->exists && $current->status === 'active' && $status === 'pending') {
                     throw ValidationException::withMessages(['status' => 'Close an active scholarship to end it. Pending is reserved for assignments that have not started.']);

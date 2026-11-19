@@ -32,6 +32,11 @@ class BillingBatchPolicy
         return $this->update($user, $batch);
     }
 
+    public function recordExclusion(User $user, BillingBatch $batch): bool
+    {
+        return $user->hasAnyRole(['registrar', 'coordinator', 'administrator']) && $this->update($user, $batch);
+    }
+
     public function configure(User $user): bool
     {
         return $user->hasAnyRole(['coordinator', 'administrator']);

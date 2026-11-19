@@ -19,11 +19,12 @@
             @if($assignment->exists && $delistingReasons->isNotEmpty())
                 <div class="record-field" x-show="['ended', 'relinquished'].includes(assignmentStatus)" x-cloak>
                     <label for="assignment-reason-suggestion">Active reason from the Reason for Delisting registry (optional)</label>
-                    <select id="assignment-reason-suggestion" class="record-input" @change="if ($event.target.value) { const field = $event.currentTarget.form.elements.namedItem('status_reason'); field.value = $event.target.value + (field.value.trim() ? '\n' + field.value : ''); }">
-                        <option value="">Select a reason to copy into the school reference</option>
-                        @foreach($delistingReasons as $reason)<option value="{{ $reason->name }}">{{ $reason->name }}</option>@endforeach
+                    <select id="assignment-reason-suggestion" name="delisting_reason_id" class="record-input" x-bind:disabled="!['ended', 'relinquished'].includes(assignmentStatus)">
+                        <option value="">Select an applicable registered reason</option>
+                        @foreach($delistingReasons as $reason)<option value="{{ $reason->id }}" @selected(old('delisting_reason_id') == $reason->id)>{{ $reason->name }}</option>@endforeach
                     </select>
-                    <p class="record-help">The selected wording is retained in the existing status-change reason. This does not change status automatically or exclude a scholar from a semester bill. Add the supporting reference below.</p>
+                    <x-input-error :messages="$errors->get('delisting_reason_id')" />
+                    <p class="record-help">The server retains the registered wording with the existing status-change reason and audit history. Selecting it does not change status automatically. Ending this assignment is separate from a temporary semester billing exclusion. Add the supporting reference below.</p>
                 </div>
             @endif
             <x-record-field name="status_reason" label="Reason / school reference" type="textarea" :value="old('status_reason')" maxlength="5000" help="Required when changing status or recording an ended or relinquished scholarship." />

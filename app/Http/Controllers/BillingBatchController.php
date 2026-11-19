@@ -3,13 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Billing\ManageBillingBatch;
+use App\Actions\Records\ManageScholarshipRoster;
 use App\Actions\Records\SaveAcademicVerification;
 use App\Models\AcademicPeriod;
 use App\Models\AcademicRecord;
+use App\Models\AcademicValidationContext;
 use App\Models\BillingBatch;
 use App\Models\BillingItem;
+use App\Models\DelistingReason;
 use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipBatch;
+use App\Models\ScholarshipBatchMembership;
 use App\Models\ScholarshipProgram;
 use App\Rules\PositiveBatchNumber;
 use App\Services\Billing\AllocationSummary;
@@ -17,13 +21,23 @@ use App\Services\Billing\BillingBatchOptions;
 use App\Services\Billing\BillingEligibility;
 use App\Services\Billing\BillingRoster;
 use App\Services\Billing\Money;
+use App\Services\Eligibility\OfficialRuleCatalog;
+use App\Services\Records\ScholarImportTemplate;
+use App\Services\Records\ScholarProfile;
 use App\Support\TablePagination;
+use App\View\EvaluationWorkspace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Throwable;
 
 class BillingBatchController extends Controller
 {
@@ -142,13 +156,190 @@ class BillingBatchController extends Controller
             'id' => (string) $row['member']->student_id,
             'correction' => $row['record'] && ($row['record']->verification_status !== 'pending' || $row['record']->verified_at !== null),
         ])->values() : collect();
+        $canRecordExclusion = Gate::allows('recordExclusion', $batch) && $batch->scholarshipBatch !== null;
+        $exclusionReady = Schema::hasColumn('scholarship_batch_memberships', 'billing_exclusion') && Schema::hasTable('delisting_reasons');
+        $exclusionChoices = $canRecordExclusion ? collect($members->items())->mapWithKeys(function ($row) {
+            $member = $row['member'];
+            $other = $row['exclusion_member'] && $row['exclusion_member']->id !== $member->id;
+
+            return [(string) $member->id => ['label' => $member->student->student_number.' / '.$member->student->full_name,
+                'enrollment' => $row['enrollment'], 'revision' => $member->billing_exclusion['revision'] ?? 0,
+                'decision' => $row['exclusion_member']?->billing_exclusion ?? $member->billing_exclusion,
+                'blocked' => (bool) ($row['reservation'] || $other),
+                'block_reason' => $row['reservation'] ? 'Already included or reserved in a semester bill. Remove an editable draft item first; submitted financial history is preserved.'
+                    : ($other ? 'An exclusion is recorded in '.$row['exclusion_member']->batch->batch_number.'. Open a draft linked to that original roster to manage its decision.' : ''),
+            ]];
+        })->all() : [];
 
         return view('billing.show', [
             'batch' => $batch, 'items' => $batch->items()->with(['student', 'adjustments.authorizedBy'])->orderBy('id')->tablePaginate('billing_items')->appends(['tab' => 'items']),
             'members' => $members, 'readinessSummary' => $readinessSummary, 'selectable' => $selectable, 'search' => $search,
             'canVerifyEnrollment' => $canVerifyEnrollment, 'enrollmentRows' => $enrollmentRows,
             'enrollmentReady' => $canVerifyEnrollment,
+            'canRecordExclusion' => $canRecordExclusion, 'exclusionReady' => $exclusionReady, 'exclusionChoices' => $exclusionChoices,
+            'delistingReasons' => $canRecordExclusion && $exclusionReady ? DelistingReason::where('is_active', true)->orderBy('name')->get() : collect(),
         ]);
+    }
+
+    public function exclusion(Request $request, BillingBatch $batch, ManageScholarshipRoster $roster): RedirectResponse
+    {
+        Gate::authorize('recordExclusion', $batch);
+        try {
+            $request->validate(['membership_id' => ['required', 'integer', 'min:1']]);
+            $member = ScholarshipBatchMembership::whereKey($request->input('membership_id'))->where('scholarship_batch_id', $batch->scholarship_batch_id)
+                ->where('program_id', $batch->program_id)->where('academic_period_id', $batch->academic_period_id)->firstOrFail();
+            $roster->recordBillingExclusion($batch, $member, $request->user(), $request->only('operation', 'exclusion_revision', 'reason_id', 'remarks', 'confirm_exclusion_review'));
+        } catch (ValidationException $exception) {
+            return to_route('billing-batches.show', ['batch' => $batch, 'tab' => 'roster'] + $request->query())
+                ->withErrors($exception->errors(), 'billingExclusion')->withInput($request->only('membership_id', 'operation', 'reason_id', 'remarks'));
+        }
+
+        return to_route('billing-batches.show', ['batch' => $batch, 'tab' => 'roster'] + $request->query())
+            ->with('status', 'Semester billing decision saved. Validation refreshed; enrollment and scholarship assignment statuses are unchanged.');
+    }
+
+    public function exportScholars(Request $request, BillingBatch $batch, BillingRoster $roster, BillingEligibility $eligibility, EvaluationWorkspace $workspace, OfficialRuleCatalog $catalog, ScholarImportTemplate $workbook): BinaryFileResponse
+    {
+        Gate::authorize('view', $batch);
+        $scope = $request->validate(['scope' => ['required', Rule::in(['roster', 'items'])]])['scope'];
+        // Collect all rows in a read-only reporting transaction, before creating the download.
+        $report = DB::transaction(function () use ($batch, $scope, $roster, $eligibility, $workspace, $catalog) {
+            $batch = BillingBatch::with(['program', 'academicPeriod', 'scholarshipBatch', 'terms', 'preparedBy', 'rate', 'approval'])->findOrFail($batch->id);
+            Gate::authorize('view', $batch);
+            if ($batch->scholarshipBatch && ($batch->scholarshipBatch->program_id !== $batch->program_id || $batch->scholarshipBatch->academic_period_id !== $batch->academic_period_id)) {
+                throw ValidationException::withMessages(['scope' => 'The recorded roster does not match this billing program and semester. No other roster can be inferred for export.']);
+            }
+            $members = $roster->readiness($batch, $eligibility);
+            $items = $batch->items()->with(['student.academicProgram', 'assignment', 'application'])->orderBy('id')->get();
+            $byStudent = $members->keyBy('member.student_id');
+            $included = $items->keyBy('student_id');
+            $rows = [];
+            if ($scope === 'roster') {
+                foreach ($members as $row) {
+                    $rows[] = $this->scholarExportRow($batch, $row, $included->get($row['member']->student_id), count($rows) + 1, $workspace, $catalog);
+                }
+            } else {
+                foreach ($items as $item) {
+                    $row = $byStudent->get($item->student_id);
+                    if (! $row || $row['member']->assignment_id !== $item->assignment_id) {
+                        $record = $item->student->academicRecords()->where('academic_period_id', $batch->academic_period_id)->orderByDesc('revision')->first();
+                        $known = $record && $record->verification_status === 'verified' && $record->verified_by && $record->verified_at;
+                        $row = ['member' => null, 'application' => $item->application, 'record' => $record,
+                            'enrollment' => $known ? Str::headline($record->enrollment_status) : 'Unverified',
+                            'eligibility' => 'Pending review', 'reservation' => $item,
+                            'reason' => 'No matching assignment membership in the recorded semester roster. Stored billing history is retained; no current roster association or payability is inferred.'];
+                    }
+                    $rows[] = $this->scholarExportRow($batch, $row, $item, count($rows) + 1, $workspace, $catalog);
+                }
+            }
+            $generated = now('Asia/Manila');
+            $rate = $batch->appliedRate();
+            $approvedRate = $rate && $rate->program_period_term_id === $batch->program_period_term_id && $rate->approved_by && $rate->approved_at;
+            $total = $items->contains(fn ($item) => $item->gross_amount === null)
+                ? null : Money::decimal(Money::signedTotal($items, 'gross_amount'));
+            $status = $batch->allocationStatus();
+            $demonstration = OfficialRuleCatalog::demonstrationDatabase() || $batch->program->code === OfficialRuleCatalog::DEMO_PROGRAM;
+            $information = [
+                ['Cronasia Foundation College, Inc.'], ['Scholarship Billing and Validation Report'],
+                ['Internal scholar list — not an official Form 2/Form 3 submission. Exporting changes no records.'],
+                ...($batch->status === 'draft' ? [['DRAFT — for internal review only']] : []),
+                ...($demonstration ? [[OfficialRuleCatalog::DEMO_LABEL]] : []),
+                ['Scholarship program', $batch->program->name.' ('.$batch->program->code.')'],
+                ['Roster batch name', $batch->scholarshipBatch?->batch_number ?? 'No recorded roster link — none inferred'],
+                ['Billing batch / reference', $batch->batch_number.' / '.($batch->reference ?: 'No reference recorded')],
+                ['Academic year', $batch->academicPeriod->academic_year], ['Semester', $batch->academicPeriod->semester_code],
+                ['Billing status', $status === 'submitted' ? 'Awaiting Coordinator approval' : Str::headline($status)],
+                ['Approved semester rate', $approvedRate ? 'PHP '.$rate->amount : 'Unconfirmed — no approved recorded rate'],
+                ['Date generated (Asia/Manila)', $generated->toIso8601String()],
+                ['Prepared by', $batch->preparedBy?->name ?? 'Not recorded'],
+                ['Export scope', $scope === 'roster' ? 'All roster members (all pages)' : 'Billing items in this batch only (all pages)'],
+                ['Total roster members', (string) $members->count()],
+                ['Total eligible scholars', (string) $members->where('eligibility', 'Eligible')->count()],
+                ['Total pending review', (string) $members->where('eligibility', 'Pending review')->count()],
+                ['Total excluded scholars', (string) $members->where('eligibility', 'Excluded')->count()],
+                ['Total already billed or reserved (roster)', (string) $members->whereNotNull('reservation')->count()],
+                ['Total scholars included in this batch', (string) $items->count()],
+                ['Total prepared billing amount', $total === null ? 'Unconfirmed — stored amount missing' : 'PHP '.$total],
+                ['Eligibility counts describe current roster validation, independently of inclusion. Reservations include this and other batches; counts overlap.'],
+                ['Individual amounts and prepared total use stored gross amounts in this batch only, before later adjustments. Blank amounts mean not included or unconfirmed; eligible does not mean included.'],
+                ['Current enrollment/compliance/approval may differ from retained billing history; this export never replaces its original rate, decision or amount snapshots.'],
+                ...($rows === [] ? [['No scholars in the selected export scope.']] : []),
+            ];
+            $name = ($batch->status === 'draft' ? 'DRAFT-' : '').($demonstration ? 'UAT-' : '').'scholar-list-'
+                .Str::slug(Str::limit($batch->scholarshipBatch?->batch_number ?? 'unlinked-roster', 60, '')).'-'
+                .Str::slug(Str::limit($batch->batch_number.'-'.($batch->reference ?? ''), 60, '')).'-'
+                .($scope === 'roster' ? 'all-roster' : 'billing-items').'-'.$generated->format('Ymd-His').'.xlsx';
+
+            return ['information' => $information, 'rows' => $rows, 'filename' => $name];
+        });
+        $path = tempnam(sys_get_temp_dir(), 'cfci-billing-scholars-');
+        if ($path === false) {
+            throw new \RuntimeException('Cannot allocate scholar export file.');
+        }
+        try {
+            @chmod($path, 0600);
+            $workbook->writeReport($path, $report['information'], [
+                'Number', 'Student ID', 'Full name', 'Course / Program', 'Year level', 'Scholarship assignment status',
+                'Current semester enrollment status', 'School compliance result', 'External approval status', 'Billing eligibility',
+                'Billing inclusion status', 'Individual billing amount (PHP)', 'Exclusion or review reason / remarks',
+            ], $report['rows'], [8, 22, 30, 46, 14, 24, 26, 32, 30, 24, 48, 24, 85], [11]);
+
+            return response()->download($path, $report['filename'], [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff',
+            ])->deleteFileAfterSend(true);
+        } catch (Throwable $exception) {
+            if (is_file($path)) {
+                unlink($path);
+            }
+            throw $exception;
+        }
+    }
+
+    private function scholarExportRow(BillingBatch $batch, array $row, ?BillingItem $item, int $number, EvaluationWorkspace $workspace, OfficialRuleCatalog $catalog): array
+    {
+        $student = $row['member']?->student ?? $item->student;
+        $assignment = $row['member']?->assignment ?? $item->assignment;
+        $application = $row['application'];
+        $school = 'Not evaluated';
+        $external = 'Not recorded';
+        if ($application && $assignment && $application->student_id === $student->id && $application->assignment_id === $assignment->id
+            && $application->program_id === $batch->program_id && $application->academic_period_id === $batch->academic_period_id) {
+            $application->loadMissing(['program', 'academicPeriod', 'terms', 'assignment', 'latestEvaluation', 'documents', 'externalApprovals.documents']);
+            $policy = $catalog->forProgram($application->program->code);
+            $state = $workspace->present(['application' => $application, 'context' => AcademicValidationContext::current(),
+                'latest' => $application->latestEvaluation, 'academic' => $row['record'], 'policy' => $policy,
+                'policyApplicable' => $policy && $catalog->appliesTo($application->academicPeriod),
+                'approvals' => $application->externalApprovals->sortByDesc('id'),
+            ], $catalog);
+            if ($application->latestEvaluation) {
+                $school = match ($application->latestEvaluation->school_decision) {
+                    'qualified' => 'Eligible', 'not_qualified' => 'Ineligible', 'needs_information' => 'Needs review', default => 'Pending',
+                };
+                if ($state['stages'][1]['status'] !== 'Completed') {
+                    $school .= ' (recorded) / '.$state['stages'][1]['status'];
+                }
+            }
+            $external = $state['externalReady'] ? 'Approved — verified and applicable'
+                : ($state['lastApproval'] ? ucfirst($state['lastApproval']->decision).($state['lastApproval']->decision === 'approved' ? ' — requires review' : '') : 'Not recorded');
+        }
+        $inclusion = $item ? 'Included in this batch / '.Str::headline($item->status)
+            : ($row['reservation'] ? 'Already billed/reserved in another transaction / billing #'.$row['reservation']->billing_batch_id : 'Not included in this batch');
+
+        $remarks = $row['reason'];
+        $decision = ($row['exclusion_member'] ?? null)?->billing_exclusion ?? $row['member']?->billing_exclusion;
+        if ($decision && ! ($decision['excluded'] ?? false)) {
+            $remarks .= ' Released semester exclusion (historical reason): '.$decision['reason_name'].'. Original remarks: '.($decision['remarks'] ?? '')
+                .'. Release remarks: '.($decision['release_remarks'] ?? '');
+        }
+        if ($assignment?->status === 'ended' && filled($assignment->status_reason) && ! str_contains($remarks, $assignment->status_reason)) {
+            $remarks .= ' Recorded scholarship closure reason / remarks: '.$assignment->status_reason;
+        }
+
+        return [(string) $number, (string) $student->student_number, $student->full_name, $student->academicProgram?->name ?? 'Not provided',
+            ScholarProfile::yearLevels()[$student->year_level] ?? ($student->year_level ? 'Year '.$student->year_level : 'Not provided'),
+            $assignment ? $assignment->statusLabel() : 'Missing assignment', $row['enrollment'], $school, $external,
+            $row['eligibility'], $inclusion, $item?->gross_amount, $remarks];
     }
 
     public function enrollment(Request $request, BillingBatch $batch, SaveAcademicVerification $academic): RedirectResponse

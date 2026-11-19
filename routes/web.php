@@ -100,8 +100,10 @@ Route::middleware('auth')->group(function () {
     Route::post('billing-batches/budget', [ScholarshipFundsController::class, 'budget'])->name('billing-batches.budget');
     Route::post('billing-batches/{batch}/approve', [ScholarshipFundsController::class, 'approve'])->name('billing-batches.approve');
     Route::post('billing-batches/{batch}/items/{item}/adjust', [ScholarshipFundsController::class, 'adjust'])->name('billing-batches.items.adjust');
+    Route::get('billing-batches/{batch}/scholar-list', [BillingBatchController::class, 'exportScholars'])->middleware('cache.headers:no_store;private')->name('billing-batches.scholars.export');
     Route::get('billing-batches/{batch}', [BillingBatchController::class, 'show'])->name('billing-batches.show');
     Route::post('billing-batches/{batch}/enrollment', [BillingBatchController::class, 'enrollment'])->name('billing-batches.enrollment');
+    Route::post('billing-batches/{batch}/exclusion', [BillingBatchController::class, 'exclusion'])->name('billing-batches.exclusion');
     Route::patch('billing-batches/{batch}', [BillingBatchController::class, 'update'])->name('billing-batches.update');
     Route::post('billing-batches/{batch}/items', [BillingBatchController::class, 'add'])->name('billing-batches.items.store');
     Route::post('billing-batches/{batch}/items/bulk', [BillingBatchController::class, 'addMany'])->name('billing-batches.items.bulk');

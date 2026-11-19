@@ -4,6 +4,11 @@
         @if($canVerifyEnrollment)
             <div class="records-actions"><button id="verify-enrollment-trigger" class="records-button" type="button" aria-haspopup="dialog" aria-controls="verify-enrollment" @click="openEnrollment(null, $event.currentTarget)" @disabled(!$enrollmentReady)>Verify enrollment</button></div>
         @endif
+        @if($canRecordExclusion)
+            <div class="records-actions"><button id="billing-exclusion-trigger" type="button" class="records-button" x-data @click="$dispatch('open-record-form-dialog', { id: 'billing-exclusion', trigger: $el })" aria-haspopup="dialog" aria-controls="billing-exclusion" @disabled(!$exclusionReady)>Record billing exclusion</button></div>
+            @unless($exclusionReady)<p class="record-help">Semester exclusion recording requires the documented registry/exclusion migration. Existing enrollment and billing history remain available.</p>@endunless
+            @if(!$exclusionReady && $exclusionErrors->any())<div class="records-alert" role="alert"><strong>The decision was not saved.</strong><ul>@foreach($exclusionErrors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+        @endif
         <form class="records-filters" method="GET" action="{{ route('billing-batches.show', $batch) }}"><input type="hidden" name="tab" value="roster"><x-record-field name="q" label="Search roster by Student ID or name" :value="$search['q'] ?? ''" maxlength="100" /><button class="records-button" type="submit">Search</button><a class="records-button" href="{{ route('billing-batches.show', ['batch' => $batch, 'tab' => 'roster']) }}">Clear</a></form>
         <form method="POST" action="{{ route('billing-batches.items.bulk', $batch) }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}" x-data="billingRosterSelection(@js($selectable), @js(old('application_ids', [])))" @submit="submitSelection($event)" :aria-busy="saving">
             @csrf<input type="hidden" name="billing_tab" value="roster"><input type="hidden" name="lock_version" value="{{ $batch->lock_version }}">
@@ -23,7 +28,9 @@
                                 @else<span class="record-help">A Coordinator or Administrator must start the semester evaluation.</span>@endcan
                             @endif
                             @can('view', $student)<a class="records-link" href="{{ route('scholars.show', $student) }}">View scholar</a>@endcan
-                        @endif</td>
+                        @endif
+                        @can('update', $row['member']->assignment)<a class="records-link" href="{{ route('scholars.assignments.edit', [$student, $row['member']->assignment]) }}">Review scholarship status</a>@endcan
+                        </td>
                     </tr>
                 @empty<tr><td colspan="12">No roster members match this view. Memberships are managed under Information Registry &rarr; Roster.</td></tr>@endforelse
             </tbody></table></div><div class="records-pagination">{{ $members->links() }}</div>

@@ -27,8 +27,11 @@ class BillingRoster
         $records = $history->map(fn ($revisions) => $revisions->first());
         $reservations = BillingItem::where('academic_period_id', $batch->academic_period_id)
             ->whereIn('student_id', $members->pluck('student_id'))->get()->keyBy('student_id');
+        $exclusions = ScholarshipBatchMembership::where('program_id', $batch->program_id)->where('academic_period_id', $batch->academic_period_id)
+            ->whereIn('student_id', $members->pluck('student_id'))->orderBy('id')->get()
+            ->filter(fn ($member) => $member->hasBillingExclusion())->keyBy('assignment_id');
 
-        return $members->map(function ($member) use ($batch, $eligibility, $applications, $records, $reservations, $history) {
+        return $members->map(function ($member) use ($batch, $eligibility, $applications, $records, $reservations, $history, $exclusions) {
             $application = $applications->get($member->student_id);
             $record = $records->get($member->student_id);
             $known = $record && $record->verification_status === 'verified' && $record->verified_by && $record->verified_at;
@@ -38,9 +41,14 @@ class BillingRoster
             $reason = 'Pending review: no semester evaluation is recorded for this roster assignment.';
             $amount = null;
             $eligible = false;
+            $exclusionMember = $exclusions->get($member->assignment_id);
             if ($member->program_id !== $batch->program_id || $member->academic_period_id !== $batch->academic_period_id ||
                 ($application && $application->assignment_id !== $member->assignment_id)) {
                 $reason = 'The roster membership and semester evaluation do not match this program, period and assignment.';
+            } elseif ($exclusionMember) {
+                $state = 'excluded';
+                $reason = 'Temporary semester billing exclusion: '.$exclusionMember->billing_exclusion['reason_name'].'. '
+                    .($exclusionMember->billing_exclusion['remarks'] ?? '').' Enrollment and scholarship assignment status are unchanged.';
             } elseif ($enrollment === 'Not enrolled' || $member->assignment->status !== 'active' || $member->student->record_status !== 'active') {
                 $state = 'excluded';
                 $reason = match (true) {
@@ -63,6 +71,9 @@ class BillingRoster
             if ($enrollment === 'Unverified' && ! $eligible) {
                 $reason = 'Enrollment is unverified for this semester. '.$reason;
             }
+            if ($member->assignment->status === 'ended' && filled($member->assignment->status_reason)) {
+                $reason .= ' Recorded scholarship closure reason / remarks: '.$member->assignment->status_reason;
+            }
             $eligibilityLabel = $eligible ? 'Eligible' : ($state === 'excluded' ? 'Excluded' : 'Pending review');
             $reservation = $reservations->get($member->student_id);
             if ($reservation) {
@@ -75,6 +86,8 @@ class BillingRoster
 
             return compact('member', 'application', 'enrollment', 'state', 'reason', 'amount', 'eligible', 'record') + [
                 'academic_history' => $history->get($member->student_id, collect()),
+                'reservation' => $reservation,
+                'exclusion_member' => $exclusionMember,
                 'eligibility' => $eligibilityLabel,
                 'availability' => $reservation ? 'Already billed or reserved' : ($eligible ? 'Available for draft' : 'Unavailable'),
             ];
@@ -132,7 +145,8 @@ class BillingRoster
                 || ! in_array($record->enrollment_status, ['enrolled', 'not_enrolled'], true)) {
                 throw ValidationException::withMessages(['classification' => 'UAT submission requires matching roster records and a current Registrar-verified enrollment finding for every sample scholar.']);
             }
-            if ($record->enrollment_status === 'enrolled') {
+            $exclusion = ScholarshipBatchMembership::billingExclusionFor($student->id, $member->assignment_id, $batch->academic_period_id);
+            if ($record->enrollment_status === 'enrolled' && ! $exclusion) {
                 $enrolled[] = $student->id;
             }
             $rows[] = [
@@ -140,14 +154,15 @@ class BillingRoster
                 'enrollment_record_id' => $record->id, 'revision' => $record->revision,
                 'lock_version' => $record->lock_version, 'verified_by' => $record->verified_by,
                 'verified_at' => $record->verified_at->toIso8601String(),
-                'class' => $record->enrollment_status === 'enrolled' ? 'UAT_ENROLLED' : 'UAT_NOT_ENROLLED',
+                'class' => $exclusion ? 'UAT_BILLING_EXCLUDED' : ($record->enrollment_status === 'enrolled' ? 'UAT_ENROLLED' : 'UAT_NOT_ENROLLED'),
+                ...($exclusion ? ['exclusion_membership_id' => $exclusion->id, 'exclusion_snapshot' => $exclusion->billing_exclusion] : []),
             ];
         }
         $included = $items->pluck('student_id')->all();
         sort($enrolled);
         sort($included);
         if ($items->isEmpty() || $enrolled !== $included || $items->pluck('student_id')->unique()->count() !== $items->count()) {
-            throw ValidationException::withMessages(['classification' => 'The fictional whole-roster scenario must bill every enrolled sample exactly once and exclude every not-enrolled sample. Resolve remaining eligibility before submission.']);
+            throw ValidationException::withMessages(['classification' => 'The fictional whole-roster scenario must bill every enrolled, non-excluded sample exactly once and exclude not-enrolled or explicitly excluded samples. Resolve remaining eligibility before submission.']);
         }
         foreach ($items as $item) {
             $member = $members->firstWhere('student_id', $item->student_id);

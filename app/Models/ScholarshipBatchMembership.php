@@ -7,11 +7,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ScholarshipBatchMembership extends Model
 {
-    protected $fillable = ['scholarship_batch_id', 'assignment_id', 'student_id', 'program_id', 'academic_period_id', 'assigned_by', 'assigned_at'];
+    protected $fillable = ['scholarship_batch_id', 'assignment_id', 'student_id', 'program_id', 'academic_period_id', 'assigned_by', 'assigned_at', 'billing_exclusion'];
 
     protected function casts(): array
     {
-        return ['assigned_at' => 'immutable_datetime'];
+        return ['assigned_at' => 'immutable_datetime', 'billing_exclusion' => 'array'];
+    }
+
+    public function hasBillingExclusion(): bool
+    {
+        return ($this->billing_exclusion['excluded'] ?? false) === true;
+    }
+
+    /** A second roster for the same award/semester must not bypass its recorded exclusion. */
+    public static function billingExclusionFor(int $studentId, int $assignmentId, int $periodId): ?self
+    {
+        return static::where('student_id', $studentId)->where('assignment_id', $assignmentId)
+            ->where('academic_period_id', $periodId)->orderBy('id')->get()->first(fn ($member) => $member->hasBillingExclusion());
     }
 
     public function batch(): BelongsTo

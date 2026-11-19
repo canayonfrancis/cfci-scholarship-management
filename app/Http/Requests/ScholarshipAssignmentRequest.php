@@ -30,6 +30,7 @@ class ScholarshipAssignmentRequest extends FormRequest
             'end_period_id' => [Rule::requiredIf($closed), Rule::prohibitedIf(! $closed), 'nullable', 'integer', 'exists:academic_periods,id'],
             'ends_on' => [Rule::prohibitedIf(! $closed), 'nullable', 'date_format:Y-m-d', ...($this->filled('starts_on') ? ['after_or_equal:starts_on'] : [])],
             'status_reason' => [Rule::requiredIf($closed || ($assignment && $this->input('status') !== $assignment->status)), 'nullable', 'string', 'max:5000'],
+            'delisting_reason_id' => [Rule::prohibitedIf(! $closed), 'nullable', 'integer', 'min:1'],
         ];
     }
 

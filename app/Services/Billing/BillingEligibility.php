@@ -5,6 +5,7 @@ namespace App\Services\Billing;
 use App\Models\AcademicRecord;
 use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipApplication;
+use App\Models\ScholarshipBatchMembership;
 use App\Models\ScholarshipRate;
 use App\Services\Eligibility\OfficialRuleCatalog;
 use App\Services\Eligibility\PrivateEvidence;
@@ -20,6 +21,11 @@ class BillingEligibility
     {
         $fail = fn (string $message) => throw ValidationException::withMessages(['billing' => $message]);
         $this->catalog->assertDemonstrationStudent($application->program->code, $application->student);
+        $exclusion = $application->assignment_id
+            ? ScholarshipBatchMembership::billingExclusionFor($application->student_id, $application->assignment_id, $application->academic_period_id) : null;
+        if ($exclusion) {
+            $fail('Temporary semester billing exclusion: '.$exclusion->billing_exclusion['reason_name'].'. '.($exclusion->billing_exclusion['remarks'] ?? '').' Enrollment and scholarship status are retained.');
+        }
         if (strtoupper(trim($application->program->code)) === 'EDUKAR') {
             $fail('EDUKAR requires an approved individual variable entitlement workflow. A uniform semester rate cannot establish its payable amount.');
         }

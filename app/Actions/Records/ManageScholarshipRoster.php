@@ -3,6 +3,9 @@
 namespace App\Actions\Records;
 
 use App\Models\AcademicPeriod;
+use App\Models\BillingBatch;
+use App\Models\BillingItem;
+use App\Models\DelistingReason;
 use App\Models\ScholarshipAssignment;
 use App\Models\ScholarshipBatch;
 use App\Models\ScholarshipBatchMembership;
@@ -12,6 +15,7 @@ use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -146,6 +150,59 @@ class ManageScholarshipRoster
             }
 
             return $students->count();
+        }, 3);
+    }
+
+    public function recordBillingExclusion(BillingBatch $batch, ScholarshipBatchMembership $member, User $actor, array $data): void
+    {
+        Gate::forUser($actor)->authorize('recordExclusion', $batch);
+        if (! Schema::hasColumn('scholarship_batch_memberships', 'billing_exclusion') || ! Schema::hasTable('delisting_reasons')) {
+            throw ValidationException::withMessages(['exclusion' => 'The developer must apply the documented registry/exclusion migrations before recording semester exclusions.']);
+        }
+        DB::transaction(function () use ($batch, $member, $actor, $data) {
+            Student::whereKey($member->student_id)->lockForUpdate()->firstOrFail();
+            $batch = BillingBatch::whereKey($batch->id)->lockForUpdate()->firstOrFail();
+            Gate::forUser($actor)->authorize('recordExclusion', $batch);
+            $member = ScholarshipBatchMembership::whereKey($member->id)->where('scholarship_batch_id', $batch->scholarship_batch_id)
+                ->where('program_id', $batch->program_id)->where('academic_period_id', $batch->academic_period_id)->lockForUpdate()->firstOrFail();
+            Validator::make($data, [
+                'operation' => ['required', 'in:exclude,release'], 'exclusion_revision' => ['required', 'integer', 'min:0'],
+                'reason_id' => ['nullable', 'required_if:operation,exclude', 'prohibited_if:operation,release', 'integer'],
+                'remarks' => ['nullable', 'required_if:operation,release', 'string', 'max:3000', 'regex:/\S/'],
+                'confirm_exclusion_review' => ['accepted'],
+            ])->validate();
+            $old = $member->billing_exclusion;
+            if ((int) ($old['revision'] ?? 0) !== (int) $data['exclusion_revision']) {
+                throw ValidationException::withMessages(['exclusion' => 'This exclusion decision changed. Reload the roster before saving.']);
+            }
+            if (BillingItem::where('student_id', $member->student_id)->where('academic_period_id', $member->academic_period_id)->exists()) {
+                throw ValidationException::withMessages(['exclusion' => 'This scholar is already included or reserved in a semester bill. Remove an editable draft item first. Submitted financial history must use its existing authorized correction workflow; it is not silently excluded.']);
+            }
+            $before = $member->only($member->getFillable());
+            if ($data['operation'] === 'exclude') {
+                $other = ScholarshipBatchMembership::where('student_id', $member->student_id)->where('assignment_id', $member->assignment_id)
+                    ->where('academic_period_id', $member->academic_period_id)->whereKeyNot($member->id)->lockForUpdate()->get()
+                    ->first(fn ($candidate) => $candidate->hasBillingExclusion());
+                if ($other) {
+                    throw ValidationException::withMessages(['exclusion' => 'An exclusion already exists for this award and semester in another roster. Review that original roster decision instead of creating conflicting decisions.']);
+                }
+                $reason = DelistingReason::whereKey($data['reason_id'])->lockForUpdate()->first();
+                if (! $reason || ! $reason->is_active) {
+                    throw ValidationException::withMessages(['reason_id' => 'Select an available Active reason from the existing registry. Reload if its availability changed.']);
+                }
+                $decision = ['excluded' => true, 'revision' => (int) ($old['revision'] ?? 0) + 1,
+                    'reason_id' => $reason->id, 'reason_name' => $reason->name, 'remarks' => trim($data['remarks'] ?? ''),
+                    'recorded_by' => $actor->id, 'recorded_at' => now()->toIso8601String()];
+            } else {
+                if (! $member->hasBillingExclusion()) {
+                    throw ValidationException::withMessages(['exclusion' => 'There is no active semester exclusion on this roster membership to release.']);
+                }
+                $decision = [...$old, 'excluded' => false, 'revision' => (int) $old['revision'] + 1,
+                    'released_by' => $actor->id, 'released_at' => now()->toIso8601String(), 'release_remarks' => trim($data['remarks'])];
+            }
+            $member->update(['billing_exclusion' => $decision]);
+            $this->audit->record($actor, $member, $data['operation'] === 'exclude' ? 'roster_billing_excluded' : 'roster_billing_exclusion_released',
+                $before, $data['remarks'] ?? null);
         }, 3);
     }
 

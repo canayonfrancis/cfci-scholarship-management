@@ -3,7 +3,8 @@
     $tabs = ['roster' => 'Roster Validation', 'items' => 'Billing Items', 'submission' => 'Submission'];
     $editErrors = $errors->getBag('editBilling');
     $enrollmentErrors = $errors->getBag('enrollment');
-    $requestedTab = $enrollmentErrors->any() ? 'roster' : (($errors->any() || $editErrors->any()) ? old('billing_tab', request()->query('tab')) : request()->query('tab'));
+    $exclusionErrors = $errors->getBag('billingExclusion');
+    $requestedTab = ($enrollmentErrors->any() || $exclusionErrors->any()) ? 'roster' : (($errors->any() || $editErrors->any()) ? old('billing_tab', request()->query('tab')) : request()->query('tab'));
     $activeTab = is_string($requestedTab) && isset($tabs[$requestedTab]) ? $requestedTab : ($batch->status === 'draft' ? 'roster' : 'items');
     $preparedTotal = $batch->totalAmount();
     $approvedRate = $batch->appliedRate();
@@ -12,6 +13,11 @@
 @endphp
 <x-records-page :title="$batch->batch_number" description="Review roster validation, prepared billing items and submission in one workspace.">
     <x-slot:actions>
+        <form method="GET" action="{{ route('billing-batches.scholars.export', $batch) }}" class="records-actions">
+            <label class="sr-only" for="scholar-export-scope">Scholar list export scope</label>
+            <select id="scholar-export-scope" name="scope" class="record-input"><option value="roster">All roster members</option><option value="items">Billing items only</option></select>
+            <button class="records-button" type="submit">Export scholar list</button>
+        </form>
         @can('update', $batch)<button id="edit-billing-trigger" class="records-button" type="button" aria-haspopup="dialog" aria-controls="edit-billing" x-data @click="$dispatch('open-record-form-dialog', { id: 'edit-billing', trigger: $el })">Edit details</button>@endcan
         <a class="records-button" href="{{ route('billing-batches.index') }}">Back to billing</a>
     </x-slot:actions>
@@ -55,6 +61,9 @@
                 @include('billing.partials.'.($key === 'roster' ? 'roster-validation' : $key))
             </section>
         @endforeach
+        @if($canRecordExclusion && $exclusionReady)
+            @include('billing.partials.exclusion-dialog')
+        @endif
         @if($canVerifyEnrollment)
             @include('billing.partials.enrollment-dialog')
         @endif

@@ -2,6 +2,12 @@
 
 Status: **IMPLEMENTED — PENDING MANUAL VERIFICATION**
 
+Billing scholar list export and Reason for Delisting integration have been added;
+see the corresponding final sections for manual checks. Both additions received
+static source review only; the earlier compilation results below predate them.
+Temporary exclusion recording requires the new, unexecuted migration documented
+in the delisting section. No registry data has been inserted or updated here.
+
 The isolated fictional walkthrough is supported by source code from enrollment to
 school evaluation, external approval, explicit activation, billing submission,
 independent allocation approval, receipt allocation, payment, signed acknowledgment,
@@ -44,13 +50,15 @@ hardcoded financial amount. The regular rate revision and billing snapshots rema
 `BillingRoster::submissionClassification()` remains in the submission transaction.
 For actual programs it still rejects submission. For the isolated sample it
 validates the **whole roster**: every member has known, verified current enrollment;
-every enrolled sample appears exactly once in the bill with the same assignment;
-no not-enrolled member is billed. The normal eligibility checks separately require
+every enrolled sample without an explicit semester exclusion appears exactly once
+in the bill with the same assignment; not-enrolled and explicitly excluded members
+are not billed. The normal eligibility checks separately require
 active awards, current qualified decisions, external approvals and authoritative
 amounts. Unknown enrollment, missing eligible members, extra or duplicate items,
 wrong scopes and invalid student identities block the sample submission.
 
-The fictional classification uses `UAT_ENROLLED` / `UAT_NOT_ENROLLED`, **not**
+The fictional classification uses `UAT_ENROLLED` / `UAT_NOT_ENROLLED` (and
+`UAT_BILLING_EXCLUDED` for an explicit recorded exclusion), **not**
 official Form 2/Form 3 codes. It retains membership/assignment IDs, academic record
 IDs, revisions, lock versions, verification actors/timestamps, policy version and
 the sample label in existing billing-item `basis_snapshot.uat_classification`.
@@ -88,7 +96,7 @@ No tables, migrations, dependencies, modules, email changes, automatic activatio
 grade/GWA rules or additional approval stages were introduced. Existing historical
 decisions and actual financial snapshots are not rewritten.
 
-## Actual review and check results
+## Original defense-workflow review and check results (before scholar export)
 
 | Check | Actual result |
 |---|---|
@@ -131,7 +139,8 @@ not load `.env`, boot application providers, render views or connect to a databa
 ## Developer setup: separate database and application copy
 
 **Instructions below were not executed.** Do these only in a separate local copy.
-There is no migration required by this change in the operational installation.
+The original defense-path changes require no migration of their own; the later
+semester-exclusion addition requires the migration documented at the end of this report.
 
 1. Create a separate folder such as `C:\Users\DOKII\Documents\Capstone\cfci-defense-demo`.
    Copy the current application source, including these uncommitted changes, and
@@ -323,8 +332,9 @@ existing scholarship roster, approved rate PHP 45,000.00, zero prepared items.
    `Not enrolled in the fictional selected semester — temporary billing exclusion`.
    Attach matching fictional proof if desired, confirm review and save.
    Expected: Neri remains in the roster with a pending assignment, excluded from
-   ordinary billing; no permanent delisting or scholarship termination. Do not use
-   Reason for Delisting to represent this temporary exclusion.
+   ordinary billing; no permanent delisting or scholarship termination. To retain
+   an applicable registered reason, use the explicit **Record billing exclusion**
+   operation described below; selecting a reason never terminates the scholarship.
 
 ### 6. School certification, external approval and activation — A
 
@@ -392,7 +402,7 @@ membership for Neri remain preserved.
    **Submission reference** = `UAT-SUBMIT-01` → **Validate and submit UAT sample**.
    Expected: both items finalized, retained classification includes all three source
    revisions, header Submitted/Awaiting Coordinator approval. Any unknown enrollment,
-   omitted enrolled sample, not-enrolled item, stale validation or changed approval
+   omitted non-excluded enrolled sample, not-enrolled/excluded item, stale validation or changed approval
    blocks the whole transaction. This generates no official Form 2/Form 3 document.
 4. **B:** Reload **Batch 1 → Submission**. **Coordinator approval reference** =
    `UAT-ALLOC-APPROVAL-01` → **Review eligibility, check budget and approve**.
@@ -535,7 +545,8 @@ not historical as-of snapshots. No new report or unsupported status filter was a
    personally execute the guide. SMTP, live payments, actual bank receipts and
    provider acceptance are neither required nor claimed by this fictional walkthrough.
 4. The sample classifier deliberately requires the whole known roster, including all
-   enrolled sample members; it is not a production partial-submission specification.
+   enrolled sample members without an explicit semester exclusion; it is not a
+   production partial-submission specification.
    A stale submitted UAT classification is rejected at approval, not silently repaired.
    Keep the demo period/sources stable between submission and approval; preserve any
    stale submission as history and use a separately prepared fictional scenario if a
@@ -547,3 +558,392 @@ not historical as-of snapshots. No new report or unsupported status filter was a
 **Final assessment:** source-level isolated demonstration support implemented;
 runtime readiness **pending developer setup and manual verification**. Production
 compliance and official billing submission are **BLOCKED** on the approvals above.
+
+## Additional requirement: billing scholar list export
+
+Status: **IMPLEMENTED — PENDING MANUAL VERIFICATION**. This addition was reviewed
+statically only. No application code, syntax/compiler commands, automated tests,
+exports, browser actions, migrations or database queries/writes were executed for
+this export task. The earlier PHP/Blade/Vite results in this report apply only to
+the preceding defense-workflow implementation, not to these export changes.
+
+### Navigation, format and permissions
+
+**Billing and Validation → Billing batches → open a batch**. Beside Edit details /
+Back to billing, select **All roster members** or **Billing items only**, then click
+**Export scholar list**. The form uses ordinary GET navigation and no new frontend
+dependency, tab or module.
+
+Route: `GET /billing-batches/{batch}/scholar-list?scope=roster` or `scope=items`,
+named `billing-batches.scholars.export`. It requires authentication and the existing
+`BillingBatchPolicy::view` permission, checked before export processing and again
+after loading the record for reporting. Current permitted roles are Registrar,
+Coordinator, retained Test Administrator, and existing legacy Finance/Viewer
+memberships, exactly as on the billing detail page. Students and other unauthorized
+accounts cannot export by directly requesting the URL. Invalid scopes are rejected.
+
+The existing `ScholarImportTemplate` ZIP/XML workbook generator is reused and
+extended with `writeReport()`. No Excel package or other dependency is installed.
+The existing PHP ZIP extension used by Download Template must remain enabled.
+The original template retains Scholars / Instructions / Courses, course validation,
+its named range and its existing text-style indexes; common package assembly and
+archive writing are now shared with the report.
+
+The output is a real `.xlsx`, with one **Scholar list** sheet, merged report
+headings/metadata, readable column widths, wrapped row content, table header
+filters, frozen institution/title rows and numeric PHP currency cells. Student IDs
+are explicit `inlineStr` cells with Text formatting; no numeric conversion or
+spreadsheet formula is used to preserve leading zeros. All other untrusted text
+is also stored as literal text, XML-escaped, with invalid XML control characters
+removed. Only validated decimal billing amounts become numeric cells.
+
+The filename contains the recorded roster name, billing batch name/reference,
+export scope and Manila generation timestamp. Drafts have a **DRAFT** filename
+prefix and workbook notice. The isolated demo DB and the UAT program produce
+**UAT SAMPLE — NOT FOR OFFICIAL SUBMISSION** inside the workbook and a UAT filename
+prefix, including when a UAT program's runtime enable flag is disabled. Every file
+is labelled an internal report, not an official Form 2/Form 3 submission.
+
+### Data, totals and historical amounts
+
+The report includes the institution/report titles, program name/code, recorded
+roster, billing name/reference, academic year, semester, allocation status, approved
+applied rate, generation time and actual linked `preparedBy` user. The exporter
+does not substitute the downloading user when the preparer is unknown.
+
+All thirteen requested columns are included: sequential number, Student ID, full
+name, course/program, year, assignment status, current enrollment, school compliance,
+external approval, billing eligibility, billing inclusion, individual billing amount
+and existing exclusion/review reason. No emails, phone numbers, protected national
+identifiers, passwords, tokens, uploaded files or unrelated personal details are
+exported.
+
+- **All roster members:** uses the opened batch's persisted `scholarship_batch_id`
+  and `BillingRoster::readiness()` before pagination. It ignores the visible page,
+  search and table filters. Eligibility/enrollment/reasons match the existing
+  readiness operation. Inclusion explicitly distinguishes this batch, another
+  transaction's reservation/bill, and not included. An eligible unadded member is
+  not labelled included and has no prepared amount in this batch.
+- **Billing items only:** queries only `$batch->items()`, on all pages. A different
+  transaction's items cannot become exported rows. The existing `gross_amount` is
+  used, not the latest program reference or a newly computed rate entitlement.
+  Legacy items without a matching roster assignment remain visible as retained
+  billing history with a review reason; no roster membership is fabricated.
+- School/external status presentation reuses `EvaluationWorkspace`, including
+  current/stale school results and verified applicable external approval. These
+  current facts do not replace an item's historical evaluation, rate or approval
+  snapshots.
+- Totals always describe the whole linked roster and whole selected bill, whichever
+  row scope is exported: roster members; current Eligible / Pending review / Excluded
+  counts; roster members already billed/reserved; included item count; prepared gross.
+  Eligibility counts are independent of inclusion. Reservations include this and
+  other batches, so reservation/inclusion counts overlap rather than being summed.
+- Prepared total uses the existing `Money` integer-centavo helpers over the same
+  stored current-batch item collection used for export, corresponding to the
+  original gross total shown by `BillingBatch::totalAmount()`. It is never a sum of
+  all roster entitlements and does not apply later adjustments to historical gross.
+  A missing stored amount remains **Unconfirmed**, not a false zero. A genuinely
+  empty bill totals PHP 0.00. Only currently included rows have individual amounts.
+- An unlinked legacy bill is labelled **No recorded roster link — none inferred**;
+  All roster members has no data rows, while Billing items only retains its items.
+  A recorded roster with a conflicting program/period is rejected instead of
+  widening the export to another scope.
+
+All business-data operations are SELECT/read operations within a reporting
+transaction, including evidence integrity checks. No provisioning, activation,
+approval, submission, audit insertion or financial mutation action is invoked.
+The private temporary workbook is generated before returning a download, deleted
+after sending, and cleaned up if generation fails. Responses use private/no-store
+and nosniff headers. Normal authentication/session middleware is unchanged.
+
+### Affected files and commands
+
+- `routes/web.php` — protected, noncached scholar-list route.
+- `app/Http/Controllers/BillingBatchController.php` — scope validation, authoritative
+  report projection/totals, existing status presentation, private XLSX response.
+- `app/Services/Billing/BillingRoster.php` — expose the reservation already retrieved
+  by readiness so inclusion does not need a second reservation lookup.
+- `app/Services/Records/ScholarImportTemplate.php` — share existing OOXML/package,
+  escaping and ZIP writing; add report worksheet and currency formatting.
+- `resources/views/billing/show.blade.php` — scope selector and export button.
+- This report — export behavior and manual verification instructions.
+
+The export alone requires no migration, dependency install, seed or frontend asset
+build. The later semester-exclusion feature requires the migration below.
+If deploying with cached routes/views, the developer may run
+`php artisan route:clear` and `php artisan view:clear` in the intended installation.
+Neither command was executed here. Static diff/whitespace review found no whitespace
+errors (`git diff --check`); syntax, compilation, functional and browser checks for
+this addition are **NOT EXECUTED**.
+
+### Developer manual verification — all NOT EXECUTED
+
+Use only the isolated fictional data from this report. Do not change operational
+Student IDs, amounts or financial history to prepare a check.
+
+1. As R, open **Billing and Validation → Billing batches → Batch 1** before adding
+   items. Select **All roster members → Export scholar list**. Expect three rows,
+   current statuses/reasons, no included scholars, blank individual prepared amounts,
+   total prepared PHP 0.00 and a DRAFT/UAT label. Eligible is distinct from included.
+2. After adding Mira/Lio as described above, export both scopes. All roster members
+   should contain three rows; Billing items only two. Both headers must report
+   included count two and prepared total PHP 90,000.00; item amounts are PHP 45,000.00
+   each. Neri remains excluded/not included with the existing Not enrolled reason.
+   With current qualified sources, Eligible count is two, Excluded one and reserved
+   count two; reservations include the two current-batch items.
+3. Apply a search/table filter hiding one scholar, or use a page size smaller than
+   the full roster in a larger isolated fixture. Export again. Expect full scoped
+   results, not just displayed rows. No re-entry of student or period data is needed.
+4. Open another isolated draft linked to the same roster while the original bill
+   reserves those students. All roster members should identify their other-transaction
+   inclusion, with blank current-batch amounts; Billing items only must omit them.
+   Prepared total and included count must refer only to the opened draft.
+5. Inspect header program/period/roster/billing reference, actual preparer, approved
+   applied rate and Manila generation time against the opened bill. Verify an old
+   draft/finalized bill retains its stored gross amounts even after a later reference
+   amount or approved rate revision; current status changes must not rewrite the bill.
+6. In an isolated fixture already containing a fictional Student ID such as
+   `00001234`, inspect the exported cell in Excel: it must remain Text and exactly
+   retain all zeros. If that fixture is unavailable, mark this case Not Tested rather
+   than altering operational IDs. Literal formula-looking text must remain text.
+7. Try no-item and unlinked legacy fixtures if available: expect labelled empty
+   scope/unconfirmed legacy information, no invented roster and no false totals.
+8. As an unauthenticated user, request the export URL: expect login handling. As a
+   Student, directly request the same existing batch URL: expect authorization denial.
+   A permitted role with an invalid `scope` must receive validation failure. Confirm
+   exporting does not alter assignment statuses, bill lock/version/status, items,
+   amounts, approvals or business audit history.
+9. Open the downloaded XLSX in Excel/LibreOffice. Expect no repair prompt, clear
+   headings, correct row count, numeric PHP amount cells and DRAFT/UAT/internal-report
+   notices. This runtime workbook compatibility check has not been performed here.
+10. Because package-writing code is shared, also use **Scholars → Bulk Upload →
+    Download Template** in the demo environment. Confirm its three sheets, Text ID/
+    Contact cells, active-course dropdown and unchanged upload instructions. This
+    template regression check is also awaiting the developer.
+
+The export does not resolve the production compliance or official submission
+blockers listed above. **Export implementation completed; manual verification pending.**
+
+## Additional requirement: Reason for Delisting integration
+
+Status: **IMPLEMENTED — PENDING DEVELOPER MIGRATION AND MANUAL VERIFICATION**.
+Static source/diff review only; no syntax/build commands, automated tests, browser
+checks, migrations, seeds, registry lookups or database changes were executed for
+this addition. The earlier compilation results do not verify this addition.
+
+### Register missing reasons through the existing interface
+
+No reasons are seeded or hardcoded into application views/JavaScript. The existing
+registry already normalizes case/whitespace, validates uniqueness and enforces a
+database unique key, including inactive entries. Its Add reason form defaults new
+records to Active. Existing registry records are not overwritten or reactivated.
+
+As **Coordinator or retained Test Administrator**, open **Information Registry →
+Reason for Delisting**. For each reason below:
+
+1. Set the search **Status** filter to **All statuses**. Search for the wording or
+   a distinctive phrase and inspect existing variants, including punctuation/dashes.
+2. If the reason already exists, leave it unchanged; do not recreate an inactive
+   reason. Resolve availability with the institution separately if necessary.
+3. If missing, click **Add reason**, paste the exact **Reason**, choose **Status:
+   Active**, then **Save reason**. Repeat only for missing entries. A duplicate
+   validation error means the existing entry must be reviewed instead of recreated.
+
+| # | Developer-provided reason | Initial status if newly registered |
+|---|---|---|
+| 1 | Availing other scholarships | Active |
+| 2 | Course not in the registry | Active |
+| 3 | Dropped | Active |
+| 4 | Exceeded HEI maximum residency | Active |
+| 5 | Graduated | Active |
+| 6 | Not enrolled – candidate for graduation/completed academic requirements | Active |
+| 7 | Not enrolled for the current semester | Active |
+| 8 | Not enrolled with LOA | Active |
+| 9 | Submitted fake documents | Active |
+| 10 | Transferred without notice | Active |
+
+This is a registration checklist, not evidence that these records exist in the
+database. Registrar can use available reasons but cannot create/edit the registry
+under the unchanged Phase 1 registry permission policy.
+
+### Temporary semester exclusion
+
+In **Billing and Validation → Billing batches → open a draft → Roster Validation**,
+**Registrar, Coordinator or retained Test Administrator** can use **Record billing
+exclusion**. This new policy ability requires the existing draft/update state;
+legacy Finance/Viewer and Student accounts cannot invoke the exclusion endpoint.
+
+The shared compact dialog retrieves the current page's roster members and all
+Active registry reasons. The selected membership supplies the student, exact
+assignment, program and semester; those details are not re-encoded. Staff choose
+**Record / replace temporary semester exclusion**, select an applicable reason,
+optionally record **Remarks / school reference**, confirm the reviewed decision,
+and click **Save semester decision**. No reason is selected automatically. The list
+does not establish which reasons apply to a particular scholar or program.
+
+Saving records a reason ID **and a copy of its exact current wording**, remarks,
+responsible actor/time and monotonic decision revision on the existing roster
+membership. Enrollment, grades, school decisions, award status and roster identity
+are unchanged. Current validation/summary results refresh after redirect. The
+recorded reason is shown in the existing Reason column and dialog preview.
+
+To lift a recorded temporary hold, explicitly choose **Release recorded semester
+exclusion**, enter the required release remarks/reference, confirm review and save.
+The original wording/remarks/actor/time remain in the snapshot alongside release
+details. Existing audit before/after snapshots preserve earlier replacements and
+releases. Release never verifies enrollment, activates an award or makes someone
+payable without the other existing eligibility requirements.
+
+Server-side `BillingEligibility` rejects an active hold for that exact scholar,
+assignment and academic period, including direct billing requests. Another roster
+for the same award/semester cannot bypass it. A conflicting second decision is
+rejected; the dialog identifies the original roster to manage. Invalid/inactive
+reason IDs, wrong-roster membership IDs, stale revisions, missing confirmation and
+unauthorized requests are rejected. Existing transaction/student locks serialize
+the decision with billing preparation; failures do not retain partial decisions.
+
+If the scholar is already included/reserved in any semester bill, recording or
+releasing a hold is rejected. First use **Billing Items → Remove draft item** where
+authorized and editable. Submitted/approved financial history requires the existing
+authorized correction process; this action never removes or reprices it. Freshly
+excluded scholars cannot become new billing items or contribute to the prepared
+amount. Historical inclusion and current eligibility remain separately labelled.
+
+### Separate scholarship closure / delisting review
+
+The row's **Review scholarship status** link opens the existing assignment form,
+only for **Coordinator or retained Test Administrator** with permission to update
+the pending/active assignment. Registrar does not gain termination permissions.
+
+The user must deliberately choose the existing **Ended / historical** or
+**Relinquished** status and provide the existing closing semester and school
+reference/remarks. The optional Active registry selector now submits the reason ID;
+`SaveScholarshipAssignment` validates it on the server and copies its wording into
+the existing `status_reason` with the remarks. Existing closure provenance/audit
+and historical-assignment write restrictions remain. There is no new Terminated
+status, automatic closure, reinstatement action or per-reason transition mapping.
+Selecting a reason alone never closes a scholarship. Return to the bill and refresh
+validation after using this existing separate workflow.
+
+### Export and historical preservation
+
+**All roster members → Export scholar list** includes the recorded reason and
+remarks in its existing **Exclusion or review reason / remarks** column. It retains
+current inclusion/eligibility distinctions, blank prepared amounts for unadded
+excluded scholars, and the prepared gross total from actual current-batch items.
+Released reasons are explicitly labelled historical, with release remarks.
+Scholarship closure reasons/remarks come from the retained assignment history.
+Billing items only continues to include only the current bill's stored items.
+
+Registry edits or deactivation do not rewrite existing membership snapshots,
+assignment `status_reason`, audit events or billing amount snapshots. New decisions
+require an Active registry entry; an existing hold can still be released after its
+reason becomes inactive. Long export remarks remain intact in the cell; row height
+is capped at Excel's supported range, so the formula bar can be used to inspect a
+long value. Draft/UAT/internal-report labels and official submission restrictions
+remain in place. The fictional UAT classifier now also retains explicit exclusion
+snapshots and rejects billing those members; it does not turn an exclusion into
+an official Form 2/Form 3 decision or permit unknown enrollment.
+
+### Necessary database change — prepared, NOT executed
+
+`2026_11_20_000001_add_billing_exclusion_to_roster_memberships.php` adds one nullable
+JSON `billing_exclusion` field to the **existing** `scholarship_batch_memberships`
+table. A dedicated period-specific state is necessary: an assignment reason applies
+to the award, while academic verification describes enrollment. Reusing either as
+a temporary billing flag would conflate these separate records. No table, service
+or new enrollment/approval workflow is introduced.
+
+The original roster migration rejects every membership UPDATE. The new migration
+replaces only that UPDATE trigger with an identity guard that still rejects changes
+to ID, roster, scholar, assignment, program, semester, assigning actor/time and
+creation time. Only the new decision metadata and normal updated timestamp may
+change. Existing composite foreign keys and the deletion guard remain. MySQL/MariaDB
+and the repository's SQLite trigger forms are retained. Rollback refuses to remove
+any recorded decision, including a released decision.
+
+The developer must review this migration and its trigger permissions against a
+backup/isolated environment before applying it. Confirm the intended database and
+the existing Phase 1 registry/roster migrations, then run **only when the developer
+chooses to apply the pending schema**:
+
+```powershell
+php artisan migrate --path=database/migrations/2026_11_20_000001_add_billing_exclusion_to_roster_memberships.php
+```
+
+This command has **not** been executed. No seed, reset, rebuild, dependency install
+or frontend asset build is required. Until both registry and exclusion storage are
+available, recording is visibly disabled and a direct write fails with an explicit
+prerequisite error; existing enrollment, exports and billing history remain readable.
+If using cached routes/views, the developer may clear those caches after deployment.
+
+### Files affected by this addition
+
+- The new migration above — nullable metadata and preserved membership identity guard.
+- `app/Models/ScholarshipBatchMembership.php` — JSON cast and exact award/semester hold lookup.
+- `app/Actions/Records/ManageScholarshipRoster.php` — transactional record/release, current-reason validation and existing audit logging.
+- `app/Policies/BillingBatchPolicy.php` — scoped `recordExclusion` permission.
+- `app/Services/Billing/BillingEligibility.php` — authoritative exclusion guard.
+- `app/Services/Billing/BillingRoster.php` — effective reasons/current exclusion labels, closure wording and guarded fictional classification.
+- `app/Http/Controllers/BillingBatchController.php`, `routes/web.php` — protected POST `/billing-batches/{batch}/exclusion`, registry-backed dialog data and export wording.
+- `resources/views/billing/partials/exclusion-dialog.blade.php` — shared record/release modal.
+- `resources/views/billing/partials/roster-validation.blade.php`, `resources/views/billing/show.blade.php` — controls, existing closure navigation and error handling.
+- `resources/views/billing/partials/submission.blade.php` — accurate UAT exclusion description; real submission remains blocked.
+- `app/Http/Requests/ScholarshipAssignmentRequest.php`, `app/Actions/Records/SaveScholarshipAssignment.php`, `resources/views/assignments/form.blade.php` — server-validated registry choice for explicit existing closure.
+- `app/Services/Records/ScholarImportTemplate.php` — safe maximum row height for longer retained remarks.
+- This documentation — actual reason list, schema prerequisite and manual checks.
+
+### Developer manual verification — all NOT EXECUTED
+
+Use the separate fictional demo database and staff accounts above. The developer
+must apply the schema first; these are instructions, not performed tests.
+
+1. As Coordinator, use **Information Registry → Reason for Delisting** and the
+   checklist above to register missing names. Confirm new reasons are Active and
+   case/spacing duplicates are rejected, including existing Inactive entries.
+2. As Registrar, open the demo **Batch 1 → Roster Validation → Record billing
+   exclusion**. Choose Neri, **Record / replace temporary semester exclusion**, the
+   available reason **Not enrolled for the current semester**, and remarks
+   `UAT enrollment-source review; temporary semester exclusion only`. Confirm review
+   and save. Expect Excluded with that wording, preserved verified Not enrolled
+   finding, preserved pending assignment and unchanged roster membership/amounts.
+3. Export **All roster members**. Expect the reason/remarks on Neri's row, no
+   individual prepared amount for Neri and unchanged PHP90,000 total if Mira/Lio
+   are the two stored items. Current included, excluded and review states remain
+   distinct. Exporting must not save another decision or alter financial records.
+4. In isolated data only, edit/deactivate that registry entry as Coordinator.
+   Reopen the roster/export: expect the original recorded wording retained. The
+   inactive entry cannot be selected for a new decision. Existing closure reasons
+   must likewise retain their original text; do not alter operational registry data
+   merely to exercise this case.
+5. As Registrar, release Neri's hold with remarks `UAT hold released for review`.
+   Expect retained historical wording and release details. Neri remains unpayable
+   because enrollment is still Not enrolled and the award is pending; no automatic
+   activation or billing item is created.
+6. For an isolated enrolled/active/otherwise eligible sample **not yet in a bill**,
+   record an applicable explicit hold. Expect it unavailable for selection, with
+   direct add requests rejected and prepared total unaffected. Release the hold:
+   remaining existing eligibility checks still apply; inclusion is a separate action.
+7. Attempt a decision for a scholar already included/reserved, a membership from
+   another roster, an inactive/invalid reason ID, stale revision, or missing review
+   confirmation. Expect rejection without partial metadata/audit changes. A second
+   roster for the same award/period must not bypass an existing hold. Submitted
+   bills cannot use this action to rewrite existing financial history.
+8. As Coordinator, for a separate fictional pending/active award, use **Review
+   scholarship status**. Explicitly choose the appropriate existing closure status,
+   closing semester, a registered reason and school reference; **Save assignment**.
+   Expect only that explicit action to close it, retaining the reason/reference and
+   audit history. Registrar cannot invoke this update; selecting a reason alone
+   must not change status. Closed assignment history remains read-only.
+9. Direct POSTs from Student, Viewer and legacy Finance accounts must be denied;
+   Registrar/Coordinator cannot record against an unauthorized or submitted batch.
+   Before schema deployment, verify the clear prerequisite message and disabled UI.
+10. On the isolated MySQL/MariaDB database, the developer should independently check
+    migration/trigger behavior: metadata updates work, changing original membership
+    identity or deleting membership remains rejected, and rollback with recorded
+    decisions is refused. No trigger behavior is claimed tested by this report.
+
+**Review result:** source implementation and documentation completed; whitespace
+review (`git diff --check`) found no errors. Runtime schema, permissions, financial
+regression and manual UI/export behavior remain **UNVERIFIED**. No production
+compliance or official submission blocker was bypassed.
