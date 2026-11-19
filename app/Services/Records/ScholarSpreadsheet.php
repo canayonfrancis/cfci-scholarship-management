@@ -12,6 +12,10 @@ class ScholarSpreadsheet
     public const LEGACY_HEADERS = ['Student ID', 'Last Name', 'First Name', 'Middle Name', 'EXT', 'Sex', 'Course', 'Year Level', 'Email', 'Contact'];
     public const HEADERS = [...self::LEGACY_HEADERS, 'LANDBANK Savings Account Number'];
 
+    /** Zero-based Text-format positions; Contact may be decoded to an exact string. */
+    public const IDENTIFIER_COLUMNS = [0, 9, 10];
+    public const STRICT_TEXT_COLUMNS = [0, 10];
+
     private const MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 
     public function read(string $path, string $extension): array
@@ -165,8 +169,16 @@ class ScholarSpreadsheet
 
                         continue;
                     }
-                    if ($number > 1 && in_array($column, [1, 10, 11], true) && $this->trimValue($value) !== '' && ! in_array($type, ['s', 'inlineStr', 'str'], true)) {
-                        $issues[] = self::HEADERS[$column - 1].' must be stored as Text in Excel. Re-enter it from the original record to retain leading zeros.';
+                    if ($number > 1 && $column === 10 && ! $hasFormula && in_array($type, ['', 'n'], true)) {
+                        $contact = $this->numericContact($value);
+                        if ($contact === null) {
+                            $issues[] = 'Contact must be a complete Philippine mobile number or an eight-digit landline stored without fractions or lost digits. Re-enter the original contact if Excel shortened it; missing digits or prefixes will not be guessed.';
+                        } else {
+                            $value = $contact;
+                        }
+                    }
+                    if ($number > 1 && in_array($column - 1, self::STRICT_TEXT_COLUMNS, true) && $this->trimValue($value) !== '' && ! in_array($type, ['s', 'inlineStr', 'str'], true)) {
+                        $issues[] = self::HEADERS[$column - 1].' is stored as a number in Excel. Set the cell to Text and re-enter the complete original value. Changing the format alone cannot restore lost leading zeros or rounded digits; no number will be reconstructed.';
                     }
                     $values[$column - 1] = $value;
                 }
@@ -200,6 +212,27 @@ class ScholarSpreadsheet
         }
 
         return $value;
+    }
+
+    /** Decode a bounded, complete integer contact using strings only, never a float. */
+    private function numericContact(string $value): ?string
+    {
+        if (! preg_match('/^([0-9]{1,15})(?:\.([0-9]{1,15}))?(?:[eE]([+-]?[0-9]{1,3}))?$/D', $this->trimValue($value), $parts)) {
+            return null;
+        }
+        $digits = $parts[1].($parts[2] ?? '');
+        $point = strlen($parts[1]) + (int) ($parts[3] ?? 0);
+        // Never fill an abbreviated coefficient with guessed trailing digits or round a fraction.
+        if ($point < 1 || $point > strlen($digits) || trim(substr($digits, $point), '0') !== '') {
+            return null;
+        }
+        $contact = substr($digits, 0, $point);
+        if (isset($parts[3])) {
+            // Leading zeros in an exponent coefficient are not phone-number prefixes.
+            $contact = ltrim($contact, '0');
+        }
+
+        return strlen($contact) <= 15 && ScholarProfile::normalizePhone($contact) !== null ? $contact : null;
     }
 
     private function header(array $values): int
@@ -263,8 +296,12 @@ class ScholarSpreadsheet
             $issues[] = 'Expected '.$columns.' columns matching the header; check commas and quoted values.';
         }
         $values = array_slice(array_pad($values, count(self::HEADERS), ''), 0, count(self::HEADERS));
-        foreach ($values as &$value) {
+        foreach ($values as $index => &$value) {
             $value = $this->trimValue((string) $value);
+            if (in_array($index, self::IDENTIFIER_COLUMNS, true)
+                && preg_match('/^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)[eE][+-]?[0-9]+$/D', $value)) {
+                $issues[] = self::HEADERS[$index].' is in scientific notation. Re-enter the complete original value as Text, including all leading zeros. Rounded or missing digits cannot be recovered from this value.';
+            }
             if (mb_strlen($value) > 1000 || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $value)) {
                 $issues[] = 'A cell contains excessive text or unsupported control characters.';
                 $value = mb_substr(preg_replace('/[\x00-\x1F\x7F]/u', '', $value), 0, 1000);

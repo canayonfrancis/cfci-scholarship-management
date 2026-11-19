@@ -13,11 +13,14 @@ class ScholarImportTemplate
         $parts = $this->parts(['Scholars', 'Instructions', 'Courses'], $courses !== [] ? '<definedNames><definedName name="ActiveCourses">Courses!$A$2:$A$'.(count($courses) + 1).'</definedName></definedNames>' : '');
         $last = max(2, config('scholar-imports.max_rows') + 1);
         $body = $this->row(1, ScholarSpreadsheet::HEADERS, 2);
-        // Explicit Text formatting on blank cells preserves IDs and contacts when entered.
+        // Text (@) on column defaults AND every blank entry cell preserves identifiers.
         for ($n = 2; $n <= $last; $n++) {
             $body .= $this->row($n, array_fill(0, count(ScholarSpreadsheet::HEADERS), ''), 1);
         }
-        $validation = '<dataValidations count="'.($courses !== [] ? '3' : '2').'">';
+        $validation = '<dataValidations count="'.(($courses !== [] ? 3 : 2) + count(ScholarSpreadsheet::STRICT_TEXT_COLUMNS)).'">';
+        foreach (ScholarSpreadsheet::STRICT_TEXT_COLUMNS as $index) {
+            $validation .= $this->textValidation(chr(65 + $index), $last);
+        }
         $validation .= $this->listValidation('F2:F'.$last, '"Male,Female"');
         $validation .= $this->listValidation('H2:H'.$last, '"'.implode(',', array_keys(ScholarProfile::yearLevels())).'"');
         if ($courses !== []) {
@@ -28,12 +31,13 @@ class ScholarImportTemplate
             'Bulk Upload Scholars - instructions',
             'Enter scholar records on the first worksheet, Scholars. Keep row 1 and all eleven column names in exactly the supplied order. Previous ten-column templates ending at Contact remain accepted.',
             'Required: Student ID, Last Name, First Name, Sex, Course, Year Level, Email, Contact. Middle Name may be blank; EXT is optional. JR/Jr/Jr. become Jr.; SR/Sr/Sr. become Sr.; II/III/IV are uppercase. Other legitimate suffixes remain allowed up to 30 characters.',
-            'Student ID, Contact and LANDBANK Savings Account Number must remain Text. Enter original values, including leading zeros. Do not use formulas or paste numeric cells into these columns.',
+            'Student ID, Contact and LANDBANK Savings Account Number use Text (@), including empty entry rows. Keep Text formatting to retain leading zeros. Student ID and LANDBANK require text cells; do not paste numeric cells into those columns.',
+            'Contact may also be a numeric Excel cell when its complete stored value is an exact valid contact. Fractions, missing digits and abbreviated numbers are rejected. Student ID, LANDBANK and scientific-notation text must be re-entered from the original source as Text; formatting cannot recover lost digits.',
             'LANDBANK Savings Account Number follows Contact and is optional. Enter digits only, with no spaces or hyphens (technical maximum: 100 characters; no exact bank length is imposed). The preview masks it. Blank values do not change existing accounts; existing Student IDs cannot be overwritten by import.',
             'Sex: Male or Female (case-insensitive), or the existing numeric codes 0 = Male and 1 = Female.',
             'Course: use an exact registered active course name from Courses. The database has course names, not a separate course-code column. Unknown or inactive courses are rejected.',
             'Year Level: '.implode('; ', array_map(fn ($key, $label) => $key.' = '.$label, array_keys(ScholarProfile::yearLevels()), ScholarProfile::yearLevels())).'.',
-            'Contact: Philippine mobile 09171234567, 9171234567, +639171234567 or 00639171234567; or an eight-digit landline. Recognized spacing and punctuation are accepted. Leading zeros are retained as text.',
+            'Contact: Philippine mobile 09171234567, 9171234567, +639171234567 or 00639171234567; or an eight-digit landline. Recognized spacing and punctuation are accepted in text. Complete numeric 9171234567 or 81234567 is also accepted. No missing zero or country prefix is added.',
             'Email is a contact address. Import does not create login accounts, send email, assign scholarships or certify enrollment.',
             'Do not include extra data columns, totals, formulas, external data connections, macros or merged data cells. Formatting-only, empty-string and whitespace-only rows are ignored.',
             'Enter email addresses normally. Automatic simple mailto hyperlinks on Email data cells may remain; only cell text is imported. Link targets are never opened. Other external links are not supported.',
@@ -84,7 +88,7 @@ class ScholarImportTemplate
             '_rels/.rels' => '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
             'xl/workbook.xml' => '<workbook xmlns="'.self::NS.'" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'.implode('', array_map(fn ($name, $n) => '<sheet name="'.$this->escape($name).'" sheetId="'.$n.'" r:id="rId'.$n.'"/>', $sheets, $numbers)).'</sheets>'.$definedNames.'</workbook>',
             'xl/_rels/workbook.xml.rels' => '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'.implode('', array_map(fn ($n) => '<Relationship Id="rId'.$n.'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'.$n.'.xml"/>', $numbers)).'<Relationship Id="rId'.(count($sheets) + 1).'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
-            'xl/styles.xml' => '<styleSheet xmlns="'.self::NS.'"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;PHP&quot; #,##0.00"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFA80E0E"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"><alignment vertical="top"/></xf><xf numFmtId="49" fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1" applyFont="1" applyNumberFormat="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"><alignment vertical="top"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
+            'xl/styles.xml' => '<styleSheet xmlns="'.self::NS.'"><numFmts count="2"><numFmt numFmtId="164" formatCode="&quot;PHP&quot; #,##0.00"/><numFmt numFmtId="165" formatCode="@"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFA80E0E"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"><alignment vertical="top"/></xf><xf numFmtId="165" fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1" applyFont="1" applyNumberFormat="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"><alignment vertical="top"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
         ];
     }
 
@@ -136,6 +140,13 @@ class ScholarImportTemplate
     private function listValidation(string $range, string $formula): string
     {
         return '<dataValidation type="list" allowBlank="0" showErrorMessage="1" errorTitle="Check the instructions" error="Choose an accepted value." sqref="'.$range.'"><formula1>'.$this->escape($formula).'</formula1></dataValidation>';
+    }
+
+    private function textValidation(string $column, int $last): string
+    {
+        $formula = 'OR('.$column.'2="",ISTEXT('.$column.'2))';
+
+        return '<dataValidation type="custom" allowBlank="1" showInputMessage="1" showErrorMessage="1" errorStyle="stop" promptTitle="Enter as Text" prompt="Keep leading zeros. Enter the complete original value; paste values without replacing the Text format." errorTitle="Identifier must be Text" error="Set the cell to Text and re-enter the original value. Do not paste numbers or scientific notation." sqref="'.$column.'2:'.$column.$last.'"><formula1>'.$this->escape($formula).'</formula1></dataValidation>';
     }
 
     private function escape(string $value): string

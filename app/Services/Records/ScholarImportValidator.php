@@ -64,7 +64,7 @@ class ScholarImportValidator
                 'landbank_account_number' => ScholarProfile::bankAccountRules(),
                 'phone' => ['required', 'string', 'max:40', function ($attribute, $value, $fail) {
                     if (ScholarProfile::normalizePhone($value) === null) {
-                        $fail('Contact must be a recognized Philippine mobile number or an eight-digit landline.');
+                        $fail('Contact must be a complete Philippine mobile number (for example 9171234567, 09171234567 or +639171234567) or an eight-digit landline. Missing digits or country prefixes are not added.');
                     }
                 }],
             ], [

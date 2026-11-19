@@ -8,13 +8,14 @@
         <h2 class="records-section-title" id="upload-title">{{ $preview ? 'Upload a corrected file' : 'Prepare your spreadsheet' }}</h2>
         <p>Download the template, enter new scholars on its first worksheet, and keep its eleven column headers in order. Middle Name, EXT and LANDBANK Savings Account Number are optional. Previous ten-column templates ending at Contact are also accepted.</p>
         <p class="record-help">Keep Student ID, Contact and LANDBANK Savings Account Number formatted as <strong>Text</strong> to retain leading zeros. Use an existing active course name. Import creates profile records only; it does not create login accounts, assign scholarships or approve eligibility.</p>
+        <p class="record-help">Complete valid numeric Contact cells are accepted when their digits can be read exactly. Student ID and LANDBANK still require Text cells. If a value has lost digits, re-enter it from the original record; changing the format alone cannot restore them. Download a fresh template and keep its Text formatting.</p>
         <details class="scholar-import-instructions">
             <summary>Accepted values and file instructions</summary>
             <ul>
                 <li><strong>Sex:</strong> Male or Female (case-insensitive), or 0 for Male and 1 for Female.</li>
                 <li><strong>EXT:</strong> optional. JR, Jr and Jr. are saved as Jr.; SR, Sr and Sr. as Sr.; II, III and IV are saved in uppercase. Other legitimate suffixes may contain up to 30 characters.</li>
                 <li><strong>Year Level:</strong> @foreach(\App\Services\Records\ScholarProfile::yearLevels() as $value => $label){{ $value }} ({{ $label }}){{ $loop->last ? '.' : '; ' }}@endforeach</li>
-                <li><strong>Contact:</strong> a Philippine mobile number such as 09171234567, 9171234567 or +639171234567, or an eight-digit landline. Original leading zeros are retained.</li>
+                <li><strong>Contact:</strong> a Philippine mobile number such as 09171234567, 9171234567 or +639171234567, or an eight-digit landline. Text retains original leading zeros. Complete numeric values such as 9171234567 or 81234567 are also accepted; fractional, incomplete or unsafe numeric values are rejected.</li>
                 <li><strong>LANDBANK Savings Account Number:</strong> optional, after Contact. Digits only, including leading zeros; no exact account length is required (technical maximum: 100 characters). Account numbers are masked in preview.</li>
                 <li><strong>Course:</strong> @if($courses->isEmpty())No active courses are registered. Ask an authorized administrator to register courses before uploading.@else{{ $courses->implode('; ') }}.@endif</li>
                 <li>Accepted files: .xlsx or comma-separated UTF-8 .csv. Maximum {{ number_format(config('scholar-imports.max_upload_kb')) }} KB and {{ number_format(config('scholar-imports.max_rows')) }} records per file.</li>
