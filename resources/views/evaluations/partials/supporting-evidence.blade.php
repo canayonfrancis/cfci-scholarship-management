@@ -11,7 +11,7 @@
             </td></tr>
         @empty<tr><td colspan="6"><div class="records-empty"><strong>No evaluation evidence uploaded</strong><p>Authorized evaluators can add evidence. Grade certificates remain on their Registrar academic records.</p></div></td></tr>@endforelse
     </tbody></table></div>
-    <p class="record-help">Academic grade certificates are separate from evaluation evidence. <a class="records-link" href="{{ route('evaluations.show', ['application' => $application, 'tab' => 'academic-records']) }}" @click.prevent="selectTab('academic-records', true)">Open Registrar records and certificates</a>.</p>
+    <p class="record-help">Academic grade certificates are separate from evaluation evidence. <a class="records-link" href="{{ route('evaluations.show', ['application' => $application, 'tab' => 'academic-records']) }}" @click.prevent="selectTab('academic-records', true)">Review retained academic sources and certificates</a>.</p>
 </section>
 @can('evaluate', $application)@if($documentTypes)
 <dialog id="evaluation-evidence-dialog" class="academic-subject-dialog evaluation-dialog" x-ref="evidenceDialog" aria-modal="true" aria-labelledby="evaluation-evidence-title" aria-describedby="evaluation-evidence-description" @cancel.prevent="closeDialog('evidenceDialog')" @keydown.tab="trapFocus($event)">

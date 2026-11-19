@@ -96,11 +96,11 @@ class ScholarshipEvaluationController extends Controller
     public function show(ScholarshipApplication $application, OfficialRuleCatalog $catalog, EvaluationWorkspace $workspace): View
     {
         Gate::authorize('view', $application);
-        $application->load(['student.academicProgram', 'program', 'academicPeriod', 'assignment.activatedBy', 'assignment.closedBy', 'terms.confirmedBy', 'documents.reviewedBy', 'documents.uploadedBy', 'evaluationRuns.evaluator', 'evaluationRuns.coordinator', 'evaluationRuns.gradeRecord', 'evaluationRuns.enrollmentRecord', 'externalApprovals.documents', 'externalApprovals.recordedBy']);
+        $application->load(['student.academicProgram', 'program', 'academicPeriod', 'assignment.activatedBy', 'assignment.closedBy', 'terms.confirmedBy', 'documents.reviewedBy', 'documents.uploadedBy', 'evaluationRuns.evaluator', 'evaluationRuns.coordinator', 'evaluationRuns.gradeRecord.documents', 'evaluationRuns.enrollmentRecord.documents', 'externalApprovals.documents', 'externalApprovals.recordedBy']);
         $runs = $application->evaluationRuns->sortByDesc('run_number');
         $context = AcademicValidationContext::current()->load(['activePeriod', 'sourcePeriod']);
-        $gradeSource = $context->source_period_id ? $application->student->academicRecords()->with('grades')->where('academic_period_id', $context->source_period_id)->orderByDesc('revision')->first() : null;
-        $academic = $application->student->academicRecords()->where('academic_period_id', $application->academic_period_id)->orderByDesc('revision')->first();
+        $gradeSource = $context->source_period_id ? $application->student->academicRecords()->with(['grades', 'documents'])->where('academic_period_id', $context->source_period_id)->orderByDesc('revision')->first() : null;
+        $academic = $application->student->academicRecords()->with('documents')->where('academic_period_id', $application->academic_period_id)->orderByDesc('revision')->first();
         $academicPolicyReady = ProgramAcademicRequirement::storageReady();
         $academicRequirements = $academicPolicyReady ? $application->terms->academicRequirements()->orderByDesc('revision')->first() : null;
         $contextValid = $context->active_period_id === $application->academic_period_id && $context->source_period_id && $context->confirmed_by && $context->confirmed_at && filled($context->source_policy_reference);

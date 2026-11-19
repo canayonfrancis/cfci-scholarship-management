@@ -200,10 +200,10 @@
 
             <article id="scholars-by-program" class="dashboard-card programs-card">
                 <header class="card-header card-header-inline">
-                    <h2><span class="title-icon"><x-dashboard-icon name="graduation-cap" :size="20" /></span>Scholars by Program</h2>
+                    <h2 id="scholars-by-program-title"><span class="title-icon"><x-dashboard-icon name="graduation-cap" :size="20" /></span>Scholars by Program</h2>
                     <a href="{{ route('scholars.index') }}" class="text-link">View All <x-dashboard-icon name="arrow-right" :size="15" /></a>
                 </header>
-                <div class="program-list">
+                <div class="program-list" tabindex="0" role="region" aria-labelledby="scholars-by-program-title">
                     @foreach ($programs as $program)
                         <div class="program-row">
                             <span>{{ $program['name'] }}</span>
@@ -212,10 +212,6 @@
                         </div>
                     @endforeach
                 </div>
-                <blockquote class="community-quote">
-                    <span class="mini-leaves" aria-hidden="true"><i></i><i></i><b></b></span>
-                    <div><p>“A more educated and empowered community begins with opportunities like these.”</p><cite>CFCI Scholarship Program</cite></div>
-                </blockquote>
             </article>
 
             <article class="dashboard-card quick-links-card">

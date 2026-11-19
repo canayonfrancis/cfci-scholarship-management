@@ -15,9 +15,6 @@
             @endcan
         </section>
     @endcan
-    @can('viewAny', \App\Models\AcademicRecord::class)
-        <section class="dashboard-card records-card"><h2 class="records-section-title">Academic records</h2><p class="record-help">Enrollment, academic standing, certificates, and Registrar verification history.</p><div class="records-actions"><a class="records-button" href="{{ route('academic-verifications.index', ['student_id' => $scholar->id]) }}">View academic history</a>@can('create', \App\Models\AcademicRecord::class)<a class="records-button" href="{{ route('academic-verifications.create', ['student_id' => $scholar->id]) }}">Add academic record</a>@endcan</div></section>
-    @endcan
     <section class="dashboard-card records-card"><div class="records-card-heading"><div><h2 class="records-section-title">Scholarship history</h2></div></div>
         <div class="records-table-wrap"><table class="records-table"><caption class="sr-only">{{ $scholar->full_name }} scholarship history</caption><thead><tr><th scope="col">Program</th><th scope="col">Status</th><th scope="col">Starting semester</th><th scope="col">Closing semester</th><th scope="col">Dates</th><th scope="col">Reason / reference</th><th scope="col">Actions</th></tr></thead><tbody>
         @forelse($scholar->assignments as $assignment)

@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
+        "build:ngrok": "vite build && node scripts/prepare-ngrok.mjs",
         "dev": "vite"
     },
     "devDependencies": {

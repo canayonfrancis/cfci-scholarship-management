@@ -3,15 +3,13 @@ import './bootstrap';
 import Alpine from 'alpinejs';
 import billingBatchFilter from './billing-batch-filter';
 import initializeDataTables from './data-tables';
-import academicGrades from './academic-grades';
-import academicSubjectEditor from './academic-subject-editor';
 import evaluationWorkspace from './evaluation-workspace';
+import primaryNavigation from './primary-navigation';
 
 window.Alpine = Alpine;
 Alpine.data('billingBatchFilter', billingBatchFilter);
-Alpine.data('academicGrades', academicGrades);
-Alpine.data('academicSubjectEditor', academicSubjectEditor);
 Alpine.data('evaluationWorkspace', evaluationWorkspace);
+Alpine.data('primaryNavigation', primaryNavigation);
 
 Alpine.data('scrollableNavigation', () => ({
     canScrollLeft: false,
@@ -41,7 +39,7 @@ Alpine.data('scrollableNavigation', () => ({
 
         if (!this.activeRevealed) {
             this.activeRevealed = true;
-            const active = navigation.querySelector('[aria-current="page"]');
+            const active = navigation.querySelector('[aria-current="page"], [data-active-navigation="true"]');
             if (active) {
                 const bounds = navigation.getBoundingClientRect();
                 const item = active.getBoundingClientRect();

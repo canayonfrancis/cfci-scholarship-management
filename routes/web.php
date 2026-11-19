@@ -1,9 +1,9 @@
 <?php
 
+use App\Http\Controllers\AcademicCertificateController;
 use App\Http\Controllers\AcademicPeriodController;
 use App\Http\Controllers\AcademicProgramController;
 use App\Http\Controllers\AcademicRequirementController;
-use App\Http\Controllers\AcademicVerificationController;
 use App\Http\Controllers\BillingBatchController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinancialRecordController;
@@ -112,10 +112,8 @@ Route::middleware('auth')->group(function () {
     Route::get('evaluations/{application}/evidence/{document}', [ScholarshipEvaluationController::class, 'download'])->name('evaluations.evidence.download');
     Route::post('evaluations/{application}/external-approval', [ScholarshipEvaluationController::class, 'externalApproval'])->name('evaluations.external');
     Route::post('evaluations/{application}/activate', [ScholarshipEvaluationController::class, 'activate'])->name('evaluations.activate');
-    Route::get('academic-verifications/{verification}/correction', [AcademicVerificationController::class, 'correction'])->name('academic-verifications.correction');
-    Route::post('academic-verifications/{verification}/correction', [AcademicVerificationController::class, 'correct'])->name('academic-verifications.correct');
-    Route::get('academic-verifications/{verification}/certificates/{document}', [AcademicVerificationController::class, 'certificate'])->name('academic-verifications.certificate');
-    Route::resource('academic-verifications', AcademicVerificationController::class)->parameters(['academic-verifications' => 'verification'])->except('destroy');
+    Route::get('academic-certificates/{record}/{document}', AcademicCertificateController::class)
+        ->middleware('cache.headers:no_store;private')->name('academic-certificates.download');
     Route::prefix('scholars/bulk-upload')->name('scholars.imports.')
         ->middleware(['can:create,App\Models\Student', 'cache.headers:no_store;private'])
         ->controller(ScholarImportController::class)->group(function () {
