@@ -14,6 +14,8 @@ use App\Services\Eligibility\OfficialRuleCatalog;
 use App\Services\Eligibility\PrivateEvidence;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class EvaluateApplication
@@ -35,6 +37,18 @@ class EvaluateApplication
             $this->catalog->assertDemonstrationStudent($program->code, $application->student);
             $terms = $application->terms()->lockForUpdate()->firstOrFail();
             $policy = $this->catalog->forProgram($program->code);
+            if (($policy['demonstration'] ?? false) === true) {
+                Validator::make($data, [
+                    'school_decision' => ['required', Rule::in(['qualified', 'not_qualified', 'needs_information'])],
+                    'certification_reference' => ['required', 'string', 'max:1000', 'starts_with:UAT-'],
+                    'evaluator_notes' => ['required', 'string', 'max:3000', 'regex:/\S/'],
+                    'certification_verified' => ['accepted'],
+                ])->validate();
+                // A requested finding is input to the existing checks, never an override of their outcome.
+                $data['facts'] = ['authenticity' => ['qualified' => 'yes', 'not_qualified' => 'no', 'needs_information' => 'unverified'][$data['school_decision']]];
+                $data['fact_sources'] = ['authenticity' => $data['certification_reference']];
+                $data['certification_verified'] = true;
+            }
             $confirmed = $policy && $terms->confirmed_by && $terms->confirmed_at && $terms->rule_version === $policy['version'] && $terms->criteria == $policy && $this->catalog->appliesTo($application->academicPeriod);
             $record = $application->student->academicRecords()->where('academic_period_id', $application->academic_period_id)->orderByDesc('revision')->lockForUpdate()->first();
             if (! $record || $record->verification_status !== 'verified' || ! $record->verified_at || ! $record->verified_by) {

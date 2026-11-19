@@ -31,7 +31,7 @@ class RecordFinancialActivity
 
     public static function approved(BillingBatch $batch): bool
     {
-        if ($batch->program->code === OfficialRuleCatalog::DEMO_PROGRAM && ! OfficialRuleCatalog::demonstrationEnabled()) {
+        if (OfficialRuleCatalog::demonstrationRecord($batch->program->code, $batch->terms?->criteria) && ! OfficialRuleCatalog::demonstrationEnabled()) {
             return false;
         }
         return ($batch->status === 'submitted' && $batch->submitted_at && $batch->approval()->exists())

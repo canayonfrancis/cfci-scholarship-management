@@ -34,7 +34,9 @@ class EligibilityEvaluator
             return $this->result($checks);
         }
         $program = $input['program'];
-        if ($program === OfficialRuleCatalog::DEMO_PROGRAM) {
+        if (OfficialRuleCatalog::demonstrationProgram($program)) {
+            $add('certification_verified', ($data['certification_verified'] ?? false) === true ? 'pass' : 'review',
+                'The evaluator must explicitly confirm review of the fictional institutional certification.');
             $source = trim($data['fact_sources']['authenticity'] ?? '');
             $finding = $data['facts']['authenticity'] ?? 'unverified';
             $add('fictional_certification', ! str_starts_with($source, 'UAT-') || $finding === 'unverified'

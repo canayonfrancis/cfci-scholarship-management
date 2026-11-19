@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AcademicPeriod;
 use App\Models\BillingBatch;
+use App\Models\ProgramPeriodTerm;
 use App\Models\ScholarshipBatch;
 use App\Models\ScholarshipProgram;
 use App\Services\Reporting\ScholarshipReports;
@@ -35,8 +36,11 @@ class ScholarshipReportController extends Controller
         ]);
         $this->validateScope($filters);
         $result = $reports->build($report, $filters);
+        $demoScopes = ProgramPeriodTerm::with(['program', 'academicPeriod'])->where('criteria->demonstration', true)->get()
+            ->mapWithKeys(fn ($terms) => [json_encode([$terms->program->code, (string) $terms->academicPeriod->academic_year, (string) $terms->academicPeriod->semester_code]) => true]);
         $result['demonstration'] = \App\Services\Eligibility\OfficialRuleCatalog::demonstrationDatabase()
-            || $result['rows']->contains('program', \App\Services\Eligibility\OfficialRuleCatalog::DEMO_PROGRAM);
+            || $result['rows']->contains('program', \App\Services\Eligibility\OfficialRuleCatalog::DEMO_PROGRAM)
+            || $result['rows']->contains(fn ($row) => $demoScopes->has(json_encode([$row['program'], (string) $row['academic_year'], (string) $row['semester']])));
         $result['filters'] = array_diff_key($filters, ['format' => true, 'page' => true]);
         if (($filters['format'] ?? null) === 'csv') {
             return $this->csv($result);

@@ -2,6 +2,254 @@
 
 Status: **IMPLEMENTED — PENDING MANUAL VERIFICATION**
 
+## Latest correction: COSCHO certification and an actionable isolated demonstration
+
+**The source-level cause of the reported screen is confirmed:** the previous
+catalog/classifier recognized `UAT-COSCHO` only. Opening `COSCHO` therefore still
+returned no policy, even if a developer expected the fictional workflow to apply.
+No runtime environment settings or existing operational records were inspected.
+
+The implementation now also supports **COSCHO inside the isolated demonstration
+environment**, while retaining the `UAT-COSCHO` alias for earlier fictional records.
+Do not rename an existing program, relink real beneficiaries or enable the sample
+on the operational installation. A real COSCHO assessment at port 8000 remains
+blocked until a genuine compliance basis is approved. Use the separate site below.
+
+### Actual changes in this correction
+
+- One shared catalog predicate now recognizes COSCHO and UAT-COSCHO only with
+  `APP_ENV=local`, `SMS_DEFENSE_DEMO=true`, MySQL/MariaDB and resolved database
+  **exactly `cfci_sms_defense_demo`**. Production TDP/TES criteria are unchanged.
+- Fictional `UAT-DEF-` Student IDs and `@example.invalid` student emails are checked
+  at semester confirmation, evaluation, activation and billing. A nonfictional
+  identity gets an explicit message and cannot submit the sample assessment.
+- The existing school-compliance form now contains **School compliance result**
+  (Eligible / Ineligible / Needs review), **Supporting certification / reference**,
+  **Evaluator remarks / supporting reference**, and a required verification
+  confirmation. Accepted private certification/enrollment files still come from
+  Supporting evidence. No grade/GWA or unrelated TDP/TES checklist is introduced.
+- The service validates the compact input and feeds the requested finding into the
+  existing evaluator. Eligible cannot override missing verified enrollment,
+  unconfirmed semester criteria, missing/changed evidence or an award conflict.
+- The same COSCHO gate reaches the existing fictional submission classifier and
+  independent approval. The classifier is still called and can reject unknown
+  enrollment, excluded members, duplicate/missing items or changed source revisions.
+- Fictional terms remain identifiable after disabling demo mode. New financial use
+  is blocked outside isolation; XLSX, CSV, payroll and liquidation prints preserve
+  the sample label from the database/retained policy markers.
+- Added **`php artisan sms:defense-status`**, a read-only diagnostic. It prints only
+  environment/driver/database name/flag, checks the isolated schema and sample
+  active period, and reports missing prerequisites. It creates no records, runs no
+  migration/seed, changes no configuration and verifies no functional happy path.
+  If isolation fails, it does not query business tables.
+
+### Exact isolated setup — developer actions, NOT executed here
+
+1. Make a separate application folder, for example
+   `C:\Users\DOKII\Documents\Capstone\cfci-defense-demo`. Copy the **current source
+   including these changes**, manifests and public static assets. Exclude the real
+   `.env`, bootstrap caches, operational databases/backups, storage/uploads/sessions/
+   logs and populated scholar workbooks. Do not expose this demo through the
+   operational web server or share its private storage.
+2. Using your local database administration interface, create a **new empty**
+   MySQL/MariaDB database `cfci_sms_defense_demo`, UTF-8/utf8mb4. Use a dedicated
+   database account restricted to `cfci_sms_defense_demo.*`, with permissions needed
+   for the existing tables/foreign keys/triggers. Do not rename, copy or reset the
+   operational database. If the demo database already contains prior fictional
+   data, retain it and reuse that setup; use a separate local database instance if
+   an entirely fresh same-named demonstration database is needed.
+3. Create a fresh demo `.env` from `.env.example` and set:
+
+   ```dotenv
+   APP_ENV=local
+   APP_URL=http://127.0.0.1:8001
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=cfci_sms_defense_demo
+   DB_USERNAME=<dedicated local demo account>
+   DB_PASSWORD=<local secret, never committed>
+   SMS_DEFENSE_DEMO=true
+   SESSION_DRIVER=file
+   SESSION_COOKIE=cfci_defense_demo_session
+   CACHE_STORE=file
+   QUEUE_CONNECTION=sync
+   ```
+
+   Leave any database URL override blank/unset and remove inherited process-level
+   connection overrides. Use the dedicated instance's port if different. Do not
+   copy SMTP credentials; no email or account-delivery operation is part of this demo.
+4. In PowerShell **in the demo folder**, the preparation commands are:
+
+   ```powershell
+   Set-Location 'C:\Users\DOKII\Documents\Capstone\cfci-defense-demo'
+   New-Item -ItemType Directory -Force -Path bootstrap/cache,storage/logs,storage/framework/views,storage/framework/sessions,storage/framework/cache/data,storage/app/private,storage/app/scholarship-private,storage/app/academic-private | Out-Null
+   composer install
+   npm ci
+   php artisan config:clear
+   php artisan route:clear
+   php artisan view:clear
+   php artisan key:generate
+   php artisan sms:defense-status
+   ```
+
+   **Stop if the printed environment/driver/database/flag are not exactly local /
+   mysql / cfci_sms_defense_demo / true.** A clean new database is expected to
+   report missing schema; this command never fixes it automatically. After verifying
+   that this is the separate empty database, the developer may explicitly run:
+
+   ```powershell
+   php artisan migrate
+   npm run build
+   php artisan serve --host=127.0.0.1 --port=8001
+   ```
+
+   These commands are instructions only. None were executed for this correction.
+   Do not run seeds, `migrate:fresh`, `sms:seed-demo`, resets or the legacy synthetic
+   fixtures. Existing migrations include the documented temporary-exclusion column/
+   trigger change; no new migration was added by this correction.
+5. Create/reuse only the three fictional staff accounts using the exact secure
+   Tinker instructions under **Developer setup: separate database and application
+   copy** below. Choose the password privately; no account password is supplied by
+   this report. They are `registrar@example.invalid` (R),
+   `coordinator.a@example.invalid` (A), `coordinator.b@example.invalid` (B).
+6. Browse **`http://127.0.0.1:8001/login`**, not the operational URL. The authenticated
+   page must display **UAT SAMPLE — NOT FOR OFFICIAL SUBMISSION**. As A register/open
+   `2026-2027 / Semester 2`, select it as **Active validation period**, create the
+   fictional course and a **COSCHO** program whose name includes the sample label.
+   Configure reference amount `45000.00` in this demo program only. Follow the
+   detailed registry/bulk-upload steps below; do not reuse real records.
+7. In another demo-folder terminal run **`php artisan sms:defense-status`** again.
+   It should report configuration, schema and the open active sample period
+   available. A failure identifies the prerequisite to resolve. Its success does
+   **not** mean login, financial transactions or browser compatibility were tested.
+
+Sample student data (full ten-column CSV is in the walkthrough below):
+
+| Student ID | Fictional name | Contact email | Enrollment for this demo |
+|---|---|---|---|
+| UAT-DEF-001 | Mira DemoSantos | mira@example.invalid | Registrar-verified Enrolled |
+| UAT-DEF-002 | Lio DemoReyes | lio@example.invalid | Registrar-verified Enrolled |
+| UAT-DEF-003 | Neri DemoCruz | neri@example.invalid | Registrar-verified Not enrolled |
+
+Create the `COSCHO-1.0-2-2026-2027` roster and pending assignments through the
+existing Batch/Roster UI, confirm the configured demonstration semester rate as A,
+create the billing draft, and verify those two enrollment groups as R. The detailed
+steps below give the exact fields, menus, source references and supporting files.
+Earlier UAT-COSCHO datasets remain usable under the same isolation gates; use their
+existing program consistently rather than changing historical codes.
+
+### Short run sheet: compliance through liquidation
+
+Every step below is **NOT EXECUTED**. D means today's Manila date. Every uploaded
+file must visibly say **UAT SAMPLE — NOT FOR OFFICIAL SUBMISSION** and contain only
+fictional information/signature marks. No actual money is received or transferred.
+
+1. **A**, billing draft **Roster Validation → Start evaluation**, confirm COSCHO /
+   current sample scholar → **Open validation**. **School compliance → Applicable
+   COSCHO rules**: review the fictional basis and **Confirm semester rules** once
+   for that program/period. A conflicting old confirmation is not overwritten.
+2. **A**, **Supporting evidence → Add evidence**: upload and accept the fictional
+   institutional certification as **Evidence for the verified facts / school
+   certifications**, and a separate current sample enrollment certificate as
+   **Current COR/COE or permitted certified enrollment list**. A reference string
+   alone does not replace these required private accepted files.
+3. **A**, **School compliance**: choose **School compliance result: Eligible**;
+   reference `UAT-CERT-001` / `UAT-CERT-002`; remarks
+   `Reviewed fictional certification and current enrollment for UAT only`; check
+   the verification confirmation → **Evaluate and record school decision**.
+   Expect a current Eligible result only if all existing checks pass. Repeat for
+   Mira and Lio. Neri is not qualified by this action.
+4. **A**, **External approval → Record external decision**: authority
+   `UAT fictional scholarship provider`, Approved, award `UAT-AWARD-001` /
+   `UAT-AWARD-002`, decision date D, corresponding fictional award PDF and verified
+   identity/program/semester notes. Confirm verification and save. **Award activation
+   → Activate award**, review the modal, then explicitly **Activate award** for
+   each qualified scholar. External approval alone does not activate them.
+5. **R**, refresh **Roster Validation**, select Mira/Lio → **Review selected
+   scholars**, confirm → **Save selected draft items**. Expect two stored amounts
+   of PHP45,000 and prepared total PHP90,000. Neri and active temporary exclusions
+   stay unavailable. Export **All roster members** (three rows) and **Billing items
+   only** (two rows); both totals must use those two stored items. Drafts/UAT output
+   remain labelled, including exclusion reasons/remarks.
+6. **B**, **Billing batches → Configure scholarship rates and budgets → Manage
+   semester rate and budget history**: approve demo budget PHP90,000, ref
+   `UAT-BUDGET-01`. **R**, batch **Submission**, ref `UAT-SUBMIT-01` →
+   **Validate and submit UAT sample**. **B**, same tab, approval ref
+   `UAT-ALLOC-APPROVAL-01` → **Review eligibility, check budget and approve**.
+   Submitted items/classification are rechecked; preparer A and submitter R cannot
+   approve their own allocation. This is fictional classification, not official forms.
+7. **R**, **Liquidation and Payment → Payments and liquidation**, save fictional
+   school receipt PHP90,000 / D / `UAT-RECEIPT-01`; upload labelled receipt evidence.
+   **B** accepts evidence and **Verify and post actual receipt**. **R** opens the
+   approved batch and **Record receipt allocation** for PHP90,000. Optional payroll:
+   `UAT-PAYROLL-01` → **Validate funding and retain payroll**. This creates no payment.
+8. **R**, batch **Record a student payment**: school path, gross/net PHP45,000,
+   date D, Cash, `UAT-PAY-001` / `UAT-PAY-002`. Save each draft; upload payment proof
+   and separate Signed acknowledgment. **B** accepts the evidence, **Verify recorded
+   payment**, then **Verify signed payment acknowledgment** with exact sample ID,
+   name, payment reference, date, net amount, `UAT-ACK-001` / `UAT-ACK-002` and
+   page1/line1. A prepared payroll or generic proof is not an acknowledged signature.
+9. **R**, batch **Liquidation records**, ref `UAT-LIQ-01` → **Prepare / open
+   liquidation draft**, upload fictional reconciliation as Liquidation support.
+   **B** accepts evidence. **R** **Refresh from verified records → Validate and
+   submit**. **B** records review notes → **Accept complete liquidation**. Expected
+   gross/paid/signed PHP90,000, zero deductions/outstanding/unspent allocated cash.
+   Use **Reports** with COSCHO / 2026-2027 / Semester2 / this roster and submission;
+   the existing six report modes, CSV and print retain their normal source checks.
+
+The longer walkthrough below supplies individual field labels and values for
+receipts, payment acknowledgments, liquidation, exports and reports.
+
+### Source inspection, modified files and unresolved prerequisites
+
+Inspected `EvaluateApplication` → `EligibilityEvaluator` → `ActivateAward` →
+`BillingEligibility`/`BillingRoster` → `ManageBillingBatch::change` →
+`ManageScholarshipFunds::approve`, both `exportScholars` scopes, and existing
+financial receipt/payment/liquidation/signature/report operations. The existing
+rate snapshot, budget checks, temporary exclusions and duplicate prevention remain.
+Both export scopes still use current-batch stored gross amounts, not all roster
+entitlements; export actions do not create/approve/submit records.
+
+Modified: `OfficialRuleCatalog`, `EligibilityEvaluator`, `EvaluateApplication`,
+`EvaluateScholarshipRequest`, `ScholarshipEvaluationController`, its existing
+school-compliance partial, `BillingRoster`, `ManageScholarshipFunds`,
+`RecordFinancialActivity`, `BillingBatchController` (XLSX label),
+`ScholarshipReportController` (retained-policy UAT label), `ScholarshipFundsController`
+(allocation CSV sample label), `EvaluationWorkspace`
+(current confirmed applicable basis before showing readiness), financial payroll/
+liquidation print views and this report. Added only the read-only
+`app/Console/Commands/DefenseStatus.php`; no table, policy-management module,
+dependency, public registration, email change, migration or seed was added.
+
+Static template/document search still finds no approved official Form 2/Form 3
+files/applicability definitions; the available scholar import workbook is not an
+official financial form and its personal data was not inspected. Real submission
+continues to call/reject through `BillingRoster::submissionClassification()`;
+only the isolated fictional classifier is available for the sample.
+
+**Actual validation for this correction:** source review and `git diff --check`
+only. No diagnostic command, PHP syntax/build command, test, browser action, schema
+operation, account creation, import or database query was run. No operational
+record/configuration was changed. The previous compilation results later in this
+report apply to the earlier source version, not this correction.
+
+**Remaining demo prerequisites:** the developer must prepare the isolated DB/source
+copy, apply existing migrations with appropriate trigger permissions, create staff/
+fictional data, accept intact private evidence, confirm the sample basis/rate/budget
+and personally verify the walkthrough. Stale contexts, conflicting immutable policy
+confirmations, wrong URLs/flags/identities, incomplete proof, prior reservations or
+insufficient receipts legitimately block it; they are not silently repaired.
+No new source-level blocker was identified in the traced happy path, but runtime
+success is **UNVERIFIED**, not a PASS verdict.
+
+**Production remains restricted:** no genuine COSCHO institutional/provider
+certification acceptance basis has been supplied, and official Form 2/Form 3
+requirements remain absent. The actual operational assessment is not unlocked by
+fictional evidence or by merely setting a flag on its real database. SMTP/provider
+delivery, real payments and provider acceptance are neither needed nor claimed for
+this sample. Public registration and Student Profile Management are unchanged.
+
 Billing scholar list export and Reason for Delisting integration have been added;
 see the corresponding final sections for manual checks. Both additions received
 static source review only; the earlier compilation results below predate them.
@@ -29,12 +277,12 @@ when **all** of these conditions hold:
 - `SMS_DEFENSE_DEMO=true` (default: false).
 - The resolved default database driver is `mysql` (MySQL/MariaDB).
 - Its resolved database name is exactly `cfci_sms_defense_demo`.
-- The program code is exactly `UAT-COSCHO`, not the actual `COSCHO` program.
+- The program is `COSCHO` (or the retained `UAT-COSCHO` alias), exclusively with fictional students inside these isolation gates. Operational COSCHO receives no fictional basis.
 - Evaluation, activation and billing concern a student number starting `UAT-DEF-`
   whose email ends in `@example.invalid`.
 
 It reuses the existing certification/evidence types and evaluation outcomes:
-reviewed certification finding Yes/No/Unverified, a `UAT-` source reference,
+an explicit Eligible/Ineligible/Needs review certification finding, a `UAT-` source reference and verification confirmation,
 required remarks, accepted eligibility-support and enrollment evidence, actual
 Registrar-verified current enrollment, confirmed semester criteria and no
 conflicting active award. It does not expose TDP/TES checklists for this sample.
@@ -263,7 +511,7 @@ Existing Test Administrator exceptions are preserved, but not needed in this gui
    `UAT Bachelor of Science in Information Technology`, **Available for new profiles**
    = Yes. Click **Register program**. Expected: one active sample course.
 4. **Information Registry → Scholarship Grant / Program → Add program**:
-   **Program code** = `UAT-COSCHO`; **Program name** =
+   **Program code** = `COSCHO`; **Program name** =
    `CoScho UAT SAMPLE — NOT FOR OFFICIAL SUBMISSION`;
    **School-stated semester amount (PHP)** = `45000.00`;
    **Availability for new active assignments** = Active;
@@ -294,8 +542,8 @@ These numbers/email addresses are fictional and must never be contacted.
 ### 3. Create one batch/roster with pending assignments — A
 
 1. **Information Registry → Batch → Create batch**: **Scholarship program** =
-   UAT-COSCHO; **Academic year / semester** = `2026-2027 / 2`;
-   **Batch number** = `1.0`. Review generated name `UAT-COSCHO-1.0-2-2026-2027`;
+   COSCHO; **Academic year / semester** = `2026-2027 / 2`;
+   **Batch number** = `1.0`. Review generated name `COSCHO-1.0-2-2026-2027`;
    click **Create batch**. Expected: one empty scholarship batch, no financial bill.
 2. Open that batch → **Manage roster membership → Add scholars**. Search `UAT-DEF-`
    with **Student ID or name → Search / filter**. Select only the three sample rows.
@@ -340,7 +588,7 @@ existing scholarship roster, approved rate PHP 45,000.00, zero prepared items.
 
 Repeat the following for **Mira and Lio only**. Use the existing billing row
 **Start evaluation** link (or **Billing and Validation → Evaluations → Start
-assessment**, choose UAT-COSCHO → **Find assigned scholars**). Confirm the intended
+assessment**, choose COSCHO → **Find assigned scholars**). Confirm the intended
 **Assigned scholar** and active period → **Open validation**. The second scholar's
 assessment is a separate record; do not reuse another student's context.
 
@@ -355,14 +603,16 @@ assessment is a separate record; do not reuse another student's context.
    enrollment list** with the fictional enrollment file. PDF/JPG/PNG, maximum 2 MB
    each. Expected: accepted, private evidence with checksum/reviewer; an unverified
    upload needs **Review evidence → Review notes / original checked → Accept evidence**.
-3. **School compliance**: **Fictional institutional certification confirms
-   demonstration compliance** = **Yes / complies**; its **source reference** =
-   `UAT-CERT-001` for Mira or `UAT-CERT-002` for Lio.
-   **Evaluator remarks / supporting reference** =
+3. **School compliance**: **School compliance result** = **Eligible**;
+   **Supporting certification / reference** = `UAT-CERT-001` for Mira or
+   `UAT-CERT-002` for Lio. **Evaluator remarks / supporting reference** =
    `Reviewed fictional certification and current enrollment for UAT only`.
-   Click **Evaluate and record school decision**. Expected: current Eligible
-   (`passed` / `qualified`) if all sources are intact; no grade/GWA or TDP/TES
-   checklist is required. Missing finding/proof remains Needs review.
+   Check **I reviewed the fictional institutional certification...** and click
+   **Evaluate and record school decision**. Expected: current Eligible
+   (`passed` / `qualified`) only when all enrollment, evidence and confirmed-basis
+   requirements pass. Otherwise the existing evaluator retains Needs review or
+   Ineligible. The selected result cannot override those checks. No grade/GWA or
+   unrelated TDP/TES checklist is required.
 4. **External approval → Record external decision**:
    **Verified approving authority** = `UAT fictional scholarship provider`;
    **External decision** = Approved;
@@ -392,7 +642,7 @@ membership for Neri remain preserved.
    **Billing Items** must show exactly two rows and prepared total PHP 90,000.00.
    Already included students become unavailable for duplicate selection. Changing
    the program reference later must not rewrite the pinned approved rate/history.
-2. **B:** **Billing batches**, filter UAT-COSCHO and this period → **Filter**.
+2. **B:** **Billing batches**, filter COSCHO and this period → **Filter**.
    Expand **Configure scholarship rates and budgets → Manage semester rate and budget
    history** for that scope. Under **Configure available scholarship budget** enter
    **Approved budget (PHP)** = `90000.00`;
@@ -412,7 +662,7 @@ membership for Neri remain preserved.
 ### 8. Fictional receipt, funding and optional payroll
 
 1. **R:** **Liquidation and Payment → Payments and liquidation → Record an actual
-   school receipt**. In this isolated UAT database only, select UAT-COSCHO / period2;
+   school receipt**. In this isolated UAT database only, select COSCHO / period2;
    **Actual amount received (PHP)** = `90000.00`; **Date actually received** = D;
    **Source / funder** = `UAT fictional provider`;
    **Receipt / bank reference** = `UAT-RECEIPT-01` → **Save actual receipt draft**.
@@ -424,7 +674,7 @@ membership for Neri remain preserved.
    **Verify and post actual receipt**. Expected: verified fictional receipt PHP90,000.
    The uploader/recorder cannot self-verify this financial evidence/receipt.
 3. **R:** **Payments and liquidation → Submitted billing batches → Batch 1 →
-   Funding, payments & liquidation**. Under **Record allocation of verified school
+   Payments & liquidation**. Under **Record allocation of verified school
    receipts**, **Verified receipt in this semester** = UAT-RECEIPT-01;
    **Actual receipt amount to allocate (PHP)** = `90000.00` →
    **Record receipt allocation**. Expected: PHP90,000 usable funding allocated once;
@@ -493,7 +743,7 @@ Repeat for Mira and Lio. In **Batch 1 funding page → Record a student payment*
 
 ### 11. Existing Reports — R, A or B
 
-Use **Reports**, select **Scholarship program: UAT-COSCHO**, **Academic year:
+Use **Reports**, select **Scholarship program: COSCHO**, **Academic year:
 2026-2027**, **Semester: 2**, **Semester roster batch (recorded link)** = sample
 roster → **Generate report**. Where offered, select **Financial billing submission:
 Batch 1**; do not use that financial filter for the roster/not-billed denominator.
@@ -525,8 +775,7 @@ not historical as-of snapshots. No new report or unsupported status filter was a
 - In a separate configuration check, disabling the demo flag must block fresh UAT
   qualification/activation/billing and use of the batch for allocation/payment. Do not disable it midway through
   the happy-path demonstration and then assume current outputs remain payable.
-- Actual `COSCHO` remains unsupported for a positive compliance decision, even inside
-  this demo database. The fictional program cannot qualify a non-UAT student identity.
+- Actual/nonfictional COSCHO beneficiaries remain prohibited from fictional qualification, even inside this demo database. Only the isolated sample identities may use the COSCHO demonstration basis; operational COSCHO remains blocked.
 - An actual/non-UAT billing request still hits the original final classification
   exception. No official Form 2/Form 3 output or automatically payable Form 3 exists.
 

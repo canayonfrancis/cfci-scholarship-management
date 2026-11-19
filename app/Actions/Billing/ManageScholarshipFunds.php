@@ -60,7 +60,7 @@ class ManageScholarshipFunds
                 $this->fail('An empty allocation batch cannot be approved.');
             }
             $classification = null;
-            if ($batch->program->code === OfficialRuleCatalog::DEMO_PROGRAM) {
+            if (OfficialRuleCatalog::demonstrationRecord($batch->program->code, $terms->criteria)) {
                 $classification = app(BillingRoster::class)->demonstrationClassification($batch);
                 if ($classification === null) {
                     $this->fail('Fictional billing can only be approved in the enabled isolated local defense database.');

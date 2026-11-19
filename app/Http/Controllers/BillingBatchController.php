@@ -238,7 +238,8 @@ class BillingBatchController extends Controller
             $total = $items->contains(fn ($item) => $item->gross_amount === null)
                 ? null : Money::decimal(Money::signedTotal($items, 'gross_amount'));
             $status = $batch->allocationStatus();
-            $demonstration = OfficialRuleCatalog::demonstrationDatabase() || $batch->program->code === OfficialRuleCatalog::DEMO_PROGRAM;
+            $demonstration = OfficialRuleCatalog::demonstrationDatabase() || OfficialRuleCatalog::demonstrationRecord($batch->program->code, $batch->terms?->criteria)
+                || $items->contains(fn ($item) => isset($item->basis_snapshot['uat_classification']));
             $information = [
                 ['Cronasia Foundation College, Inc.'], ['Scholarship Billing and Validation Report'],
                 ['Internal scholar list — not an official Form 2/Form 3 submission. Exporting changes no records.'],
@@ -309,7 +310,8 @@ class BillingBatchController extends Controller
             $policy = $catalog->forProgram($application->program->code);
             $state = $workspace->present(['application' => $application, 'context' => AcademicValidationContext::current(),
                 'latest' => $application->latestEvaluation, 'academic' => $row['record'], 'policy' => $policy,
-                'policyApplicable' => $policy && $catalog->appliesTo($application->academicPeriod),
+                'policyApplicable' => $policy && $catalog->appliesTo($application->academicPeriod)
+                    && (! ($policy['demonstration'] ?? false) || OfficialRuleCatalog::fictionalStudent($student)),
                 'approvals' => $application->externalApprovals->sortByDesc('id'),
             ], $catalog);
             if ($application->latestEvaluation) {

@@ -113,7 +113,9 @@ class ScholarshipEvaluationController extends Controller
         $context = AcademicValidationContext::current()->load('activePeriod');
         $academic = $application->student->academicRecords()->with('documents')->where('academic_period_id', $application->academic_period_id)->orderByDesc('revision')->first();
         $policy = $catalog->forProgram($application->program->code);
-        $policyApplicable = $policy && $catalog->appliesTo($application->academicPeriod);
+        $demonstrationIdentityAllowed = ! OfficialRuleCatalog::demonstrationRecord($application->program->code, $application->terms?->criteria)
+            || (OfficialRuleCatalog::demonstrationEnabled() && OfficialRuleCatalog::fictionalStudent($application->student));
+        $policyApplicable = $policy && $catalog->appliesTo($application->academicPeriod) && $demonstrationIdentityAllowed;
         $factKeys = $policyApplicable ? array_unique([
             ...$catalog->requiredFacts($application->program->code, 'new'),
             ...$catalog->requiredFacts($application->program->code, 'continuing'),
@@ -125,7 +127,7 @@ class ScholarshipEvaluationController extends Controller
             'academic' => $academic,
             // Read-only History data; never assembled into the current evaluation input.
             'academicHistory' => $application->student->academicRecords()->with(['academicPeriod', 'grades', 'documents'])->orderByDesc('academic_period_id')->orderByDesc('revision')->get(),
-            'policy' => $policy, 'policyApplicable' => (bool) $policyApplicable,
+            'policy' => $policy, 'policyApplicable' => (bool) $policyApplicable, 'demonstrationIdentityAllowed' => $demonstrationIdentityAllowed,
             'facts' => array_intersect_key(OfficialRuleCatalog::FACTS, array_flip($factKeys)),
             'documentTypes' => $application->program->code === 'EDUKAR' ? [] : $catalog->validationDocuments($application->program->code),
             'approvals' => $application->externalApprovals->sortByDesc('id'),
@@ -139,6 +141,8 @@ class ScholarshipEvaluationController extends Controller
         Gate::authorize('evaluate', $application);
         $request->validate(['confirm_policy' => ['accepted']]);
         DB::transaction(function () use ($application, $catalog, $request, $audit) {
+            $student = Student::whereKey($application->student_id)->lockForUpdate()->firstOrFail();
+            $catalog->assertDemonstrationStudent($application->program->code, $student);
             $terms = $application->terms()->lockForUpdate()->firstOrFail();
             $policy = $catalog->forProgram($application->program->code);
             if (! $policy || ! $catalog->appliesTo($application->academicPeriod)) {
@@ -152,7 +156,7 @@ class ScholarshipEvaluationController extends Controller
         }, 3);
 
         return to_route('evaluations.show', ['application' => $application, 'tab' => 'school-compliance'])->with('status',
-            $application->program->code === OfficialRuleCatalog::DEMO_PROGRAM
+            OfficialRuleCatalog::demonstrationProgram($application->program->code)
                 ? OfficialRuleCatalog::DEMO_LABEL.' — fictional semester requirements confirmed.'
                 : 'Official semester rules confirmed. Existing evaluation snapshots remain unchanged.');
     }

@@ -68,9 +68,14 @@ class ScholarshipFundsController extends Controller
         if (($filters['export'] ?? null) === 'csv') {
             return response()->streamDownload(function () use ($terms, $summary, $items) {
                 $stream = fopen('php://output', 'w');
+                fwrite($stream, "\xEF\xBB\xBF");
                 $safe = fn ($value) => preg_match('/^[=+@\-\t\r]/', (string) $value) ? "'".$value : $value;
                 $row = fn ($values) => fputcsv($stream, array_map($safe, $values), ',', '"', '');
                 $row(['Scholarship fund summary (PHP); budget and allocations are not cash receipts or payments']);
+                if (\App\Services\Eligibility\OfficialRuleCatalog::demonstrationDatabase()
+                    || $terms->contains(fn ($term) => \App\Services\Eligibility\OfficialRuleCatalog::demonstrationRecord($term->program->code, $term->criteria))) {
+                    $row([\App\Services\Eligibility\OfficialRuleCatalog::DEMO_LABEL]);
+                }
                 $row(['Program', 'Academic year', 'Semester', 'Budget', 'Approved allocations', 'Adjustments', 'Remaining budget', 'Pending approval', 'Actually received', 'School-paid student net', 'Verified direct-to-student net']);
                 foreach ($terms as $term) {
                     $s = $summary->forTerms($term);

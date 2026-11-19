@@ -26,11 +26,26 @@ class OfficialRuleCatalog
             && self::demonstrationDatabase();
     }
 
+    public static function demonstrationProgram(string $code): bool
+    {
+        return in_array($code, [self::DEMO_PROGRAM, 'COSCHO'], true) && self::demonstrationEnabled();
+    }
+
+    public static function demonstrationRecord(string $code, ?array $policy = null): bool
+    {
+        return $code === self::DEMO_PROGRAM || ($policy['demonstration'] ?? false) === true
+            || ($code === 'COSCHO' && self::demonstrationDatabase());
+    }
+
+    public static function fictionalStudent(Student $student): bool
+    {
+        return str_starts_with($student->student_number, 'UAT-DEF-')
+            && str_ends_with(strtolower($student->email ?? ''), '@example.invalid');
+    }
+
     public function assertDemonstrationStudent(string $program, Student $student): void
     {
-        if ($program === self::DEMO_PROGRAM && (! self::demonstrationEnabled()
-            || ! str_starts_with($student->student_number, 'UAT-DEF-')
-            || ! str_ends_with(strtolower($student->email ?? ''), '@example.invalid'))) {
+        if (self::demonstrationRecord($program) && (! self::demonstrationEnabled() || ! self::fictionalStudent($student))) {
             throw ValidationException::withMessages(['demonstration' => 'Fictional compliance requires the isolated local defense database and a UAT-DEF- scholar with an @example.invalid email. It cannot authorize actual scholarship records.']);
         }
     }
@@ -63,7 +78,7 @@ class OfficialRuleCatalog
 
     public function forProgram(string $code): ?array
     {
-        if ($code === self::DEMO_PROGRAM && self::demonstrationEnabled()) {
+        if (self::demonstrationProgram($code)) {
             return [
                 'version' => 'UAT-INSTITUTIONAL-CERTIFICATION-v1',
                 'source' => self::DEMO_LABEL.' / fictional institutional certification scenario v1',
@@ -102,7 +117,7 @@ class OfficialRuleCatalog
         if (! $this->forProgram($program)) {
             return [];
         }
-        if ($program === self::DEMO_PROGRAM) {
+        if (self::demonstrationProgram($program)) {
             return ['authenticity'];
         }
         $keys = ['filipino', 'recognized_program', 'permitted_aid', 'authenticity'];

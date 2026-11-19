@@ -9,7 +9,12 @@
     </dl>
     <p class="record-help">Enrollment, school compliance and external scholarship approval are separate checks. An enrolled scholar is not automatically qualified or payable.</p>
     @unless($hasComplianceBasis)
+        @if(!$demonstrationIdentityAllowed)
+        <p class="records-alert">Demonstration setup or sample identity is incomplete. Certification assessment requires the enabled isolated demonstration site and new UAT-DEF- sample scholars with an @example.invalid email. No actual beneficiary can be approved with this fictional basis.</p>
+        @else
         <p class="records-alert">There is no approved school-compliance basis for {{ $application->program->code }} in {{ $application->academicPeriod->academic_year }} / Semester {{ $application->academicPeriod->semester_code }}. No TDP/TES checklist is imposed without an approved program/semester mapping. Retain actual school/provider evidence and record Needs review until the institution confirms the applicable requirements, authority and acceptance of certification.</p>
+        @if($application->program->code === 'COSCHO')<p class="record-help">The defense scenario runs on the separate demonstration site with fictional sample scholars. Reopening this operational assessment does not enable demonstration certification.</p>@endif
+        @endif
     @endunless
     <p class="record-help"><a class="records-link" href="{{ route('evaluations.show', ['application' => $application, 'tab' => 'supporting-evidence']) }}" @click.prevent="selectTab('supporting-evidence', true)">Review supporting documents and references</a>. Accepted uploads remain evidence; they do not approve an unsupported program's compliance rules.</p>
     @if($application->documents->isNotEmpty())<details><summary>Recorded document references</summary><ul>@foreach($application->documents->sortBy('id')->groupBy('document_type')->map->last() as $document)<li>{{ $documentTypes[$document->document_type] ?? Str::headline($document->document_type) }} / {{ $document->original_name }} / Review status: {{ ucfirst($document->review_status) }}</li>@endforeach</ul></details>@endif
@@ -43,8 +48,15 @@
         @csrf<input type="hidden" name="_workspace_form" value="evaluate"><input type="hidden" name="submission_revision" value="{{ $application->submission_revision }}"><input type="hidden" name="previous_run" value="{{ $latest?->run_number ?? 0 }}">
         <x-input-error :messages="$errorsFor('evaluate', 'submission_revision')" /><x-input-error :messages="$errorsFor('evaluate', 'previous_run')" />
         @if($hasComplianceBasis && $demonstration)
-            <p class="records-alert">{{ \App\Services\Eligibility\OfficialRuleCatalog::DEMO_LABEL }}. Select the actual finding from the fictional certification; nothing is automatically satisfied.</p>
-            <x-evaluation-fact field="authenticity" label="Fictional institutional certification confirms demonstration compliance" :value="$oldFor('evaluate', 'facts.authenticity', $prior['facts']['authenticity'] ?? 'unverified')" :source="$oldFor('evaluate', 'fact_sources.authenticity', $prior['fact_sources']['authenticity'] ?? '')" :messages="$errorsFor('evaluate', 'facts.authenticity')" :source-messages="$errorsFor('evaluate', 'fact_sources.authenticity')" />
+            <p class="records-alert">{{ \App\Services\Eligibility\OfficialRuleCatalog::DEMO_LABEL }}. Record the finding from the fictional institutional certification. An Eligible selection still requires verified current enrollment, confirmed semester criteria and accepted supporting evidence; it cannot override missing requirements.</p>
+            <x-record-field name="school_decision" label="School compliance result" type="select" required>
+                @foreach(['needs_information' => 'Needs review', 'qualified' => 'Eligible', 'not_qualified' => 'Ineligible'] as $value => $label)
+                    <option value="{{ $value }}" @selected($oldFor('evaluate', 'school_decision', $prior['school_decision'] ?? 'needs_information') === $value)>{{ $label }}</option>
+                @endforeach
+            </x-record-field>
+            <x-record-field name="certification_reference" label="Supporting certification / reference" :value="$oldFor('evaluate', 'certification_reference', $prior['certification_reference'] ?? $prior['fact_sources']['authenticity'] ?? '')" maxlength="1000" required help="Use the UAT- reference printed on the fictional certification. Upload and accept certification and enrollment documents through Supporting evidence." />
+            <label for="certification_verified"><input id="certification_verified" name="certification_verified" type="checkbox" value="1" required @checked($checkedFor('evaluate', 'certification_verified')) aria-invalid="{{ $errorsFor('evaluate', 'certification_verified') ? 'true' : 'false' }}" aria-describedby="certification_verified-error"> I reviewed the fictional institutional certification, its scholar identity, semester, supporting evidence and recorded finding.</label>
+            <x-input-error id="certification_verified-error" :messages="$errorsFor('evaluate', 'certification_verified')" />
         @elseif($hasComplianceBasis)
             <x-record-field name="applicant_type" label="Applicable beneficiary category" type="select" required x-model="applicantType">@foreach(['new' => 'New beneficiary', 'continuing' => 'Continuing grantee'] as $value => $label)<option value="{{ $value }}" @selected($beneficiary === $value)>{{ $label }}</option>@endforeach</x-record-field>
             <details id="compliance-details" class="evaluation-accordion" @if($failedForm === 'evaluate' && $errors->any()) open @endif data-has-errors="{{ $failedForm === 'evaluate' && $errors->any() ? 'true' : 'false' }}">
@@ -64,8 +76,8 @@
                 </div>
             </details>
         @endif
-        <x-record-field name="evaluator_notes" label="Evaluator remarks / supporting reference" type="textarea" :value="$oldFor('evaluate', 'evaluator_notes', $prior['evaluator_notes'] ?? '')" maxlength="3000" />
-        <div class="evaluation-submit-footer"><p class="record-help">{{ $hasComplianceBasis ? 'The existing service records Eligible, Ineligible or Needs review from the actual applicable findings and usable evidence. There is no manual eligibility override.' : 'Only a needs-review assessment can be recorded without an approved compliance basis. Supporting certification or external approval does not automatically qualify this award.' }} Prior decisions remain in History; activation and billing stay separate.</p><x-primary-button class="records-submit">{{ $hasComplianceBasis ? 'Evaluate and record school decision' : 'Record needs-review assessment' }}</x-primary-button></div>
+        <x-record-field name="evaluator_notes" label="Evaluator remarks / supporting reference" type="textarea" :value="$oldFor('evaluate', 'evaluator_notes', $prior['evaluator_notes'] ?? '')" maxlength="3000" :required="$hasComplianceBasis && $demonstration" />
+        <div class="evaluation-submit-footer"><p class="record-help">{{ $hasComplianceBasis ? 'The existing service records Eligible, Ineligible or Needs review from the actual applicable findings and usable evidence. There is no manual eligibility override.' : 'Only a needs-review assessment can be recorded without an approved compliance basis. Supporting certification or external approval does not automatically qualify this award.' }} Prior decisions remain in History; activation and billing stay separate.</p><x-primary-button class="records-submit" :disabled="!$demonstrationIdentityAllowed">{{ $hasComplianceBasis ? 'Evaluate and record school decision' : 'Record needs-review assessment' }}</x-primary-button></div>
     </form>
 </section>
 @else<section class="dashboard-card records-card"><h2 class="records-section-title">School compliance</h2><p class="record-help">This account has read-only access. Coordinator or Administrator authorization is required to record an assessment.</p></section>@endcan

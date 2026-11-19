@@ -18,15 +18,14 @@ class EvaluateScholarshipRequest extends FormRequest
     {
         $application = $this->route('application');
         $catalog = app(OfficialRuleCatalog::class);
-        if ($application->program->code === OfficialRuleCatalog::DEMO_PROGRAM && $catalog->forProgram($application->program->code)) {
+        if (OfficialRuleCatalog::demonstrationProgram($application->program->code)) {
             return [
                 'submission_revision' => ['required', 'integer', 'min:1'],
                 'previous_run' => ['required', 'integer', 'min:0'],
-                'facts' => ['required', 'array:authenticity'],
-                'facts.authenticity' => ['required', Rule::in(['yes', 'no', 'unverified'])],
-                'fact_sources' => ['required', 'array:authenticity'],
-                'fact_sources.authenticity' => ['required', 'string', 'max:1000', 'starts_with:UAT-'],
-                'evaluator_notes' => ['required', 'string', 'max:3000'],
+                'school_decision' => ['required', Rule::in(['qualified', 'not_qualified', 'needs_information'])],
+                'certification_reference' => ['required', 'string', 'max:1000', 'starts_with:UAT-'],
+                'certification_verified' => ['accepted'],
+                'evaluator_notes' => ['required', 'string', 'max:3000', 'regex:/\S/'],
             ];
         }
         if (! $catalog->forProgram($application->program->code) || ! $catalog->appliesTo($application->academicPeriod)) {

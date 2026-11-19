@@ -118,8 +118,7 @@ class BillingRoster
 
     public function demonstrationAvailable(BillingBatch $batch): bool
     {
-        return $batch->program->code === OfficialRuleCatalog::DEMO_PROGRAM
-            && OfficialRuleCatalog::demonstrationEnabled();
+        return OfficialRuleCatalog::demonstrationProgram($batch->program->code);
     }
 
     /** Fictional enrollment classification, never an official Form 2/Form 3 mapping. Caller holds the billing transaction. */

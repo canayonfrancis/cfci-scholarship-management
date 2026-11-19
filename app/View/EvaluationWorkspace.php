@@ -73,7 +73,7 @@ class EvaluationWorkspace
 
             return $document && $document->checksum === ($snapshot['checksum'] ?? null) && $usableDocument($document);
         });
-        $runReady = $current && $latest->automatic_outcome === 'passed' && $latest->school_decision === 'qualified'
+        $runReady = $officialConfirmed && $current && $latest->automatic_outcome === 'passed' && $latest->school_decision === 'qualified'
             && $latest->evaluated_by && ($latest->rule_snapshot['confirmed'] ?? false) === true && $data['policy']
             && ($latest->rule_snapshot['policy'] ?? null) == $data['policy'] && $runEvidence;
         $prerequisites = [
